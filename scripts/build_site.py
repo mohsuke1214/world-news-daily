@@ -2,6 +2,7 @@
 """World News Daily - multi-source digest grouped by region, with Japanese translation.
 
 Sources: BBC, Al Jazeera, The Guardian, Deutsche Welle, France 24, NPR.
+Keeps a daily archive under /archive with a sidebar to browse past editions.
 """
 
 import html
@@ -473,6 +474,56 @@ PAGE_TEMPLATE = Template(
       "Noto Sans JP", Roboto, sans-serif;
     background: var(--bg); color: var(--text); line-height: 1.8;
   }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
   header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
   h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
   .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
@@ -549,10 +600,18 @@ PAGE_TEMPLATE = Template(
 </style>
 </head>
 <body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="{{ home_href }}">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
 <header>
   <h1>World News Digest</h1>
   <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
-  <p class="updated">最終更新: {{ generated_at }} (JST)</p>
+  <p class="updated">{% if is_archive %}{{ page_date_label }} 版(アーカイブ){% else %}最終更新: {{ generated_at }} (JST){% endif %}</p>
 </header>
 
 {% if sections %}
@@ -627,20 +686,80 @@ PAGE_TEMPLATE = Template(
   <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
   <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
 </footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "{{ archive_prefix }}";
+  var CURRENT_DATE = "{{ current_date }}";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
 </body>
 </html>
 """
 )
 
 
-def render(sections):
+def render(sections, *, archive_prefix, home_href, current_date, is_archive, page_date_label):
     for sec in sections:
         for s in sec["stories"]:
             s["published_jst"] = (
                 s["published"].astimezone(JST).strftime("%m/%d %H:%M") if s["published"] else None
             )
     generated_at = datetime.now(JST).strftime("%Y-%m-%d %H:%M")
-    return PAGE_TEMPLATE.render(sections=sections, generated_at=generated_at)
+    return PAGE_TEMPLATE.render(
+        sections=sections,
+        generated_at=generated_at,
+        archive_prefix=archive_prefix,
+        home_href=home_href,
+        current_date=current_date,
+        is_archive=is_archive,
+        page_date_label=page_date_label,
+    )
 
 
 def main():
@@ -649,17 +768,54 @@ def main():
     print(f"Total stories selected: {n} in {len(sections)} regions")
 
     repo_root = Path(__file__).resolve().parent.parent
-    out_path = repo_root / "index.html"
+    archive_dir = repo_root / "archive"
+    archive_dir.mkdir(exist_ok=True)
 
     if not n:
-        print("No stories fetched - leaving existing index.html untouched.")
+        print("No stories fetched - leaving existing pages untouched.")
         return
 
     enrich(sections)
 
-    out_path.write_text(render(sections), encoding="utf-8")
+    today = datetime.now(JST)
+    date_key = today.strftime("%Y-%m-%d")
+    date_label = f"{today.year}年{today.month}月{today.day}日"
+
+    # Latest page at the site root.
+    (repo_root / "index.html").write_text(
+        render(
+            sections,
+            archive_prefix="archive/",
+            home_href="index.html",
+            current_date=date_key,
+            is_archive=False,
+            page_date_label=date_label,
+        ),
+        encoding="utf-8",
+    )
+
+    # Permanent copy for the archive (overwrites same-day reruns only).
+    (archive_dir / f"{date_key}.html").write_text(
+        render(
+            sections,
+            archive_prefix="",
+            home_href="../index.html",
+            current_date=date_key,
+            is_archive=True,
+            page_date_label=date_label,
+        ),
+        encoding="utf-8",
+    )
+
+    # Regenerate the sidebar date list from what actually exists on disk.
+    dates = sorted(
+        (f.stem for f in archive_dir.glob("*.html") if re.fullmatch(r"\d{4}-\d{2}-\d{2}", f.stem)),
+        reverse=True,
+    )
+    (archive_dir / "list.json").write_text(json.dumps(dates), encoding="utf-8")
+
     (repo_root / ".nojekyll").touch()
-    print(f"Wrote {out_path}")
+    print(f"Wrote index.html, archive/{date_key}.html, list.json ({len(dates)} dates)")
 
 
 if __name__ == "__main__":
