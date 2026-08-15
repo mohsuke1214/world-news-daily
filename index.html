@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="BBCとThe Economistから毎日19時(JST)に自動更新される世界のニュースまとめ">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --accent: #4f8dfd;
+    --bbc: #bb1919; --economist: #e3120b;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #5b6373; --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+  }
+  header { max-width: 760px; margin: 0 auto; padding: 40px 20px 20px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.95rem; margin: 0 0 4px; }
+  .updated {
+    color: var(--text-dim); font-size: 0.85rem; margin: 14px 0 0;
+    padding-top: 14px; border-top: 1px solid var(--border);
+  }
+  main { max-width: 760px; margin: 0 auto; padding: 0 20px 60px; }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 16px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.7rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.economist { background: var(--economist); }
+  .story-time { color: var(--text-dim); font-size: 0.78rem; }
+  .story h2 { font-size: 1.08rem; margin: 0 0 8px; line-height: 1.4; }
+  .story h2 a { color: var(--text); text-decoration: none; }
+  .story h2 a:hover { color: var(--accent); text-decoration: underline; }
+  .story p { margin: 0; color: var(--text-dim); font-size: 0.92rem; }
+  footer {
+    max-width: 760px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-dim); font-size: 0.8rem;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC と The Economist から、世界の主要ニュースを毎日19:00(JST)に自動更新</p>
+  <p class="updated">最終更新: 2026-08-15 12:05 (JST)</p>
+</header>
+<main>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">08/15 11:54</span>
+    </div>
+    <h2><a href="https://www.bbc.co.uk/news/articles/c2k7y4k98x3o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Fires prompt national alert as 19 homes destroyed</a></h2>
+    <p>The prime minister said 37 fires were currently burning across England and Wales</p>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">08/15 11:51</span>
+    </div>
+    <h2><a href="https://www.bbc.co.uk/news/articles/c5y0zz63gero?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">One dead after 7.7 magnitude earthquake strikes Indonesia</a></h2>
+    <p>The earthquake struck off Flores island in the country's east early on Saturday morning.</p>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">08/15 10:41</span>
+    </div>
+    <h2><a href="https://www.bbc.co.uk/news/articles/c1j1ye6n30no?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Jason Arday, ex-Cambridge professor at centre of plagiarism row, found dead</a></h2>
+    <p>His family said it was "in shock to have lost this amazing father, partner, brother, uncle and son" after the academic was found dead in London on Friday.</p>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">08/15 09:51</span>
+    </div>
+    <h2><a href="https://www.bbc.co.uk/news/articles/c141y5zk4yko?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">The Papers: 'Row professor found dead' and 'barbecue ban'</a></h2>
+    <p>Former Cambridge Professor Jason Arday's death and the ban on barbecues in Britain lead Saturday's papers.</p>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">08/15 09:10</span>
+    </div>
+    <h2><a href="https://www.bbc.co.uk/news/articles/c87nwq9qe24o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">I wish I had been a more rebellious teenager, says Bella Ramsey</a></h2>
+    <p>Ramsey stars in a new film about a cancer survivor who attends “chemo camp” and finds friendship, love and freedom.</p>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">08/15 09:01</span>
+    </div>
+    <h2><a href="https://www.bbc.co.uk/news/articles/cd69ely319eo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">BBC seeks to subpoena Trump's family members in Panorama lawsuit</a></h2>
+    <p>The BBC's lawyers argue Trump's family members "have personal knowledge" of his intentions in the speech he gave outside the US Capitol on 6 January 2021.</p>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">08/15 09:01</span>
+    </div>
+    <h2><a href="https://www.bbc.co.uk/news/articles/c74gdgly3g3o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Air India pilot's reported cannabis test: What it can and can't tell investigators</a></h2>
+    <p>A reported cannabis-positive test involving an Air India pilot raises questions about what such a result can actually tell investigators.</p>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge economist">The Economist</span>
+      <span class="story-time">08/13 22:12</span>
+    </div>
+    <h2><a href="https://www.economist.com/international/2026/08/13/silicon-valleys-ai-boom-is-remaking-american-charity" target="_blank" rel="noopener">Silicon Valley’s AI boom is remaking American charity</a></h2>
+    <p>AI founders pledge to give away hundreds of billions of dollars. How will they be spent?</p>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge economist">The Economist</span>
+      <span class="story-time">08/11 22:38</span>
+    </div>
+    <h2><a href="https://www.economist.com/international/2026/08/11/taking-taiwans-democracy-hostage" target="_blank" rel="noopener">Taking Taiwan’s democracy hostage</a></h2>
+    <p>Self-interested Taiwanese politicians are making the country increasingly ungovernable. China is the only winner</p>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge economist">The Economist</span>
+      <span class="story-time">08/11 01:56</span>
+    </div>
+    <h2><a href="https://www.economist.com/international/2026/08/10/the-war-room-newsletter-do-generals-make-good-politicians" target="_blank" rel="noopener">The War Room newsletter: Do generals make good politicians?</a></h2>
+    <p>Anshel Pfeffer, our Israel correspondent, examines why so few of the country’s former generals succeed in politics</p>
+  </article>
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。見出しは原文(英語)のままです。
+  出典: <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC News</a>,
+  <a href="https://www.economist.com/international" target="_blank" rel="noopener">The Economist</a>
+</footer>
+</body>
+</html>
