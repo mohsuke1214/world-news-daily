@@ -8,13 +8,14 @@
 <style>
   :root {
     --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
-    --text: #e7e9ee; --text-dim: #9aa1b1; --accent: #4f8dfd;
-    --bbc: #bb1919; --economist: #e3120b;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd; --bbc: #bb1919; --economist: #e3120b;
   }
   @media (prefers-color-scheme: light) {
     :root {
       --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
-      --text: #1a1d24; --text-dim: #5b6373; --accent: #2563eb;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
     }
   }
   * { box-sizing: border-box; }
@@ -22,35 +23,53 @@
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
       "Noto Sans JP", Roboto, sans-serif;
-    background: var(--bg); color: var(--text); line-height: 1.6;
+    background: var(--bg); color: var(--text); line-height: 1.75;
   }
-  header { max-width: 760px; margin: 0 auto; padding: 40px 20px 20px; }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 20px; }
   h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
-  .subtitle { color: var(--text-dim); font-size: 0.95rem; margin: 0 0 4px; }
+  .subtitle { color: var(--text-dim); font-size: 0.95rem; margin: 0; }
   .updated {
-    color: var(--text-dim); font-size: 0.85rem; margin: 14px 0 0;
+    color: var(--text-faint); font-size: 0.85rem; margin: 14px 0 0;
     padding-top: 14px; border-top: 1px solid var(--border);
   }
-  main { max-width: 760px; margin: 0 auto; padding: 0 20px 60px; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
   .story {
     background: var(--card-bg); border: 1px solid var(--border);
-    border-radius: 12px; padding: 20px 22px; margin-bottom: 16px;
+    border-radius: 12px; padding: 22px 24px; margin-bottom: 18px;
   }
-  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
   .badge {
     font-size: 0.7rem; font-weight: 700; letter-spacing: 0.03em;
     padding: 3px 9px; border-radius: 999px; color: #fff;
   }
   .badge.bbc { background: var(--bbc); }
   .badge.economist { background: var(--economist); }
-  .story-time { color: var(--text-dim); font-size: 0.78rem; }
-  .story h2 { font-size: 1.08rem; margin: 0 0 8px; line-height: 1.4; }
-  .story h2 a { color: var(--text); text-decoration: none; }
-  .story h2 a:hover { color: var(--accent); text-decoration: underline; }
-  .story p { margin: 0; color: var(--text-dim); font-size: 0.92rem; }
+  .story-time { color: var(--text-faint); font-size: 0.78rem; }
+  .title-ja { font-size: 1.15rem; font-weight: 700; margin: 0 0 4px; line-height: 1.5; }
+  .title-en {
+    font-size: 0.85rem; color: var(--text-faint); margin: 0 0 14px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.95rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 14px; border-top: 1px dashed var(--border); padding-top: 12px; }
+  summary {
+    cursor: pointer; color: var(--text-faint); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details p {
+    margin: 10px 0 0; color: var(--text-faint); font-size: 0.86rem; line-height: 1.7;
+  }
+  .read-more { display: inline-block; margin-top: 12px; font-size: 0.82rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
   footer {
-    max-width: 760px; margin: 0 auto; padding: 0 20px 50px;
-    color: var(--text-dim); font-size: 0.8rem;
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.8rem; line-height: 1.7;
   }
   footer a { color: var(--accent); }
   .empty-note { color: var(--text-dim); font-size: 0.9rem; }
@@ -60,7 +79,7 @@
 <header>
   <h1>World News Digest</h1>
   <p class="subtitle">BBC と The Economist から、世界の主要ニュースを毎日19:00(JST)に自動更新</p>
-  <p class="updated">最終更新: 2026-08-15 13:16 (JST)</p>
+  <p class="updated">最終更新: 2026-08-15 13:18 (JST)</p>
 </header>
 <main>
   
@@ -69,8 +88,27 @@
       <span class="badge bbc">BBC</span>
       <span class="story-time">08/15 13:12</span>
     </div>
-    <h2><a href="https://www.bbc.co.uk/news/articles/c5y0zz63gero?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Five dead after 7.7 magnitude earthquake strikes Indonesia</a></h2>
-    <p>The earthquake struck off Flores island in the country's east early on Saturday morning.</p>
+
+    
+    <p class="title-ja">インドネシアでマグニチュード7.7の地震、5人死亡</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c5y0zz63gero?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Five dead after 7.7 magnitude earthquake strikes Indonesia</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>インドネシア州知事によると、土曜日早朝にインドネシアを襲ったマグニチュード7.7の地震により、少なくとも5人が死亡した。</p><p>東ヌサトゥンガラ州のエマヌエル・メルキアデス・ラカ・レナ知事は記者会見で、彼らは崩れた瓦礫によって睡眠中に死亡したと語った。</p><p>捜索救助チームは、地震とそれに続く数十回の余震によって被害を受けた建物に閉じ込められた人々の救出に取り組んでいる。津波警報は発令されたが、最初の揺れから約３時間後に解除された。</p><p>地震は現地時間午前５時直前にフローレス島を襲った。インドネシアの気象・気候・地球物理庁は声明で、その深さは15キロだったと発表した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>原文(英語)を表示</summary>
+      <p>At least five people have died after a 7.7 magnitude earthquake struck Indonesia early on Saturday morning, according to the provincial governor.</p><p>The governor of East Nusa Tenggara Province, Emanuel Melkiades Laka Lena, told a press conference they were killed in their sleep by collapsing rubble.</p><p>Search and rescue teams are working to free anyone trapped in buildings damaged by the quake and the dozens of aftershocks which followed. A tsunami warning was issued but lifted around three hours after the initial jolt.</p><p>The quake struck the island of Flores shortly before 05:00 local time. It had a depth of 15km, the Indonesian agency for Meteorology, Climatology and Geophysics said in a statement.</p>
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c5y0zz63gero?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む →</a></span>
   </article>
   
   <article class="story">
@@ -78,8 +116,27 @@
       <span class="badge bbc">BBC</span>
       <span class="story-time">08/15 12:58</span>
     </div>
-    <h2><a href="https://www.bbc.co.uk/news/articles/c0jlyqdj6geo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Temporary ban on disposable BBQs as military deployed to help battle wildfires</a></h2>
-    <p>Single-use grills pose a "significant risk to the public" in current drought and heatwave conditions, the government warns.</p>
+
+    
+    <p class="title-ja">山火事対策に軍隊が出動中、使い捨てバーベキューを一時禁止</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c0jlyqdj6geo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Temporary ban on disposable BBQs as military deployed to help battle wildfires</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>干ばつと熱波の状況が英国を襲い続ける中、使い捨てバーベキューグリルが「公衆に重大なリスク」をもたらすという懸念から、一時的に販売が禁止された。</p><p>政府は、これらが「夏の間、全国各地で多数の深刻な山火事」の原因となっていると発表した。</p><p>禁止の可能性は、今週初めの記録的な気温を受けての緊急コブラ会議で初めて議論された。国民に対しては、たき火をしないことと、タバコを慎重に処分することが求められている。</p><p>一方、アンディ・バーナム首相は、全国の山火事に対処する緊急チームを支援するために現在200人が派遣されており、この国は「火口箱」のようなものだと述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>原文(英語)を表示</summary>
+      <p>Disposable barbecues have been temporarily banned from sale over fears they pose a "significant risk to the public" as drought and heatwave conditions continue to grip the UK.</p><p>They have been the cause of "a number of serious wildfires across the country over the summer months", the government said.</p><p>A potential ban was first discussed at an emergency Cobra meeting in response to record temperatures earlier this week. The public have been urged not to light an open fires and to dispose of cigarettes carefully.</p><p>Meanwhile Prime Minister Andy Burnham says the country is like "a tinderbox", as 200 personnel have now been deployed to help emergency teams tackling wildfires around the country.</p>
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c0jlyqdj6geo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む →</a></span>
   </article>
   
   <article class="story">
@@ -87,8 +144,27 @@
       <span class="badge bbc">BBC</span>
       <span class="story-time">08/15 11:54</span>
     </div>
-    <h2><a href="https://www.bbc.co.uk/news/articles/c2k7y4k98x3o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Fires prompt national alert as 19 homes destroyed</a></h2>
-    <p>The prime minister said 37 fires were currently burning across England and Wales</p>
+
+    
+    <p class="title-ja">火災で家屋19棟が全焼、全国に警戒を呼びかける</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c2k7y4k98x3o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Fires prompt national alert as 19 homes destroyed</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イングランドとウェールズの各地で火災が発生し、政府は山火事の原因となる可能性のあるものに火をつけないよう国民に警告した。</p><p>金曜夜の警報は、木曜日にウェスト・ミッドランズ州スタウアブリッジで発生した大規模火災で、住宅19棟が焼失し、さらに18棟が被害を受けたことが明らかになった際に出された。火災は木曜日に草地や森林に急速に広がり、その後住宅に被害が及んだ。</p><p>アンディ・バーナム首相は国民に対し、この警告を「真剣に」受け止めるよう呼び掛け、警告は消防士の要請によって発動されたと付け加えた。</p><p>ウェスト・ミッドランズ消防局のサイモン・テュヒル消防署長は、スタウアブリッジ火災は同局がこれまで対処した中で最も重大な事件の一つだったと述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>原文(英語)を表示</summary>
+      <p>Fires across England and Wales have prompted a national government alert warning people not to light anything that could spark a wildfire.</p><p>The warning on Friday evening came as it was revealed 19 homes were destroyed and a further 18 damaged in a huge fire in Stourbridge, West Midlands, that spread rapidly through grass and woodland on Thursday before damaging homes.</p><p>Prime Minister Andy Burnham told members of the public to take the warning "seriously", adding it was triggered at the request of firefighters.</p><p>West Midlands Fire Service chief fire officer Simon Tuhill said the Stourbridge blaze was one of the most significant incidents the service had ever dealt with.</p>
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c2k7y4k98x3o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む →</a></span>
   </article>
   
   <article class="story">
@@ -96,8 +172,27 @@
       <span class="badge bbc">BBC</span>
       <span class="story-time">08/15 10:41</span>
     </div>
-    <h2><a href="https://www.bbc.co.uk/news/articles/c1j1ye6n30no?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Jason Arday, ex-Cambridge professor at centre of plagiarism row, found dead</a></h2>
-    <p>His family said it was "in shock to have lost this amazing father, partner, brother, uncle and son" after the academic was found dead in London on Friday.</p>
+
+    
+    <p class="title-ja">盗作騒動の中心人物、元ケンブリッジ教授ジェイソン・アーデイ氏が遺体で発見される</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c1j1ye6n30no?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Jason Arday, ex-Cambridge professor at centre of plagiarism row, found dead</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>盗作騒動の中心人物である元ケンブリッジ大学教授のジェイソン・アーデイ氏が死亡しているのが発見された。</p><p>救急サービスによると、金曜午後、ロンドン南部バタシーの住所で男性が「無反応」の状態で発見された。</p><p>アーデー氏は先週、盗作疑惑と業績の一部に対する疑問を受けてケンブリッジ大学の教育社会学の教授を辞任した。彼はその主張を否定していた。</p><p>アーデーさんの家族は声明で、「この素晴らしい父親、パートナー、兄弟、叔父、そして息子を失ってショックを受けている」と述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>原文(英語)を表示</summary>
+      <p>Jason Arday, the former University of Cambridge professor at the centre of a plagiarism row, has been found dead.</p><p>Emergency services said a man was found "unresponsive" at an address in Battersea, south London, on Friday afternoon.</p><p>Arday resigned as a Cambridge professor of sociology of education last week after allegations of plagiarism and questions about some of his achievements. He had denied the claims.</p><p>Arday's family said in a statement that they were "in shock to have lost this amazing father, partner, brother, uncle and son".</p>
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c1j1ye6n30no?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む →</a></span>
   </article>
   
   <article class="story">
@@ -105,8 +200,27 @@
       <span class="badge bbc">BBC</span>
       <span class="story-time">08/15 09:51</span>
     </div>
-    <h2><a href="https://www.bbc.co.uk/news/articles/c141y5zk4yko?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">The Papers: 'Row professor found dead' and 'barbecue ban'</a></h2>
-    <p>Former Cambridge Professor Jason Arday's death and the ban on barbecues in Britain lead Saturday's papers.</p>
+
+    
+    <p class="title-ja">論文：「教授の死体が発見された」と「バーベキュー禁止」</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c141y5zk4yko?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">The Papers: 'Row professor found dead' and 'barbecue ban'</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>元ケンブリッジ教授ジェイソン・アーデイ氏の死と英国でのバーベキュー禁止が土曜日の新聞をリードした。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>原文(英語)を表示</summary>
+      <p>Former Cambridge Professor Jason Arday's death and the ban on barbecues in Britain lead Saturday's papers.</p>
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c141y5zk4yko?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む →</a></span>
   </article>
   
   <article class="story">
@@ -114,8 +228,27 @@
       <span class="badge bbc">BBC</span>
       <span class="story-time">08/15 09:10</span>
     </div>
-    <h2><a href="https://www.bbc.co.uk/news/articles/c87nwq9qe24o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">I wish I had been a more rebellious teenager, says Bella Ramsey</a></h2>
-    <p>Ramsey stars in a new film about a cancer survivor who attends “chemo camp” and finds friendship, love and freedom.</p>
+
+    
+    <p class="title-ja">もっと反抗的なティーンエイジャーだったらよかった、とベラ・ラムジーは言う</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c87nwq9qe24o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">I wish I had been a more rebellious teenager, says Bella Ramsey</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ベラ・ラムジーは、10代の多くの時間を大人と一緒に働いてきたため、10代にありがちな不機嫌で反抗的な時期をまったく経験しませんでした。</p><p>11歳で『ゲーム・オブ・スローンズ』でデビューし、they/themの代名詞を使うこの英国人俳優は、大人たちからの批判を聞いて、ステレオタイプのティーンエイジャーのように振る舞わないように意識的に決めたと語った。</p><p>したがって、がんに苦しむ若者のためのサマーキャンプを描いた映画『サニーダンサー』が、ラムジーに 10 代の自由を経験するために 7 週間を与えたとき、それはまっすぐに飛び込む機会でした。</p><p>「21歳でティーンエイジャーになれたのは素晴らしいことだった」とラムジーはBBCニュースに語った。 「本当に素晴らしかったし、解放感もありました。」</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>原文(英語)を表示</summary>
+      <p>Bella Ramsey spent many teenage years working with adults so never really went through the moody, rebellious phase often associated with being a teenager.</p><p>The British actor, who debuted in Game of Thrones aged 11 and uses they/them pronouns, says they had consciously decided not to behave like a stereotypical teenager after hearing criticisms from adults.</p><p>So when Sunny Dancer, a film about a summer camp for young people affected by cancer , gave Ramsey seven weeks to experience teenage freedom, it was an opportunity to dive straight in.</p><p>"I got to be a teenager aged 21, which was brilliant," Ramsey tells BBC News. "It was really nice - and liberating."</p>
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c87nwq9qe24o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む →</a></span>
   </article>
   
   <article class="story">
@@ -123,8 +256,27 @@
       <span class="badge bbc">BBC</span>
       <span class="story-time">08/15 09:01</span>
     </div>
-    <h2><a href="https://www.bbc.co.uk/news/articles/cd69ely319eo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">BBC seeks to subpoena Trump's family members in Panorama lawsuit</a></h2>
-    <p>The BBC's lawyers argue Trump's family members "have personal knowledge" of his intentions in the speech he gave outside the US Capitol on 6 January 2021.</p>
+
+    
+    <p class="title-ja">BBC、パノラマ訴訟でトランプ大統領の家族への召喚を求める</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cd69ely319eo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">BBC seeks to subpoena Trump's family members in Panorama lawsuit</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>BBCは、米大統領による同放送局に対する100億ドル（約74億円）の名誉毀損訴訟を弁護するため、ドナルド・トランプ氏の家族らに文書と証言を求める召喚を求めている。</p><p>裁判所への提出文書によると、BBCの法務チームの代表者らは5月、大統領の息子ドナルド・トランプ・ジュニア氏、娘のイヴァンカ・トランプ氏、義理の息子ジャレッド・クシュナー氏に召喚状を送達しようとした。</p><p>大統領は、2021年の国会議事堂暴動前に行った演説の2つの異なるセクションを編集した『パノラマ』のエピソードをめぐってBBCを訴えている。</p><p>BBCは以前、この編集について謝罪したが、名誉毀損の理由にはならないと否定した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>原文(英語)を表示</summary>
+      <p>The BBC has sought to subpoena members of Donald Trump's family for documents and testimony as it defends against the US president's $10bn (Â£7.4bn) defamation lawsuit against the broadcaster.</p><p>Court filings show that representatives for the BBC's legal team attempted in May to serve subpoenas to the president's son Donald Trump Jr., his daughter Ivanka Trump and son-in-law Jared Kushner.</p><p>The president is suing the BBC over an episode of Panorama that edited together two different sections of a speech he gave before the 2021 Capitol riots.</p><p>The BBC has previously apologised for the edit but denied it was grounds for defamation.</p>
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cd69ely319eo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む →</a></span>
   </article>
   
   <article class="story">
@@ -132,8 +284,27 @@
       <span class="badge economist">The Economist</span>
       <span class="story-time">08/13 22:12</span>
     </div>
-    <h2><a href="https://www.economist.com/international/2026/08/13/silicon-valleys-ai-boom-is-remaking-american-charity" target="_blank" rel="noopener">Silicon Valley’s AI boom is remaking American charity</a></h2>
-    <p>AI founders pledge to give away hundreds of billions of dollars. How will they be spent?</p>
+
+    
+    <p class="title-ja">シリコンバレーのAIブームがアメリカの慈善団体を作り変える</p>
+    <p class="title-en"><a href="https://www.economist.com/international/2026/08/13/silicon-valleys-ai-boom-is-remaking-american-charity" target="_blank" rel="noopener">Silicon Valley’s AI boom is remaking American charity</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>AI の創設者たちは、数千億ドルを寄付することを約束します。それらはどのように使われるのでしょうか？</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>原文(英語)を表示</summary>
+      <p>AI founders pledge to give away hundreds of billions of dollars. How will they be spent?</p>
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.economist.com/international/2026/08/13/silicon-valleys-ai-boom-is-remaking-american-charity" target="_blank" rel="noopener">
+      記事全文を読む →</a></span>
   </article>
   
   <article class="story">
@@ -141,8 +312,27 @@
       <span class="badge economist">The Economist</span>
       <span class="story-time">08/11 22:38</span>
     </div>
-    <h2><a href="https://www.economist.com/international/2026/08/11/taking-taiwans-democracy-hostage" target="_blank" rel="noopener">Taking Taiwan’s democracy hostage</a></h2>
-    <p>Self-interested Taiwanese politicians are making the country increasingly ungovernable. China is the only winner</p>
+
+    
+    <p class="title-ja">台湾の民主主義を人質に取る</p>
+    <p class="title-en"><a href="https://www.economist.com/international/2026/08/11/taking-taiwans-democracy-hostage" target="_blank" rel="noopener">Taking Taiwan’s democracy hostage</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>私利私欲にとらわれた台湾の政治家たちが、この国をますます統治不能な状態にしている。中国が唯一の勝者</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>原文(英語)を表示</summary>
+      <p>Self-interested Taiwanese politicians are making the country increasingly ungovernable. China is the only winner</p>
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.economist.com/international/2026/08/11/taking-taiwans-democracy-hostage" target="_blank" rel="noopener">
+      記事全文を読む →</a></span>
   </article>
   
   <article class="story">
@@ -150,13 +340,33 @@
       <span class="badge economist">The Economist</span>
       <span class="story-time">08/11 01:56</span>
     </div>
-    <h2><a href="https://www.economist.com/international/2026/08/10/the-war-room-newsletter-do-generals-make-good-politicians" target="_blank" rel="noopener">The War Room newsletter: Do generals make good politicians?</a></h2>
-    <p>Anshel Pfeffer, our Israel correspondent, examines why so few of the country’s former generals succeed in politics</p>
+
+    
+    <p class="title-ja">作戦室ニュースレター: 将軍は優れた政治家になれるのか?</p>
+    <p class="title-en"><a href="https://www.economist.com/international/2026/08/10/the-war-room-newsletter-do-generals-make-good-politicians" target="_blank" rel="noopener">The War Room newsletter: Do generals make good politicians?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イスラエル特派員アンシェル・フェファーが、なぜこの国の元将軍で政治家として成功する人が少ないのかを考察する</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>原文(英語)を表示</summary>
+      <p>Anshel Pfeffer, our Israel correspondent, examines why so few of the country’s former generals succeed in politics</p>
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.economist.com/international/2026/08/10/the-war-room-newsletter-do-generals-make-good-politicians" target="_blank" rel="noopener">
+      記事全文を読む →</a></span>
   </article>
   
 </main>
 <footer>
-  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。見出しは原文(英語)のままです。
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
   出典: <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC News</a>,
   <a href="https://www.economist.com/international" target="_blank" rel="noopener">The Economist</a>
 </footer>
