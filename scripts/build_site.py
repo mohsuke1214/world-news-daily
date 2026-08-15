@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""World News Daily - site generator (English excerpt + Japanese translation)."""
+"""World News Daily - BBC digest with Japanese translation."""
 
 import html
 import json
@@ -34,22 +34,11 @@ BBC_FEEDS = [
     ("BBC", "https://feeds.bbci.co.uk/news/rss.xml"),
 ]
 
-ECONOMIST_FEEDS = [
-    ("The Economist", "https://www.economist.com/international/rss.xml"),
-    ("The Economist", "https://www.economist.com/the-world-this-week/rss.xml"),
-    ("The Economist", "https://www.economist.com/europe/rss.xml"),
-]
-
-ECONOMIST_FALLBACK_FEED = (
-    "The Economist",
-    "https://news.google.com/rss/search?q=site:economist.com+when:2d&hl=en-US&gl=US&ceid=US:en",
-)
-
 TOTAL_STORIES = 10
-MIN_ECONOMIST_STORIES = 3
 
-MAX_PARAGRAPHS = 4
-MAX_EXCERPT_CHARS = 900
+# How much of each article body to keep.
+MAX_PARAGRAPHS = 8
+MAX_EXCERPT_CHARS = 2000
 
 TAG_RE = re.compile(r"<[^>]+>")
 
@@ -60,11 +49,11 @@ BOILERPLATE_MARKERS = (
     "getty images",
     "follow bbc",
     "bbc is not responsible",
-    "read more about",
     "advertisement",
     "cookie",
     "subscribe to",
     "all rights reserved",
+    "additional reporting by",
 )
 
 
@@ -112,20 +101,13 @@ def fetch_feed(source_name, url):
         link = _text(item.find("link"))
         if not title or not link:
             continue
-        summary = clean_text(_text(item.find("description")))
-        published = parse_published(_text(item.find("pubDate")))
-        display_title = (
-            re.sub(r"\s*-\s*[^-]+$", "", title)
-            if source_name == "The Economist" and " - " in title
-            else title
-        )
         stories.append(
             {
                 "source": source_name,
-                "title": display_title,
-                "feed_summary": summary,
+                "title": title,
+                "feed_summary": clean_text(_text(item.find("description"))),
                 "link": link,
-                "published": published,
+                "published": parse_published(_text(item.find("pubDate"))),
             }
         )
     print(f"  - {source_name} ({url}): {len(stories)} items")
@@ -146,49 +128,16 @@ def dedupe(stories):
 
 def collect_stories():
     print("Fetching BBC feeds...")
-    bbc_stories = []
+    stories = []
     for name, url in BBC_FEEDS:
-        bbc_stories.extend(fetch_feed(name, url))
-    bbc_stories = dedupe(bbc_stories)
+        stories.extend(fetch_feed(name, url))
+    stories = dedupe(stories)
 
-    print("Fetching The Economist feeds...")
-    economist_stories = []
-    for name, url in ECONOMIST_FEEDS:
-        economist_stories.extend(fetch_feed(name, url))
-        if len(economist_stories) >= MIN_ECONOMIST_STORIES:
-            break
-    economist_stories = dedupe(economist_stories)
-
-    if len(economist_stories) < MIN_ECONOMIST_STORIES:
-        print("  Economist feeds thin, trying Google News fallback...")
-        name, url = ECONOMIST_FALLBACK_FEED
-        economist_stories = dedupe(economist_stories + fetch_feed(name, url))
-
-    def sort_key(s):
-        return s["published"] or datetime.min.replace(tzinfo=timezone.utc)
-
-    bbc_stories.sort(key=sort_key, reverse=True)
-    economist_stories.sort(key=sort_key, reverse=True)
-
-    picked = []
-    bi, ei = 0, 0
-    econ_quota = min(MIN_ECONOMIST_STORIES, len(economist_stories))
-    while len(picked) < TOTAL_STORIES and (bi < len(bbc_stories) or ei < len(economist_stories)):
-        if ei < econ_quota and ei < len(economist_stories):
-            picked.append(economist_stories[ei])
-            ei += 1
-        elif bi < len(bbc_stories):
-            picked.append(bbc_stories[bi])
-            bi += 1
-        elif ei < len(economist_stories):
-            picked.append(economist_stories[ei])
-            ei += 1
-        else:
-            break
-
-    picked = dedupe(picked)[:TOTAL_STORIES]
-    picked.sort(key=sort_key, reverse=True)
-    return picked
+    stories.sort(
+        key=lambda s: s["published"] or datetime.min.replace(tzinfo=timezone.utc),
+        reverse=True,
+    )
+    return stories[:TOTAL_STORIES]
 
 
 def extract_paragraphs(html_text):
@@ -213,9 +162,6 @@ def extract_paragraphs(html_text):
 
 
 def fetch_article_excerpt(story):
-    if story["source"] != "BBC":
-        return [story["feed_summary"]] if story["feed_summary"] else []
-
     try:
         resp = requests.get(story["link"], headers=HEADERS, timeout=REQUEST_TIMEOUT)
         resp.raise_for_status()
@@ -283,7 +229,7 @@ def translate_to_ja(text):
                     print(f"  ! translation failed: {exc}", file=sys.stderr)
                     return None
                 time.sleep(1.5 * (attempt + 1))
-        time.sleep(0.4)
+        time.sleep(0.3)
     return "".join(out).strip() or None
 
 
@@ -303,7 +249,7 @@ def enrich(stories):
                 break
             translated.append(ja)
         story["excerpt_ja"] = translated
-        time.sleep(0.5)
+        time.sleep(0.4)
     return stories
 
 
@@ -314,12 +260,12 @@ PAGE_TEMPLATE = Template(
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>World News Digest</title>
-<meta name="description" content="BBCとThe Economistから毎日19時(JST)に自動更新される世界のニュースまとめ">
+<meta name="description" content="BBCの世界ニュースを毎日19時(JST)に自動更新">
 <style>
   :root {
     --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
     --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
-    --accent: #4f8dfd; --bbc: #bb1919; --economist: #e3120b;
+    --accent: #4f8dfd; --bbc: #bb1919;
   }
   @media (prefers-color-scheme: light) {
     :root {
@@ -333,7 +279,7 @@ PAGE_TEMPLATE = Template(
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
       "Noto Sans JP", Roboto, sans-serif;
-    background: var(--bg); color: var(--text); line-height: 1.75;
+    background: var(--bg); color: var(--text); line-height: 1.8;
   }
   header { max-width: 720px; margin: 0 auto; padding: 40px 20px 20px; }
   h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
@@ -345,25 +291,23 @@ PAGE_TEMPLATE = Template(
   main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
   .story {
     background: var(--card-bg); border: 1px solid var(--border);
-    border-radius: 12px; padding: 22px 24px; margin-bottom: 18px;
+    border-radius: 12px; padding: 24px 26px; margin-bottom: 20px;
   }
   .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
   .badge {
     font-size: 0.7rem; font-weight: 700; letter-spacing: 0.03em;
-    padding: 3px 9px; border-radius: 999px; color: #fff;
+    padding: 3px 9px; border-radius: 999px; color: #fff; background: var(--bbc);
   }
-  .badge.bbc { background: var(--bbc); }
-  .badge.economist { background: var(--economist); }
   .story-time { color: var(--text-faint); font-size: 0.78rem; }
-  .title-ja { font-size: 1.15rem; font-weight: 700; margin: 0 0 4px; line-height: 1.5; }
+  .title-ja { font-size: 1.2rem; font-weight: 700; margin: 0 0 4px; line-height: 1.5; }
   .title-en {
-    font-size: 0.85rem; color: var(--text-faint); margin: 0 0 14px; line-height: 1.5;
+    font-size: 0.85rem; color: var(--text-faint); margin: 0 0 16px; line-height: 1.5;
   }
   .title-en a { color: inherit; text-decoration: none; }
   .title-en a:hover { color: var(--accent); text-decoration: underline; }
-  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.95rem; }
+  .body-ja p { margin: 0 0 12px; color: var(--text-dim); font-size: 0.95rem; }
   .body-ja p:last-child { margin-bottom: 0; }
-  details { margin-top: 14px; border-top: 1px dashed var(--border); padding-top: 12px; }
+  details { margin-top: 16px; border-top: 1px dashed var(--border); padding-top: 12px; }
   summary {
     cursor: pointer; color: var(--text-faint); font-size: 0.8rem;
     list-style: none; user-select: none;
@@ -372,9 +316,9 @@ PAGE_TEMPLATE = Template(
   summary::before { content: "▸ "; }
   details[open] summary::before { content: "▾ "; }
   details p {
-    margin: 10px 0 0; color: var(--text-faint); font-size: 0.86rem; line-height: 1.7;
+    margin: 12px 0 0; color: var(--text-faint); font-size: 0.86rem; line-height: 1.7;
   }
-  .read-more { display: inline-block; margin-top: 12px; font-size: 0.82rem; }
+  .read-more { display: inline-block; margin-top: 14px; font-size: 0.82rem; }
   .read-more a { color: var(--accent); text-decoration: none; }
   .read-more a:hover { text-decoration: underline; }
   footer {
@@ -388,14 +332,14 @@ PAGE_TEMPLATE = Template(
 <body>
 <header>
   <h1>World News Digest</h1>
-  <p class="subtitle">BBC と The Economist から、世界の主要ニュースを毎日19:00(JST)に自動更新</p>
+  <p class="subtitle">BBC から、世界の主要ニュースを毎日19:00(JST)に自動更新</p>
   <p class="updated">最終更新: {{ generated_at }} (JST)</p>
 </header>
 <main>
   {% for s in stories %}
   <article class="story">
     <div class="story-meta">
-      <span class="badge {{ 'bbc' if s.source == 'BBC' else 'economist' }}">{{ s.source }}</span>
+      <span class="badge">{{ s.source }}</span>
       {% if s.published_jst %}<span class="story-time">{{ s.published_jst }}</span>{% endif %}
     </div>
 
@@ -434,8 +378,7 @@ PAGE_TEMPLATE = Template(
 <footer>
   このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
   日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
-  出典: <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC News</a>,
-  <a href="https://www.economist.com/international" target="_blank" rel="noopener">The Economist</a>
+  出典: <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC News</a>
 </footer>
 </body>
 </html>
