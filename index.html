@@ -4,12 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>World News Digest</title>
-<meta name="description" content="BBCとThe Economistから毎日19時(JST)に自動更新される世界のニュースまとめ">
+<meta name="description" content="BBCの世界ニュースを毎日19時(JST)に自動更新">
 <style>
   :root {
     --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
     --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
-    --accent: #4f8dfd; --bbc: #bb1919; --economist: #e3120b;
+    --accent: #4f8dfd; --bbc: #bb1919;
   }
   @media (prefers-color-scheme: light) {
     :root {
@@ -23,7 +23,7 @@
     margin: 0;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
       "Noto Sans JP", Roboto, sans-serif;
-    background: var(--bg); color: var(--text); line-height: 1.75;
+    background: var(--bg); color: var(--text); line-height: 1.8;
   }
   header { max-width: 720px; margin: 0 auto; padding: 40px 20px 20px; }
   h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
@@ -35,25 +35,23 @@
   main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
   .story {
     background: var(--card-bg); border: 1px solid var(--border);
-    border-radius: 12px; padding: 22px 24px; margin-bottom: 18px;
+    border-radius: 12px; padding: 24px 26px; margin-bottom: 20px;
   }
   .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
   .badge {
     font-size: 0.7rem; font-weight: 700; letter-spacing: 0.03em;
-    padding: 3px 9px; border-radius: 999px; color: #fff;
+    padding: 3px 9px; border-radius: 999px; color: #fff; background: var(--bbc);
   }
-  .badge.bbc { background: var(--bbc); }
-  .badge.economist { background: var(--economist); }
   .story-time { color: var(--text-faint); font-size: 0.78rem; }
-  .title-ja { font-size: 1.15rem; font-weight: 700; margin: 0 0 4px; line-height: 1.5; }
+  .title-ja { font-size: 1.2rem; font-weight: 700; margin: 0 0 4px; line-height: 1.5; }
   .title-en {
-    font-size: 0.85rem; color: var(--text-faint); margin: 0 0 14px; line-height: 1.5;
+    font-size: 0.85rem; color: var(--text-faint); margin: 0 0 16px; line-height: 1.5;
   }
   .title-en a { color: inherit; text-decoration: none; }
   .title-en a:hover { color: var(--accent); text-decoration: underline; }
-  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.95rem; }
+  .body-ja p { margin: 0 0 12px; color: var(--text-dim); font-size: 0.95rem; }
   .body-ja p:last-child { margin-bottom: 0; }
-  details { margin-top: 14px; border-top: 1px dashed var(--border); padding-top: 12px; }
+  details { margin-top: 16px; border-top: 1px dashed var(--border); padding-top: 12px; }
   summary {
     cursor: pointer; color: var(--text-faint); font-size: 0.8rem;
     list-style: none; user-select: none;
@@ -62,9 +60,9 @@
   summary::before { content: "▸ "; }
   details[open] summary::before { content: "▾ "; }
   details p {
-    margin: 10px 0 0; color: var(--text-faint); font-size: 0.86rem; line-height: 1.7;
+    margin: 12px 0 0; color: var(--text-faint); font-size: 0.86rem; line-height: 1.7;
   }
-  .read-more { display: inline-block; margin-top: 12px; font-size: 0.82rem; }
+  .read-more { display: inline-block; margin-top: 14px; font-size: 0.82rem; }
   .read-more a { color: var(--accent); text-decoration: none; }
   .read-more a:hover { text-decoration: underline; }
   footer {
@@ -78,14 +76,14 @@
 <body>
 <header>
   <h1>World News Digest</h1>
-  <p class="subtitle">BBC と The Economist から、世界の主要ニュースを毎日19:00(JST)に自動更新</p>
-  <p class="updated">最終更新: 2026-08-15 13:18 (JST)</p>
+  <p class="subtitle">BBC から、世界の主要ニュースを毎日19:00(JST)に自動更新</p>
+  <p class="updated">最終更新: 2026-08-15 13:34 (JST)</p>
 </header>
 <main>
   
   <article class="story">
     <div class="story-meta">
-      <span class="badge bbc">BBC</span>
+      <span class="badge">BBC</span>
       <span class="story-time">08/15 13:12</span>
     </div>
 
@@ -96,14 +94,14 @@
 
     
     <div class="body-ja">
-      <p>インドネシア州知事によると、土曜日早朝にインドネシアを襲ったマグニチュード7.7の地震により、少なくとも5人が死亡した。</p><p>東ヌサトゥンガラ州のエマヌエル・メルキアデス・ラカ・レナ知事は記者会見で、彼らは崩れた瓦礫によって睡眠中に死亡したと語った。</p><p>捜索救助チームは、地震とそれに続く数十回の余震によって被害を受けた建物に閉じ込められた人々の救出に取り組んでいる。津波警報は発令されたが、最初の揺れから約３時間後に解除された。</p><p>地震は現地時間午前５時直前にフローレス島を襲った。インドネシアの気象・気候・地球物理庁は声明で、その深さは15キロだったと発表した。</p>
+      <p>インドネシア州知事によると、土曜日早朝にインドネシアを襲ったマグニチュード7.7の地震により、少なくとも5人が死亡した。</p><p>東ヌサトゥンガラ州のエマヌエル・メルキアデス・ラカ・レナ知事は記者会見で、彼らは崩れた瓦礫によって睡眠中に死亡したと語った。</p><p>捜索救助チームは、地震とそれに続く数十回の余震によって被害を受けた建物に閉じ込められた人々の救出に取り組んでいる。津波警報は発令されたが、最初の揺れから約３時間後に解除された。</p><p>地震は現地時間午前５時直前にフローレス島を襲った。インドネシアの気象・気候・地球物理庁は声明で、その深さは15キロだったと発表した。</p><p>同じ地域で強い余震が感じられ、その中にはマグニチュード6.1の地震もあった。</p><p>マウメレの港で撮影されたビデオには、大きなコンクリートの塊がターミナルビルから島間フェリーの乗船を待つ乗客の上に突き破られる様子が映っていた。船への通路が崩壊し、海に投げ出された人もいた。</p><p>当局が津波警報を発令した後、バイクで内陸部に移動する人々の流れが見られた。</p><p>しかし、遠隔地で山岳地帯にあるこの地域の破壊の全容を評価するには時間がかかるだろう。</p>
     </div>
     
 
     
     <details>
       <summary>原文(英語)を表示</summary>
-      <p>At least five people have died after a 7.7 magnitude earthquake struck Indonesia early on Saturday morning, according to the provincial governor.</p><p>The governor of East Nusa Tenggara Province, Emanuel Melkiades Laka Lena, told a press conference they were killed in their sleep by collapsing rubble.</p><p>Search and rescue teams are working to free anyone trapped in buildings damaged by the quake and the dozens of aftershocks which followed. A tsunami warning was issued but lifted around three hours after the initial jolt.</p><p>The quake struck the island of Flores shortly before 05:00 local time. It had a depth of 15km, the Indonesian agency for Meteorology, Climatology and Geophysics said in a statement.</p>
+      <p>At least five people have died after a 7.7 magnitude earthquake struck Indonesia early on Saturday morning, according to the provincial governor.</p><p>The governor of East Nusa Tenggara Province, Emanuel Melkiades Laka Lena, told a press conference they were killed in their sleep by collapsing rubble.</p><p>Search and rescue teams are working to free anyone trapped in buildings damaged by the quake and the dozens of aftershocks which followed. A tsunami warning was issued but lifted around three hours after the initial jolt.</p><p>The quake struck the island of Flores shortly before 05:00 local time. It had a depth of 15km, the Indonesian agency for Meteorology, Climatology and Geophysics said in a statement.</p><p>Strong aftershocks were felt in the same area, including one with a magnitude of 6.1.</p><p>Video taken at the port in Maumere showed large chunks of concrete breaking off the terminal building onto passengers waiting to board an inter-island ferry. Some were thrown into the sea when the gangway to the ship collapsed.</p><p>A stream of people could be seen moving inland on motorbikes after authorities issued a tsunami warning.</p><p>But it will take time to assess the full extent of the destruction in the region, which is remote and mountainous.</p>
     </details>
     
 
@@ -113,7 +111,7 @@
   
   <article class="story">
     <div class="story-meta">
-      <span class="badge bbc">BBC</span>
+      <span class="badge">BBC</span>
       <span class="story-time">08/15 12:58</span>
     </div>
 
@@ -124,14 +122,14 @@
 
     
     <div class="body-ja">
-      <p>干ばつと熱波の状況が英国を襲い続ける中、使い捨てバーベキューグリルが「公衆に重大なリスク」をもたらすという懸念から、一時的に販売が禁止された。</p><p>政府は、これらが「夏の間、全国各地で多数の深刻な山火事」の原因となっていると発表した。</p><p>禁止の可能性は、今週初めの記録的な気温を受けての緊急コブラ会議で初めて議論された。国民に対しては、たき火をしないことと、タバコを慎重に処分することが求められている。</p><p>一方、アンディ・バーナム首相は、全国の山火事に対処する緊急チームを支援するために現在200人が派遣されており、この国は「火口箱」のようなものだと述べた。</p>
+      <p>干ばつと熱波の状況が英国を襲い続ける中、使い捨てバーベキューグリルが「公衆に重大なリスク」をもたらすという懸念から、一時的に販売が禁止された。</p><p>政府は、これらが「夏の間、全国各地で多数の深刻な山火事」の原因となっていると発表した。</p><p>禁止の可能性は、今週初めの記録的な気温を受けての緊急コブラ会議で初めて議論された。国民に対しては、たき火をしないことと、タバコを慎重に処分することが求められている。</p><p>一方、アンディ・バーナム首相は、全国の山火事に対処する緊急チームを支援するために現在200人が派遣されており、この国は「火口箱」のようなものだと述べた。</p><p>バーナム氏、ウェスト・ミッドランドの作業員が2日目に複数の火災に立ち向かう中、英国は「火口」のようなものだと語る</p><p>見る: スタウアブリッジの「大虐殺」で家が焼失</p><p>軍事配備の一環として、給水車と軍事技術者を装備したグルカ兵站チームが現在、南ウェールズの消防活動を支援している。</p><p>アンディ・バーナムは、必要に応じてさらに多くの軍人を他の場所に派遣すると約束した。</p>
     </div>
     
 
     
     <details>
       <summary>原文(英語)を表示</summary>
-      <p>Disposable barbecues have been temporarily banned from sale over fears they pose a "significant risk to the public" as drought and heatwave conditions continue to grip the UK.</p><p>They have been the cause of "a number of serious wildfires across the country over the summer months", the government said.</p><p>A potential ban was first discussed at an emergency Cobra meeting in response to record temperatures earlier this week. The public have been urged not to light an open fires and to dispose of cigarettes carefully.</p><p>Meanwhile Prime Minister Andy Burnham says the country is like "a tinderbox", as 200 personnel have now been deployed to help emergency teams tackling wildfires around the country.</p>
+      <p>Disposable barbecues have been temporarily banned from sale over fears they pose a "significant risk to the public" as drought and heatwave conditions continue to grip the UK.</p><p>They have been the cause of "a number of serious wildfires across the country over the summer months", the government said.</p><p>A potential ban was first discussed at an emergency Cobra meeting in response to record temperatures earlier this week. The public have been urged not to light an open fires and to dispose of cigarettes carefully.</p><p>Meanwhile Prime Minister Andy Burnham says the country is like "a tinderbox", as 200 personnel have now been deployed to help emergency teams tackling wildfires around the country.</p><p>Burnham says UK is like a 'tinderbox' as West Midlands crews tackle multiple fires for second day</p><p>Watch: 'Carnage' in Stourbridge as houses destroyed by fire</p><p>As part of the military deployment, Gurkha logistics teams equipped with water tankers and military engineers are now assisting fire services in South Wales.</p><p>Andy Burnham has promised more military personnel will be deployed elsewhere if needed.</p>
     </details>
     
 
@@ -141,7 +139,7 @@
   
   <article class="story">
     <div class="story-meta">
-      <span class="badge bbc">BBC</span>
+      <span class="badge">BBC</span>
       <span class="story-time">08/15 11:54</span>
     </div>
 
@@ -152,14 +150,14 @@
 
     
     <div class="body-ja">
-      <p>イングランドとウェールズの各地で火災が発生し、政府は山火事の原因となる可能性のあるものに火をつけないよう国民に警告した。</p><p>金曜夜の警報は、木曜日にウェスト・ミッドランズ州スタウアブリッジで発生した大規模火災で、住宅19棟が焼失し、さらに18棟が被害を受けたことが明らかになった際に出された。火災は木曜日に草地や森林に急速に広がり、その後住宅に被害が及んだ。</p><p>アンディ・バーナム首相は国民に対し、この警告を「真剣に」受け止めるよう呼び掛け、警告は消防士の要請によって発動されたと付け加えた。</p><p>ウェスト・ミッドランズ消防局のサイモン・テュヒル消防署長は、スタウアブリッジ火災は同局がこれまで対処した中で最も重大な事件の一つだったと述べた。</p>
+      <p>イングランドとウェールズの各地で火災が発生し、政府は山火事の原因となる可能性のあるものに火をつけないよう国民に警告した。</p><p>金曜夜の警報は、木曜日にウェスト・ミッドランズ州スタウアブリッジで発生した大規模火災で、住宅19棟が焼失し、さらに18棟が被害を受けたことが明らかになった際に出された。火災は木曜日に草地や森林に急速に広がり、その後住宅に被害が及んだ。</p><p>アンディ・バーナム首相は国民に対し、この警告を「真剣に」受け止めるよう呼び掛け、警告は消防士の要請によって発動されたと付け加えた。</p><p>ウェスト・ミッドランズ消防署のサイモン・テュヒル消防署長は、スタウアブリッジ火災は同署がこれまで扱った中で最も重大な事件の一つだったと述べた。</p><p>これは金曜日にイングランドとウェールズ全土で対処されたいくつかの火災のうちの1つだった。</p><p>ウェールズでは、カーマーゼンシャー州ランドバリー近郊で大規模な事件が発生したと宣言され、数十軒の家が避難し、道路が閉鎖された。</p><p>ハンプシャー州では、日曜日にハンプシャー州ニューフォレストで発生した山火事に対し、消防士らが6日間かけて消火活動を行った。</p><p>ノーフォーク消防救助隊は木曜午後、市内のガーニー・ロード沖にあるマウスホールド・ヒースでの火災を含む16件の緊急事態に対処した。</p>
     </div>
     
 
     
     <details>
       <summary>原文(英語)を表示</summary>
-      <p>Fires across England and Wales have prompted a national government alert warning people not to light anything that could spark a wildfire.</p><p>The warning on Friday evening came as it was revealed 19 homes were destroyed and a further 18 damaged in a huge fire in Stourbridge, West Midlands, that spread rapidly through grass and woodland on Thursday before damaging homes.</p><p>Prime Minister Andy Burnham told members of the public to take the warning "seriously", adding it was triggered at the request of firefighters.</p><p>West Midlands Fire Service chief fire officer Simon Tuhill said the Stourbridge blaze was one of the most significant incidents the service had ever dealt with.</p>
+      <p>Fires across England and Wales have prompted a national government alert warning people not to light anything that could spark a wildfire.</p><p>The warning on Friday evening came as it was revealed 19 homes were destroyed and a further 18 damaged in a huge fire in Stourbridge, West Midlands, that spread rapidly through grass and woodland on Thursday before damaging homes.</p><p>Prime Minister Andy Burnham told members of the public to take the warning "seriously", adding it was triggered at the request of firefighters.</p><p>West Midlands Fire Service chief fire officer Simon Tuhill said the Stourbridge blaze was one of the most significant incidents the service had ever dealt with.</p><p>It was one of several fires being dealt with across England and Wales on Friday.</p><p>In Wales, a major incident was declared near Llandovery, Carmarthenshire, after dozens of homes were evacuated and roads closed</p><p>In Hampshire, firefighters spent a sixth day tackling a wildfire in the New Forest, Hampshire, which broke out on Sunday.</p><p>Sixteen emergencies were tackled by Norfolk Fire and Rescue Service on Thursday afternoon, including a fire at Mousehold Heath, off Gurney Road in the city.</p>
     </details>
     
 
@@ -169,7 +167,7 @@
   
   <article class="story">
     <div class="story-meta">
-      <span class="badge bbc">BBC</span>
+      <span class="badge">BBC</span>
       <span class="story-time">08/15 10:41</span>
     </div>
 
@@ -180,14 +178,14 @@
 
     
     <div class="body-ja">
-      <p>盗作騒動の中心人物である元ケンブリッジ大学教授のジェイソン・アーデイ氏が死亡しているのが発見された。</p><p>救急サービスによると、金曜午後、ロンドン南部バタシーの住所で男性が「無反応」の状態で発見された。</p><p>アーデー氏は先週、盗作疑惑と業績の一部に対する疑問を受けてケンブリッジ大学の教育社会学の教授を辞任した。彼はその主張を否定していた。</p><p>アーデーさんの家族は声明で、「この素晴らしい父親、パートナー、兄弟、叔父、そして息子を失ってショックを受けている」と述べた。</p>
+      <p>盗作騒動の中心人物である元ケンブリッジ大学教授のジェイソン・アーデイ氏が死亡しているのが発見された。</p><p>救急サービスによると、金曜午後、ロンドン南部バタシーの住所で男性が「無反応」の状態で発見された。</p><p>アーデー氏は先週、盗作疑惑と業績の一部に対する疑問を受けてケンブリッジ大学の教育社会学の教授を辞任した。彼はその主張を否定していた。</p><p>アーデーさんの家族は声明で、「この素晴らしい父親、パートナー、兄弟、叔父、そして息子を失ってショックを受けている」と述べた。</p><p>さらに、「偽情報のキャンペーンは、優しい男で常にみんなの良いところを見たいと思っていたジェイソンにとっては負担が大きすぎた」とも付け加えた。</p><p>金曜早朝、警察官らはロンドン救急隊からバタシーの住所に呼び出された。</p><p>ロンドン警視庁は声明で、「現時点では彼の死は予期せぬものとして扱われているが、不審な点は考えられていない」と述べた。</p><p>ケンブリッジ大学副学長のデボラ・プレンティス教授は、「この悲劇的なニュースを聞いて、本当に悲しんでいます」と述べた。</p>
     </div>
     
 
     
     <details>
       <summary>原文(英語)を表示</summary>
-      <p>Jason Arday, the former University of Cambridge professor at the centre of a plagiarism row, has been found dead.</p><p>Emergency services said a man was found "unresponsive" at an address in Battersea, south London, on Friday afternoon.</p><p>Arday resigned as a Cambridge professor of sociology of education last week after allegations of plagiarism and questions about some of his achievements. He had denied the claims.</p><p>Arday's family said in a statement that they were "in shock to have lost this amazing father, partner, brother, uncle and son".</p>
+      <p>Jason Arday, the former University of Cambridge professor at the centre of a plagiarism row, has been found dead.</p><p>Emergency services said a man was found "unresponsive" at an address in Battersea, south London, on Friday afternoon.</p><p>Arday resigned as a Cambridge professor of sociology of education last week after allegations of plagiarism and questions about some of his achievements. He had denied the claims.</p><p>Arday's family said in a statement that they were "in shock to have lost this amazing father, partner, brother, uncle and son".</p><p>They added: "The campaign of misinformation was too much for Jason, who was a gentle man and who always wanted to see the best in everyone."</p><p>Earlier on Friday, police officers were called to an address in Battersea by the London Ambulance Service.</p><p>In a statement, the Metropolitan Police said: "At this time his death is being treated as unexpected, but is not believed to be suspicious."</p><p>Cambridge University vice-chancellor Prof Deborah Prentice said: "We are desperately saddened to hear this tragic news."</p>
     </details>
     
 
@@ -197,7 +195,7 @@
   
   <article class="story">
     <div class="story-meta">
-      <span class="badge bbc">BBC</span>
+      <span class="badge">BBC</span>
       <span class="story-time">08/15 09:51</span>
     </div>
 
@@ -225,7 +223,7 @@
   
   <article class="story">
     <div class="story-meta">
-      <span class="badge bbc">BBC</span>
+      <span class="badge">BBC</span>
       <span class="story-time">08/15 09:10</span>
     </div>
 
@@ -236,14 +234,14 @@
 
     
     <div class="body-ja">
-      <p>ベラ・ラムジーは、10代の多くの時間を大人と一緒に働いてきたため、10代にありがちな不機嫌で反抗的な時期をまったく経験しませんでした。</p><p>11歳で『ゲーム・オブ・スローンズ』でデビューし、they/themの代名詞を使うこの英国人俳優は、大人たちからの批判を聞いて、ステレオタイプのティーンエイジャーのように振る舞わないように意識的に決めたと語った。</p><p>したがって、がんに苦しむ若者のためのサマーキャンプを描いた映画『サニーダンサー』が、ラムジーに 10 代の自由を経験するために 7 週間を与えたとき、それはまっすぐに飛び込む機会でした。</p><p>「21歳でティーンエイジャーになれたのは素晴らしいことだった」とラムジーはBBCニュースに語った。 「本当に素晴らしかったし、解放感もありました。」</p>
+      <p>ベラ・ラムジーは、10代の多くの時間を大人と一緒に働いてきたため、10代にありがちな不機嫌で反抗的な時期をまったく経験しませんでした。</p><p>11歳で『ゲーム・オブ・スローンズ』でデビューし、they/themの代名詞を使うこの英国人俳優は、大人たちからの批判を聞いて、典型的なティーンエイジャーのように振る舞わないことを意識的に決めたと語った。</p><p>したがって、がんに苦しむ若者のためのサマーキャンプを描いた映画『サニーダンサー』が、ラムジーに 10 代の自由を経験するために 7 週間を与えたとき、それはまっすぐに飛び込む機会でした。</p><p>「21歳でティーンエイジャーになれたのは素晴らしいことだった」とラムジーはBBCニュースに語った。 「本当に素晴らしかったし、解放感もありました。」</p><p>ラムジーさんは振り返って、その経験で、最初に非常に賢明であったことが見逃していたのではないかと疑問に思ったと述べています。</p><p>「10代の頃、物事から逃げたり、少し反抗的だったりすることを最大限に活用できていればよかったと思うんです。」</p><p>『サニー・ダンサー』でラムジーは、寛解中の若い女性がんサバイバーであるアイビーを演じる。彼女はしぶしぶ「化学療法キャンプ」に向かうが、そこで思いがけない友人たちと出会い、彼女を変える夏を過ごす。</p><p>残りのキャストは喜んでギャップを埋めるのに協力してくれました。ラムジーによれば、若い共演者たちは歌や夜の外出について話し合ったという。</p>
     </div>
     
 
     
     <details>
       <summary>原文(英語)を表示</summary>
-      <p>Bella Ramsey spent many teenage years working with adults so never really went through the moody, rebellious phase often associated with being a teenager.</p><p>The British actor, who debuted in Game of Thrones aged 11 and uses they/them pronouns, says they had consciously decided not to behave like a stereotypical teenager after hearing criticisms from adults.</p><p>So when Sunny Dancer, a film about a summer camp for young people affected by cancer , gave Ramsey seven weeks to experience teenage freedom, it was an opportunity to dive straight in.</p><p>"I got to be a teenager aged 21, which was brilliant," Ramsey tells BBC News. "It was really nice - and liberating."</p>
+      <p>Bella Ramsey spent many teenage years working with adults so never really went through the moody, rebellious phase often associated with being a teenager.</p><p>The British actor, who debuted in Game of Thrones aged 11 and uses they/them pronouns, says they had consciously decided not to behave like a stereotypical teenager after hearing criticisms from adults.</p><p>So when Sunny Dancer, a film about a summer camp for young people affected by cancer , gave Ramsey seven weeks to experience teenage freedom, it was an opportunity to dive straight in.</p><p>"I got to be a teenager aged 21, which was brilliant," Ramsey tells BBC News. "It was really nice - and liberating."</p><p>Looking back, Ramsey says the experience made them wonder whether they had missed out by being quite so sensible the first time around.</p><p>"I kind of wish that I had made the most of being a teenager and getting away with things and being a bit rebellious."</p><p>In Sunny Dancer, Ramsey plays Ivy, a young female cancer survivor in remission who reluctantly heads to a "chemo camp" where she finds an unexpected group of friends and has a summer that changes her.</p><p>The rest of the cast were more than happy to help fill in the gaps; Ramsey says younger co-stars discussed songs and nights out.</p>
     </details>
     
 
@@ -253,7 +251,7 @@
   
   <article class="story">
     <div class="story-meta">
-      <span class="badge bbc">BBC</span>
+      <span class="badge">BBC</span>
       <span class="story-time">08/15 09:01</span>
     </div>
 
@@ -264,14 +262,14 @@
 
     
     <div class="body-ja">
-      <p>BBCは、米大統領による同放送局に対する100億ドル（約74億円）の名誉毀損訴訟を弁護するため、ドナルド・トランプ氏の家族らに文書と証言を求める召喚を求めている。</p><p>裁判所への提出文書によると、BBCの法務チームの代表者らは5月、大統領の息子ドナルド・トランプ・ジュニア氏、娘のイヴァンカ・トランプ氏、義理の息子ジャレッド・クシュナー氏に召喚状を送達しようとした。</p><p>大統領は、2021年の国会議事堂暴動前に行った演説の2つの異なるセクションを編集した『パノラマ』のエピソードをめぐってBBCを訴えている。</p><p>BBCは以前、この編集について謝罪したが、名誉毀損の理由にはならないと否定した。</p>
+      <p>BBCは、米大統領による同放送局に対する100億ドル（約74億円）の名誉毀損訴訟を弁護するため、ドナルド・トランプ氏の家族らに文書と証言を求める召喚を求めている。</p><p>裁判所への提出文書によると、BBCの法務チームの代表者らは5月、大統領の息子ドナルド・トランプ・ジュニア氏、娘のイヴァンカ・トランプ氏、義理の息子ジャレッド・クシュナー氏に召喚状を送ろうとした。</p><p>大統領は、2021年の国会議事堂暴動前に行った演説の2つの異なるセクションを編集した『パノラマ』のエピソードをめぐってBBCを訴えている。</p><p>BBCは以前、この編集について謝罪したが、名誉毀損の理由にはならないと否定した。</p><p>判事、BBCへの財務記録提出延期を求めるトランプ大統領の要請を認める</p><p>最新の提出書類の中で、BBCの弁護士らは、トランプ大統領の家族は演説の意図について「個人的に知っており」、彼らの証言や文書は大統領の名誉毀損の主張に関連すると主張している。</p><p>提出書類は、米議会委員会が以前に収集した証拠に基づいて、ドナルド・トランプ・ジュニアとイヴァンカ・トランプが父親が演説を修正して発表した際に同席していたとし、ジャレッド・クシュナー氏が暴力の使用を非難する声明文案を起草したと付け加えた。</p><p>提出書類は裁判所に対し、召喚状を電子メールや内容証明郵便で送達することを許可するよう求めており、手書きで送達する試みは失敗したとしている。</p>
     </div>
     
 
     
     <details>
       <summary>原文(英語)を表示</summary>
-      <p>The BBC has sought to subpoena members of Donald Trump's family for documents and testimony as it defends against the US president's $10bn (Â£7.4bn) defamation lawsuit against the broadcaster.</p><p>Court filings show that representatives for the BBC's legal team attempted in May to serve subpoenas to the president's son Donald Trump Jr., his daughter Ivanka Trump and son-in-law Jared Kushner.</p><p>The president is suing the BBC over an episode of Panorama that edited together two different sections of a speech he gave before the 2021 Capitol riots.</p><p>The BBC has previously apologised for the edit but denied it was grounds for defamation.</p>
+      <p>The BBC has sought to subpoena members of Donald Trump's family for documents and testimony as it defends against the US president's $10bn (Â£7.4bn) defamation lawsuit against the broadcaster.</p><p>Court filings show that representatives for the BBC's legal team attempted in May to serve subpoenas to the president's son Donald Trump Jr., his daughter Ivanka Trump and son-in-law Jared Kushner.</p><p>The president is suing the BBC over an episode of Panorama that edited together two different sections of a speech he gave before the 2021 Capitol riots.</p><p>The BBC has previously apologised for the edit but denied it was grounds for defamation.</p><p>Judge grants Trump's request to delay handing financial records to BBC</p><p>In the latest filing, the BBC's lawyers argue Trump's family members "have personal knowledge" of his intentions in delivering the speech, making their testimony and documents relevant to the president's defamation claim.</p><p>Drawing on evidence previously gathered by a US congressional committee, the filing says Donald Trump Jr and Ivanka Trump were present when their father revised and delivered his speech, adding Jared Kushner drafted a proposed statement for him which would have condemned the use of violence.</p><p>The filing asks the court to allow the subpoenas to be served by email and certified mail, saying attempts to serve them by hand were unsuccessful.</p>
     </details>
     
 
@@ -281,85 +279,85 @@
   
   <article class="story">
     <div class="story-meta">
-      <span class="badge economist">The Economist</span>
-      <span class="story-time">08/13 22:12</span>
+      <span class="badge">BBC</span>
+      <span class="story-time">08/15 09:01</span>
     </div>
 
     
-    <p class="title-ja">シリコンバレーのAIブームがアメリカの慈善団体を作り変える</p>
-    <p class="title-en"><a href="https://www.economist.com/international/2026/08/13/silicon-valleys-ai-boom-is-remaking-american-charity" target="_blank" rel="noopener">Silicon Valley’s AI boom is remaking American charity</a></p>
+    <p class="title-ja">エア・インディアのパイロットが大麻検査を報告：捜査官に言えること、言えないこと</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c74gdgly3g3o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Air India pilot's reported cannabis test: What it can and can't tell investigators</a></p>
     
 
     
     <div class="body-ja">
-      <p>AI の創設者たちは、数千億ドルを寄付することを約束します。それらはどのように使われるのでしょうか？</p>
+      <p>エア・インディアのパイロットが飛行後に大麻検査で陽性反応を示したという報道は、航空捜査官が腰を上げるような発見のように聞こえる。</p><p>しかし、報告された結果は正式に確認されておらず、陽性が確認されたとしても、必ずしもそれが決定打となるわけではない。</p><p>8月4日、プーケット発デリー行きエア・インディアのエアバスA320型機が突然高度を約91メートル（300フィート）失い、乗客13名と乗務員4名が負傷した。乗客137名と乗員8名を乗せた同機は無事デリーに着陸した。この事件は調査中です。</p><p>インド航空省によると、両パイロットは飛行後に精神活性物質の定期検査を受けたという。同紙は、機長の最初の検査では外部の「確認検査」が必要な結果が得られ、調査が行われるまで両パイロットは飛行任務から外されたと述べた。</p><p>今週初め、多くのメディアが情報筋の話として、船長がその後の臨床検査でマリファナの陽性反応が出たと報じた。エア・インディアは結果を確認していない。この報道は、インドでのパイロットの薬物検査と航空の安全をめぐる嵐を引き起こした。</p><p>これまでのところ、機長の薬物検査の結果と突然の高度低下を結びつける公式の発見はない。捜査当局はこの事故を技術的、運用的、医学的、人的要因を含めてより広範囲に調査しているが、航空機が墜落した原因は依然として不明である。</p><p>明らかな疑問は、大麻がそれと関係があるかどうかです。</p><p>あまり明白ではないほうが難しいのです。大麻検査で陽性反応が出た場合、パイロットの数時間前の精神状態について実際に何がわかるのでしょうか?</p>
     </div>
     
 
     
     <details>
       <summary>原文(英語)を表示</summary>
-      <p>AI founders pledge to give away hundreds of billions of dollars. How will they be spent?</p>
+      <p>Reports that an Air India pilot tested positive for cannabis after a flight sound like the sort of finding that should make an aviation investigator sit up.</p><p>But the reported result has not been officially confirmed, and even a confirmed positive would not necessarily be the smoking gun it might appear to be.</p><p>On 4 August, an Air India Airbus A320 flying from Phuket to Delhi suddenly lost about 91m (300ft) of altitude, injuring 13 passengers and four crew members. The aircraft, carrying 137 passengers and eight crew, landed safely in Delhi. The incident is under investigation.</p><p>Both pilots underwent routine post-flight screening for psychoactive substances, India's aviation ministry said. It said the captain's initial test produced a result requiring "confirmatory testing" , external and that both pilots had been removed from flying duties pending the inquiry.</p><p>Earlier this week, a number of media reports, citing sources, reported that the captain subsequently tested positive for marijuana in a confirmatory laboratory test. Air India has not confirmed the result. The reports have triggered a storm over pilot drug testing and aviation safety in India.</p><p>There is, so far, no official finding linking the captain's alleged drug-test result to the sudden loss of altitude. Investigators are examining the incident more broadly, including technical, operational, medical and human factors, and it remains unclear what caused the aircraft to plunge.</p><p>The obvious question is whether cannabis had anything to do with it.</p><p>The less obvious one is harder: what does a positive cannabis test actually tell us about a pilot's state of mind several hours earlier?</p>
     </details>
     
 
-    <span class="read-more"><a href="https://www.economist.com/international/2026/08/13/silicon-valleys-ai-boom-is-remaking-american-charity" target="_blank" rel="noopener">
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c74gdgly3g3o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
       記事全文を読む →</a></span>
   </article>
   
   <article class="story">
     <div class="story-meta">
-      <span class="badge economist">The Economist</span>
-      <span class="story-time">08/11 22:38</span>
+      <span class="badge">BBC</span>
+      <span class="story-time">08/15 09:01</span>
     </div>
 
     
-    <p class="title-ja">台湾の民主主義を人質に取る</p>
-    <p class="title-en"><a href="https://www.economist.com/international/2026/08/11/taking-taiwans-democracy-hostage" target="_blank" rel="noopener">Taking Taiwan’s democracy hostage</a></p>
+    <p class="title-ja">グレッグ・ジェームスと同じように、私も愛犬を亡くしました - その悲しみは圧倒的で複雑でした</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c4gx8ljyn0po?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Like Greg James, I lost my dog - and my grief was overwhelming and complicated</a></p>
     
 
     
     <div class="body-ja">
-      <p>私利私欲にとらわれた台湾の政治家たちが、この国をますます統治不能な状態にしている。中国が唯一の勝者</p>
+      <p>BBCラジオ1の司会者グレッグ・ジェームスが、愛するチョコレートラブラドールのバーニーが眠らされた後に語った悲しみと痛みは、あまりにも懐かしいものに感じられた。</p><p>6月末頃、私の愛犬ララも亡くなりました。彼女も眠らされた。私は打ちのめされました。</p><p>ララは、泥の中で転がったときとは別に、11歳になったばかりのウェスティ・ジョイの真っ白な毛皮の束でした。</p><p>私は彼女が永遠に続くだろうと素朴に思っていましたが、彼女が体調を崩すかもしれないということは一度も頭によぎりませんでした。しかし、4月の終わり頃、彼女はそうしました。</p><p>ララの状態は、よく眠っていて、食欲がなくなり始めていたことを意味していました。時々、彼女は自分がどこにいるのかわからないように見え、最終的には生きる意欲を失いました。</p><p>彼女の生活の質が低下するにつれて、私はララが一人でいるという考えに耐えられず、2か月半の間、彼女に寄り添うためにソファで寝ていました。</p><p>最期の数週間、ララは甘やかされました。犬のおやつ、好物、自宅での洗濯とドライヤー、終わりのない愛情と配慮。</p><p>最後に彼女を獣医に連れて行く直前に、彼女はアイスクリームを味わい、日差しが当たる庭の芝生の上に横たわっていました。それは、そんな6月の暑い日のことだった。</p>
     </div>
     
 
     
     <details>
       <summary>原文(英語)を表示</summary>
-      <p>Self-interested Taiwanese politicians are making the country increasingly ungovernable. China is the only winner</p>
+      <p>The grief and pain that BBC Radio 1 presenter Greg James described after his beloved chocolate labrador, Barney, was put to sleep felt all too familiar.</p><p>Towards the end of June my dog, Lara, also died. She too was put to sleep. I was devastated.</p><p>Lara was â apart from when she rolled in mud â a bright white furry bundle of Westie joy who had just turned 11.</p><p>I naively thought she would go on forever, and not once did it cross my mind she might become unwell. But towards the end of April, she did.</p><p>Lara's condition meant she was sleeping a lot and began to lose her appetite. At times she seemed unsure of where she was, and eventually she lost her zest for life.</p><p>As her quality of life declined, I couldn't bear the thought of Lara being alone, so for two and a half months I slept on the sofa to be close to her.</p><p>In her final weeks Lara was pampered. Dog treats, favourite foods, washes and blow dries at home, endless love and attention.</p><p>Just before I took her to the vet for the final time, she savoured an ice-cream and lay on the grass in the sunshine in the garden. It was one of those hot June days.</p>
     </details>
     
 
-    <span class="read-more"><a href="https://www.economist.com/international/2026/08/11/taking-taiwans-democracy-hostage" target="_blank" rel="noopener">
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c4gx8ljyn0po?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
       記事全文を読む →</a></span>
   </article>
   
   <article class="story">
     <div class="story-meta">
-      <span class="badge economist">The Economist</span>
-      <span class="story-time">08/11 01:56</span>
+      <span class="badge">BBC</span>
+      <span class="story-time">08/15 08:16</span>
     </div>
 
     
-    <p class="title-ja">作戦室ニュースレター: 将軍は優れた政治家になれるのか?</p>
-    <p class="title-en"><a href="https://www.economist.com/international/2026/08/10/the-war-room-newsletter-do-generals-make-good-politicians" target="_blank" rel="noopener">The War Room newsletter: Do generals make good politicians?</a></p>
+    <p class="title-ja">多くのカナダ人が米国をボイコットしているため、代わりにここを旅行している</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c8jnwnw22ngo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Many Canadians are boycotting the US, so this is where they're travelling instead</a></p>
     
 
     
     <div class="body-ja">
-      <p>イスラエル特派員アンシェル・フェファーが、なぜこの国の元将軍で政治家として成功する人が少ないのかを考察する</p>
+      <p>ドナルド・トランプ大統領の再選に先立って、オンタリオ州ロンドン出身のケント・トラスコットさんとその家族は、カリフォルニア州や最近では2023年にニューヨーク州を含む国境以南へ複数回旅行していた。</p><p>しかし、2024年末以来、「家族と私は米国をボイコットすることを完全に決意した」と彼はBBCに語った。</p><p>それは、昨年の春に弟と一緒にSpaceXの宇宙船の打ち上げを見に行くためのテキサスへの旅行をキャンセルすることを意味した。 2人はトロントから飛行機で到着し、レンタカーを借りて1週間滞在して打ち上げを見守る計画を立てており、おそらく「数千ドル」を費やしたとみられる。</p><p>トラスコットと彼の妻は、そのお金をカナダ、正確に言えばノバスコシア州とプリンスエドワード島の大西洋岸の州で使うことに決めた。</p><p>彼らの決定は、米国の関税と自国の併合に関する大統領のコメントへの対応である。トランプ大統領がホワイトハウスに復帰してから1年以上が経ったが、トラスコット氏のような多くのカナダ人は依然として米国への旅行ボイコットを堅持している。</p><p>全国データによると、4月に米国へのロードトリップがわずかに増加したにもかかわらず、トランプ大統領が選出される前の2024年の同時期と比較して、同月のカナダ人の旅行は80万件減少した。</p><p>ボイコットは昨年、米国の旅行収入約33億カナダドル（23億5000万ドル、17億5000万ポンド）の損失を意味しており、カナダ人はその代わりに海外や自国の観光に費やすことを選択した。</p><p>BBCは数人のカナダ人に、なぜ米国を避けることを選んだのか、代わりにどこへ行ったのか、そして戻るには何が必要なのかについて話を聞いた。</p>
     </div>
     
 
     
     <details>
       <summary>原文(英語)を表示</summary>
-      <p>Anshel Pfeffer, our Israel correspondent, examines why so few of the country’s former generals succeed in politics</p>
+      <p>Prior to President Donald Trump's re-election, Kent Truscott and his family, from London, Ontario, had taken multiple trips south of the border, including to California and most recently New York in 2023.</p><p>But since late 2024, "my family and I have completely decided to boycott the United States", he told BBC.</p><p>That meant cancelling a trip last spring to Texas to watch the SpaceX Starship launch with his brother. The two had planned to fly down from Toronto, rent a car and stay a week to watch the launch, likely spending "thousands of dollars".</p><p>Truscott and his wife decided to spend that money in Canada instead â the Atlantic provinces of Nova Scotia and Prince Edward Island, to be exact.</p><p>Their decision is a response to US tariffs and the president's comments about annexing their country. More than a year after Trump's return to the White House, many Canadians like Truscott are still holding firm on their boycott on travel to the US.</p><p>Even with a slight uptick in road trips to the US in April, Canadians made 800,000 fewer trips that month compared to the same time in 2024, before Trump was elected, according to national data.</p><p>The boycott has meant a loss of about C$3.3bn ($2.35bn; Â£1.75bn) in travel revenue for the US last year - money that Canadians have instead chosen to spend overseas or exploring their own country.</p><p>The BBC spoke to a few Canadians about why they have chosen to avoid the US, where they have gone instead and what it would take for them to return.</p>
     </details>
     
 
-    <span class="read-more"><a href="https://www.economist.com/international/2026/08/10/the-war-room-newsletter-do-generals-make-good-politicians" target="_blank" rel="noopener">
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c8jnwnw22ngo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
       記事全文を読む →</a></span>
   </article>
   
@@ -367,8 +365,7 @@
 <footer>
   このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
   日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
-  出典: <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC News</a>,
-  <a href="https://www.economist.com/international" target="_blank" rel="noopener">The Economist</a>
+  出典: <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC News</a>
 </footer>
 </body>
 </html>
