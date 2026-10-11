@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年10月12日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/12 00:18</span>
+    </div>
+
+    
+    <p class="title-ja"><a href="https://www.bbc.co.uk/news/articles/ckp8gyd65z2go?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener"
+      style="color:inherit;text-decoration:none">Poland stabbings driven by online glorification of violence, Tusk says</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>Three violent attacks at Polish schools this week were driven by the "glorification of violence" online, Prime Minister Donald Tusk said.</p><p>The attacks have left one woman dead and others injured, including children.</p>
+    </div>
+    
+
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/ckp8gyd65z2go?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/12 00:10</span>
+    </div>
+
+    
+    <p class="title-ja"><a href="https://www.aljazeera.com/news/2026/10/11/trump-says-ukraine-russia-agree-to-energy-ceasefire-2?traffic_source=rss" target="_blank" rel="noopener"
+      style="color:inherit;text-decoration:none">Trump says Ukraine and Russia agree to ‘energy ceasefire’</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>US President Donald Trump has announced what he called an ‘energy ceasefire’ between Ukraine and Russia, after mutual attacks on energy infrastructure piled pressure on global energy prices.</p><p>“Effective immediately, there is an ENERGY CEASEFIRE in the War between Russia and Ukraine. Both parties have agreed,” Trump wrote on social media on Sunday. “Do not break it! Thank you for your attention to this matter. President DONALD J. TRUMP.”</p>
+    </div>
+    
+
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/11/trump-says-ukraine-russia-agree-to-energy-ceasefire-2?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/11 23:41</span>
+    </div>
+
+    
+    <p class="title-ja"><a href="https://www.france24.com/en/video/20261011-france-can-the-left-unite-behind-a-single-candidate" target="_blank" rel="noopener"
+      style="color:inherit;text-decoration:none">France: Can the left unite behind a single candidate?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>Five candidates are vying to lead France's social-democratic left in the 2027 presidential election, with a cyberattack disrupting the primary vote. Can the left unite behind one candidate? We discuss this with our guest Joseph Downing, Senior Lecturer in Politics and International Relations at Aston University.</p>
+    </div>
+    
+
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261011-france-can-the-left-unite-behind-a-single-candidate" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/11 16:45</span>
+    </div>
+
+    
+    <p class="title-ja"><a href="https://www.dw.com/en/surrogacy-in-georgia-is-booming-but-at-what-cost/a-79629971?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener"
+      style="color:inherit;text-decoration:none">Surrogacy in Georgia is booming, but at what cost?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>Three years ago, Olga, 40, and Daniel (both names changed to protect the their identities) from Hamburg decided to employ the services of a surrogate mother. But surrogacy is illegal in Germany, and people whose children are born through surrogacy must pursue the legal recognition of their parenthood in German courts.</p><p>Olga is a German citizen, but was born and raised in Russia . That's why the couple wanted to learn more about the surrogacy market in Russia. But foreign customers have been banned from signing Russian surrogacy contracts since 2022. After Russia's full-scale invasion of Ukraine , many international agencies that liaise between surrogates and intended parents moved to Georgia . So, Olga and Daniel traveled there.</p>
+    </div>
+    
+
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/surrogacy-in-georgia-is-booming-but-at-what-cost/a-79629971?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/12 00:32</span>
+    </div>
+
+    
+    <p class="title-ja"><a href="https://www.bbc.co.uk/news/articles/cwy7lxx60dg5o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener"
+      style="color:inherit;text-decoration:none">Children among 139 dead after boat capsizes off Djibouti, UN says</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>At least 139 migrants including 15 children have died and dozens more are still missing after a boat sank off the coast of Djibouti, the UN's migration office has said.</p><p>The boat had been travelling from Djibouti to Yemen with 305 people aboard when it capsized near the port town of Obock on Thursday night. Around 82 people were rescued, the International Organization for Migration (IOM) said.</p>
+    </div>
+    
+
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cwy7lxx60dg5o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/11 23:39</span>
+    </div>
+
+    
+    <p class="title-ja"><a href="https://www.france24.com/en/video/20261011-strike-on-riyadh-what-options-for-the-saudi-led-coalition" target="_blank" rel="noopener"
+      style="color:inherit;text-decoration:none">Strike on Riyadh: What options for the Saudi-led coalition?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>Saturday's attack, the deadliest on Saudi soil in more than a decade, marked a sharp escalation in the Yemen war. Riyadh backs the internationally recognised government against the Houthis, who captured swathes of the Red Sea coastline in a lightning offensive last month. The Saudi-led coalition has vowed a firm response, but what options are on the table? We discuss this with Dr Nawaf Obaid, Senior Research Fellow in the Department of War Studies at King's College London.</p>
+    </div>
+    
+
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261011-strike-on-riyadh-what-options-for-the-saudi-led-coalition" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/11 23:25</span>
+    </div>
+
+    
+    <p class="title-ja"><a href="https://www.aljazeera.com/news/2026/10/11/why-are-houthi-missiles-breaking-through-saudi-arabias-air-defences?traffic_source=rss" target="_blank" rel="noopener"
+      style="color:inherit;text-decoration:none">Why are Houthi missiles breaking through Saudi Arabia’s air defences?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>Yemen’s Houthis, the armed group also known as Ansar Allah (Arabic for Supporters of God), are hitting deep inside Saudi Arabia with waves of ballistic missiles, cruise missiles and drones.</p><p>Riyadh’s King Khalid International Airport has been targeted multiple times by the Houthis since their new military campaign against the kingdom began in September.</p>
+    </div>
+    
+
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/11/why-are-houthi-missiles-breaking-through-saudi-arabias-air-defences?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/11 08:44</span>
+    </div>
+
+    
+    <p class="title-ja"><a href="https://www.npr.org/2026/10/10/g-s1-147682/attack-on-riyadh-airport-killed-12-people-and-wounded-over-300-more-saudi-authorities-say" target="_blank" rel="noopener"
+      style="color:inherit;text-decoration:none">Attack on Riyadh airport killed 12 people and wounded over 300 more, Saudi authorities say</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>This image from video obtained and verified by AP shows thick black smoke and flames rising from a fire at King Khalid International Airport in Riyadh, Saudi Arabia, Friday, Oct. 9, 2026. (UGC via AP) AP/UGC hide caption</p><p>CAIRO (AP) — The latest attack on the international airport in Saudi Arabia's capital of Riyadh killed 12 people and injured over 300 others, civil aviation authorities said early Sunday, with some in critical condition.</p>
+    </div>
+    
+
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/10/g-s1-147682/attack-on-riyadh-airport-killed-12-people-and-wounded-over-300-more-saudi-authorities-say" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/12 00:26</span>
+    </div>
+
+    
+    <p class="title-ja"><a href="https://www.aljazeera.com/video/newsfeed/2026/10/11/power-bank-fire-forces-plane-to-emergency-land-in-india?traffic_source=rss" target="_blank" rel="noopener"
+      style="color:inherit;text-decoration:none">Power bank fire forces plane to emergency land in India</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>Power bank fire forces plane to emergency land in India</p><p>An IndiGo plane was forced to make an emergency landing after a passenger’s power bank reportedly caught fire, during a flight from New Delhi to Chennai. Passengers managed to extinguish the fire on board.</p>
+    </div>
+    
+
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/10/11/power-bank-fire-forces-plane-to-emergency-land-in-india?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/11 23:40</span>
+    </div>
+
+    
+    <p class="title-ja"><a href="https://www.france24.com/en/video/20261011-india-s-cockroach-leaders-vow-to-keep-up-election-protests" target="_blank" rel="noopener"
+      style="color:inherit;text-decoration:none">India's 'cockroach' leaders vow to keep up election protests</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>Leaders of India's online "cockroach" movement pledged on Sunday to continue their campaign against the election commissioner, hours after they were released from detention as authorities sought to thwart a major demonstration. Our correspondent Navodita Kumari tells us more.</p>
+    </div>
+    
+
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261011-india-s-cockroach-leaders-vow-to-keep-up-election-protests" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/11 21:03</span>
+    </div>
+
+    
+    <p class="title-ja"><a href="https://www.bbc.co.uk/news/articles/ck86zppejjw3o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener"
+      style="color:inherit;text-decoration:none">Homes and bridges swept away as fresh floods hit Nepal</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>A major river in Nepal has flooded, sweeping away houses, bridges and damaging a part of hydropower station, authorities have said.</p><p>Around 50 people have been rescued from along the bank of the Budhi Gandaki River in the central Gorkha district, the army confirmed. No casualties have been reported yet, however five people are missing.</p>
+    </div>
+    
+
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/ck86zppejjw3o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/11 06:19</span>
+    </div>
+
+    
+    <p class="title-ja"><a href="https://www.npr.org/2026/10/10/nx-s1-5995118/protests-against-voter-roll-revisions-rock-capital-of-worlds-largest-democracy" target="_blank" rel="noopener"
+      style="color:inherit;text-decoration:none">Protests against voter roll revisions rock capital of world's largest democracy</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>Parts of the capital city of India, the world's largest democracy, are on lockdown. Protests over sweeping revisions to the voter rolls were met with a massive police crackdown.</p><p>Accuracy and availability of NPR transcripts may vary. Transcript text may be revised to correct errors or match updates to audio. Audio on npr.org may be edited after its original broadcast or publication. The authoritative record of NPR’s programming is the audio record.</p>
+    </div>
+    
+
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/10/nx-s1-5995118/protests-against-voter-roll-revisions-rock-capital-of-worlds-largest-democracy" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/11 22:12</span>
+    </div>
+
+    
+    <p class="title-ja"><a href="https://www.france24.com/en/americas/20261011-brazil-lula-accuses-social-media-giant-meta-election-interference-amid-tight-run-campaign" target="_blank" rel="noopener"
+      style="color:inherit;text-decoration:none">Brazil's Lula accuses social media giant Meta of election interference amid tight run-off campaign</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>Social media platform Meta has 48 hours to respond to claims by Brazil's leftwing candidate and incumbent President Luiz Inacio Lula da Silva's campaign accusing the tech platform of blocking content on the company's platforms. Brazil's Superior Electoral Court on Saturday gave the social media giant 48 hours to clarify whether it reduced the reach of posts by Lula's campaign ahead of the tight October 25 run-off against rightwing candidate Flavio Bolsonaro.</p>
+    </div>
+    
+
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/americas/20261011-brazil-lula-accuses-social-media-giant-meta-election-interference-amid-tight-run-campaign" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/11 16:45</span>
+    </div>
+
+    
+    <p class="title-ja"><a href="https://www.theguardian.com/australia-news/2026/oct/11/missing-australian-hiker-jordan-yap-last-seen-on-remote-trail-found-dead-in-peru" target="_blank" rel="noopener"
+      style="color:inherit;text-decoration:none">Missing Australian hiker Jordan Yap last seen on remote trail found dead in Peru</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>Family and friends say Melbourne man should be remembered for ‘immense joy he brought to so many people’s lives’</p><p>Get our breaking news email , free app or daily news podcast</p>
+    </div>
+    
+
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/australia-news/2026/oct/11/missing-australian-hiker-jordan-yap-last-seen-on-remote-trail-found-dead-in-peru" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/11 14:05</span>
+    </div>
+
+    
+    <p class="title-ja"><a href="https://www.bbc.co.uk/news/articles/c9vgregzk6gro?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener"
+      style="color:inherit;text-decoration:none">US justice department investigates TV networks over Trump pool coverage</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>The US justice department (DoJ) has said it is investigating several TV networks over whether they broke federal competition laws when they recently suspended pool coverage of President Donald Trump.</p><p>Last month, five networks paused their presidential coverage for several days in response to the Trump administration withdrawing the credentials of reporters from CNN, MS Now and Politico.</p>
+    </div>
+    
+
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c9vgregzk6gro?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/11 04:16</span>
+    </div>
+
+    
+    <p class="title-ja"><a href="https://www.dw.com/en/money-networks-and-bias-why-women-struggle-to-win-seats-in-us-politics/a-79625179?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener"
+      style="color:inherit;text-decoration:none">Money, networks and bias: Why women struggle to win seats in US politics</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>Around 51% of the population of the United States is female, but that is not reflected in the makeup of the US Congress, where only 28.4% of the members are women . Nevertheless, with 152 women in total sitting in the House of Representatives and Senate, the number is higher than it has ever been in the history of the United States. The number of female governors of the 50 US states is also currently higher than ever before: Some 14 of them — 28% — are women.</p><p>There are a number of reasons why there are still comparatively few female representatives in the US Congress. "Some of them are structural: There are rules and processes in place in our political system that make it harder for any newcomers to break in," said Kelly Dittmar, director of research at the Center for American Women and Politics at Rutgers University. "Historically, women were newcomers."</p>
+    </div>
+    
+
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/money-networks-and-bias-why-women-struggle-to-win-seats-in-us-politics/a-79625179?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/11 23:09</span>
+    </div>
+
+    
+    <p class="title-ja"><a href="https://www.aljazeera.com/news/2026/10/11/ethiopia-eritrea-ramp-up-rhetoric-are-they-inching-towards-war?traffic_source=rss" target="_blank" rel="noopener"
+      style="color:inherit;text-decoration:none">Ethiopia, Eritrea ramp up rhetoric: Are they inching towards war?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>Ethiopia and Eritrea have exchanged accusations of aggression at the United Nations, raising fears of a new conflict in the Horn of Africa region as fighting intensifies in Ethiopia’s northern Tigray region.</p><p>The diplomatic spat comes as Ethiopian troops and allied armed groups advanced across Tigray, where forces from Asmara have allegedly crossed the border to support rebels fighting the government forces.</p>
+    </div>
+    
+
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/11/ethiopia-eritrea-ramp-up-rhetoric-are-they-inching-towards-war?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/10 06:25</span>
+    </div>
+
+    
+    <p class="title-ja"><a href="https://www.npr.org/2026/10/09/nx-s1-5996461/south-african-human-rights-lawyer-navi-pillay-wins-nobel-peace-prize" target="_blank" rel="noopener"
+      style="color:inherit;text-decoration:none">South African human rights lawyer Navi Pillay wins Nobel Peace Prize</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>South African human rights lawyer Navi Pillay wins the 2026 Nobel Peace Prize for her lifelong defense of human rights and international law.</p><p>Accuracy and availability of NPR transcripts may vary. Transcript text may be revised to correct errors or match updates to audio. Audio on npr.org may be edited after its original broadcast or publication. The authoritative record of NPR’s programming is the audio record.</p>
+    </div>
+    
+
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/09/nx-s1-5996461/south-african-human-rights-lawyer-navi-pillay-wins-nobel-peace-prize" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-10-12";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
