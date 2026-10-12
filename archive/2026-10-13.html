@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年10月13日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/13 03:31</span>
+    </div>
+
+    
+    <p class="title-ja">フランスのスーパーマーケットの冷蔵庫がサイバー攻撃を受ける</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/crq5nzxv9q4yo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Fridges in French supermarkets hit by cyber attack</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>フランスの何百ものスーパーマーケットがサイバー攻撃を受け、冷蔵庫や冷凍庫が加熱し、数百万ユーロの価値があると推定される生鮮食品や冷凍食品がダメになった。</p><p>影響を受けたあるスーパーマーケットチェーンによると、ハッカーは冷蔵ユニットの温度を調整するソフトウェアを制御し、一部の冷蔵ユニットを一晩で50℃（120F）まで温めることを強制したという。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>カルフール、モノプリ、E.ルクレールなど他の大手食品小売店もこの攻撃の被害に遭い、デンマークのエンジニアリング会社ダンフォスが提供するソフトウェアが標的となった。</p><p>このソフトウェアを使用すると、小売業者は冷蔵ユニットをリモートで管理できるようになります。</p><p>通常、スーパーマーケットの冷凍庫は一晩で短時間の霜取りを行い、その間に温度がわずかに上昇します。しかし、ダンフォス氏は、その過程で冷蔵庫や冷凍庫がどの程度温かくなるかについての報告を確認していなかったものの、ハッカーらは機器を加熱して高温を保つよう命令した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Hundreds of French supermarkets have been hit by a cyber attack that caused their fridges and freezers to heat up, spoiling fresh and frozen food estimated to be worth millions of euros.</p><p>Hackers gained control of the software that regulates the temperatures of the refrigeration units, forcing some to warm to 50C (120F) overnight, according to one supermarket chain affected.</p><p>Other major food retailers including Carrefour, Monoprix and E.Leclerc were also hit by the attack, which targeted software provided by Danish engineering firm Danfoss.</p><p>The software allows retailers to manage their cold units remotely.</p><p>Normally, supermarket freezers go through a short period of defrosting overnight, in which temperatures rise slightly. But the hackers ordered the units to heat up and stay hot, although Danfoss did not confirm any reports about just how warm the fridges and freezers could become in that process.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/crq5nzxv9q4yo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/13 03:10</span>
+    </div>
+
+    
+    <p class="title-ja">フランスで逮捕後、盗まれたルノワールの絵画が壁の裏で発見される</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/12/stolen-renoir-paintings-found-behind-wall-in-france-following-arrests?traffic_source=rss" target="_blank" rel="noopener">Stolen Renoir paintings found behind wall in France following arrests</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>先月フランスの美術館から盗まれた印象派の巨匠ルノワールの絵画２枚が、差し迫った２度目の強盗であると検察が主張する前に警察が複数の逮捕を行った後、民家の偽壁の陰で破損しているのが発見された。</p><p>マルセイユの検察官ニコラ・ベッソン氏は、欧州最大級の現代美術コレクションを所蔵するサンポール・ド・ヴァンスのマーグ財団を標的にする計画を当局が発見したことを受け、水曜日に容疑者6人が逮捕されたと発表した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ベッソン氏は、今回の逮捕は「新たな強盗が差し迫っているという非常に強い疑い」によって引き起こされたと述べた。</p><p>アルプ・マリティーム司法警察署長エリック・アントネッティ氏は、「我々は犯罪計画の反復を非常に明確に観察していた」と述べた。</p><p>捜査関係者によると、9月8日、窃盗犯らは電動ノコギリを使ってフェンスを突き破り、コート・ダジュールのカーニュ・シュル・メールにあるルノワール美術館に侵入した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Two paintings by the impressionist master Renoir which were stolen from a French museum last month have been found damaged behind a false wall in a private home after police made several arrests ahead of what prosecutors say was an imminent second heist.</p><p>Marseille prosecutor Nicolas Bessone said six suspects were arrested on Wednesday after authorities discovered they were planning to target the Fondation Maeght in Saint-Paul-de-Vence, home to one of Europe’s largest collections of modern art.</p><p>Bessone said the arrests were prompted by the “very strong suspicion that another heist was imminent”.</p><p>“We were very clearly looking at the repetition of a criminal scheme”, said Eric Antonetti, the head of the Alpes-Maritimes judicial police.</p><p>On September 8, thieves used an electric saw to cut through a fence to enter the Renoir Museum in Cagnes-sur-Mer on the French Riviera, according to investigators.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/12/stolen-renoir-paintings-found-behind-wall-in-france-following-arrests?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/13 03:05</span>
+    </div>
+
+    
+    <p class="title-ja">ポーランド、先月のスターリンク駅火災に関連してドイツでトルコ人２人が逮捕されたと報告</p>
+    <p class="title-en"><a href="https://www.dw.com/en/poland-reports-arrests-of-2-turkish-citizens-in-germany-in-connection-with-starlink-station-fire-last-month/a-79646138?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Poland reports arrests of 2 Turkish citizens in Germany in connection with Starlink station fire last month</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ポーランド当局は月曜日、ポーランドのスターリンク駅で先月発生した火災に関連してドイツでトルコ人２人が拘束されたと発表した。</p><p>衛星ベースの Starlink インターネット サービスは、ロシア侵攻のさなか、ポーランドの隣国ウクライナの軍によって広く使用されています。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>複数のEU諸国の当局者は、ウクライナへの支持を損なったり、ウクライナに直接影響を与えたりすることを目的として、ロシアによる破壊工作、サイバー攻撃、ハイブリッド攻撃がヨーロッパ全土で増加していると警告している。</p><p>ポーランド当局は、２人がドイツ国内で拘束されたとされる場所や時期を正確に明らかにしていない。</p><p>ポーランドの内務大臣マルシン・キエルウィンスキーは月曜日に逮捕を報告し、その直後にドナルド・トゥスク首相も逮捕を報告した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Polish officials on Monday said that two Turkish citizens have been detained in Germany in connection with a fire last month at a Starlink station in Poland .</p><p>The satellite-based Starlink internet service is widely used by the military of Poland's neighbor Ukraine amid the Russian invasion .</p><p>Officials from several EU countries have been warning of mounting Russian sabotage, cyber and hybrid attacks across Europe aiming either to erode support for Ukraine or to impact Ukraine directly.</p><p>Polish officials did not specify exactly where or when the two men were allegedly detained in Germany.</p><p>Polish Interior Minister Marcin Kierwinski reported the arrests on Monday, with Prime Minister Donald Tusk following soon after.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/poland-reports-arrests-of-2-turkish-citizens-in-germany-in-connection-with-starlink-station-fire-last-month/a-79646138?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/13 02:07</span>
+    </div>
+
+    
+    <p class="title-ja">フランス大統領候補グリュックスマン氏、分裂した左派の結束に向けて「戦いが始まる」と発言</p>
+    <p class="title-en"><a href="https://www.france24.com/en/france/20261012-french-presidential-candidate-glucksmann-says-battle-begins-to-unite-fragmented-left" target="_blank" rel="noopener">French presidential candidate Glucksmann says 'battle begins' to unite fragmented left</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>フランス大統領候補のラファエル・グリュックスマン氏は月曜日、2027年の選挙に向けて国内の分断された左翼を復活させるための「戦いが始まる」と述べた。 EU議員は日曜日、66パーセント以上の得票を得て中道左派候補として選出された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>French presidential candidate Raphaël Glucksmann said Monday that the "battle begins" to revive the country's divided left ahead of the 2027 election. The EU lawmaker was elected Sunday as the centre-left candidate with more than 66 percent of the vote.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/france/20261012-french-presidential-candidate-glucksmann-says-battle-begins-to-unite-fragmented-left" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/13 03:51</span>
+    </div>
+
+    
+    <p class="title-ja">英国、空軍基地陰謀でイランを非難、イラン人２人に制裁</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/12/uk-blames-iran-for-airbase-plot-sanctions-two-iranian-nationals?traffic_source=rss" target="_blank" rel="noopener">UK blames Iran for airbase plot, sanctions two Iranian nationals</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>英国のアンディ・バーナム首相は、フェアフォード王立空軍（RAF）基地を標的とした陰謀疑惑はイラン・イスラム革命防衛隊（IRGC）の指揮によるものであると「ほぼ確実に」述べ、イラン政府が責任を否定しているほとんど説明されていないこの事件を巡る外交上の関心が高まっている。</p><p>バーナム氏は月曜日、議会で「我々は我が国の国土におけるこうした脅威を容認しない」と述べ、政府は「イランによる犯罪ネットワークの利用を取り締まり、犯罪ネットワークとその資金の流れを標的にするためにあらゆる権限を行使する」と付け加えた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「イランと革命防衛隊が我々に危害を加える能力を制限するため、我々はさらなる制裁を導入する」と述べた。</p><p>この事件は9月27日未明にイングランド南部の空軍基地近くで発生し、20代の英国人男性5人が「テロ」と爆発物犯罪の疑いで逮捕された。</p><p>警察は、容疑者らに関連するバン３台からガソリンが供給されているのを発見したが、爆発物は発見されなかったと発表した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Britain’s Prime Minister Andy Burnham has said that a suspected plot targeting Royal Air Force (RAF) base Fairford was “almost certainly” directed by Iran’s Islamic Revolutionary Guard Corps (IRGC), raising the diplomatic stakes over the largely unexplained incident for which Tehran has denied any responsibility.</p><p>“We will not tolerate these threats on our soil,” Burnham told parliament on Monday, adding that the government, “will crack down on Iran’s use of criminal networks, using our full range of powers to target them and their funding streams”.</p><p>“We will bring further sanctions to restrict the capacity of Iran and the IRGC to do us harm”, he said.</p><p>The incident near the airbase in southern England occurred in the early hours of September 27 when five British men in their 20s were arrested on suspected “terrorism” and explosives offences.</p><p>Police said they found a supply of petrol in three vans linked to the suspects, but no explosives.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/12/uk-blames-iran-for-airbase-plot-sanctions-two-iranian-nationals?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/13 03:33</span>
+    </div>
+
+    
+    <p class="title-ja">サウジアラビアはどの程度危険にさらされているのでしょうか?イエメンのフーシ派、ドローンとミサイル攻撃を拡大</p>
+    <p class="title-en"><a href="https://www.france24.com/en/tv-shows/the-debate/20261012-how-exposed-is-saudi-arabia-yemen-s-houthis-scale-up-drone-and-missile-attacks" target="_blank" rel="noopener">How exposed is Saudi Arabia? Yemen's Houthis scale up drone and missile attacks</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>サウジアラビアはどの程度危険にさらされているのでしょうか?ドナルド・トランプの戦争に対するイランの報復で近隣湾岸諸国の脆弱性が突然露呈したのと同じように…イエメンのテヘランが支援するフーシ派との激化にリヤドはどれほど動揺しているのだろうか？私たちは、空港や石油施設への攻撃による物理的および物質的な被害と、王国の力を投影する能力に対する最終的な影響を評価します。低コストの無人機戦争の時代に、百戦錬磨の民兵はこの地域で最も裕福な国を相手にどこまで戦えるでしょうか?</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>How exposed is Saudi Arabia? Just as Iran’s retaliation to Donald Trump’s war suddenly exposed the vulnerability of neighboring Gulf states…how much is Riyadh reeling from the escalation with Yemen’s Tehran-backed Houthis? We’ll assess the physical and material damage from strikes on airports and oil facilities as well as eventual repercussions for the kingdom’s ability to project strength. In the age of cheap drone warfare, how much can a battle-hardened militia push against the region’s richest nation?</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/tv-shows/the-debate/20261012-how-exposed-is-saudi-arabia-yemen-s-houthis-scale-up-drone-and-missile-attacks" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/13 02:19</span>
+    </div>
+
+    
+    <p class="title-ja">ファクトチェック: リヤド空港攻撃に誤って関連付けられたウイルスビデオ</p>
+    <p class="title-en"><a href="https://www.dw.com/en/fact-check-viral-videos-falsely-linked-to-riyadh-airport-attacks/a-79643037?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Fact check: Viral videos falsely linked to Riyadh airport attacks</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イエメンの反政府勢力フーシ派はここ数日、サウジアラビアのキング・ハーリド国際空港に対する一連の攻撃について犯行声明を出した。サウジ当局によると、先週の木曜日以降、少なくとも１６人が殺害された。</p><p>襲撃のニュースが広がるにつれ、ソーシャルメディアユーザーは襲撃の様子を映したとする動画をシェアしている。攻撃とその余波を映した本物の映像がオンラインで出回っているが、DW ファクトチェックでは、いくつかのバイラルビデオは本物ではなく、AI によって生成された兆候があることが判明した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>主張 : X で 170 万回再生されたこの投稿は、空港への攻撃の瞬間を示していると主張しています。</p><p>このビデオは2026年3月からオンラインに公開されているが、空港に対する最近の攻撃は映っていなかった。</p><p>多忙なカメラの動きとぼやけた映像は、AI によって生成されたコンテンツを示すことが多い不具合を隠すのに役立ちます。ただし、フレームごとの分析では、いくつかの不一致が特定されました。これは、このビデオが AI によって生成されたことを示唆しています。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Yemen's Houthi rebels have claimed responsibility for a series of attacks on Saudi Arabia's King Khalid International Airport in recent days. At least 16 people have been killed since last Thursday, according to Saudi authorities.</p><p>As news of the attacks spreads, social media users have been sharing videos that they claim show the strikes. While some authentic footage of the attacks and their aftermath has circulated online, DW Fact check found that several viral videos are not genuine and show signs of being AI-generated.</p><p>Claim : This post with 1.7 million views on X, claims it shows the moment of an attack on the airport.</p><p>The video has been online since March 2026 and could not show the most recent attacks on the airport.</p><p>Hectic camera movements and blurry footage help conceal glitches that often point to AI-generated content. However, our frame-by-frame analysis identified several inconsistencies. That suggests the video was AI-generated.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/fact-check-viral-videos-falsely-linked-to-riyadh-airport-attacks/a-79643037?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/11 08:44</span>
+    </div>
+
+    
+    <p class="title-ja">12人が殺害された翌日、サウジ空港旅客ターミナルが再び襲撃される</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/10/g-s1-147682/attack-on-riyadh-airport-killed-12-people-and-wounded-over-300-more-saudi-authorities-say" target="_blank" rel="noopener">Saudi airport passenger terminal is struck again, a day after 12 were killed</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>AP が入手し検証したビデオからのこの画像には、2026 年 10 月 9 日金曜日、サウジアラビアのリヤドにあるキング・ハーリド国際空港での火災から立ち上る濃い黒煙と炎が示されています。(AP 経由の UGC) AP/UGC キャプションを隠す</p><p>カイロ—イエメンでイランの支援を受けるフーシ派反政府勢力と戦うサウジ主導連合は、同じターミナルにミサイルが命中し12人が死亡した翌日の日曜日、リヤドの国際空港の旅客ターミナルに飛翔体が命中したと発表した。フーシ派はこれらの攻撃などに対する犯行声明を出した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>サウジ当局は、キング・ハーリド国際空港の国内線ターミナルビルに対する最近の攻撃で、パキスタン人とみられる１人が死亡、１１人が負傷したと発表した。</p><p>過去5日間で4回攻撃を受けたこの空港は、イラン戦争が始まって以来、湾岸アラブ諸国で最悪の死者数となった土曜日のミサイル攻撃以来、閉鎖されている。他にも300人以上が負傷し、中には重傷を負った人もいた。</p><p>戦争の新たな戦線の急激な激化により、米国の軍事的関与がさらに拡大する恐れがある。ドナルド・トランプ大統領は、フーシ派との戦いに参加することを検討していると述べた。日曜日にはホワイトハウスからのコメントはなかった。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>This image from video obtained and verified by AP shows thick black smoke and flames rising from a fire at King Khalid International Airport in Riyadh, Saudi Arabia, Friday, Oct. 9, 2026. (UGC via AP) AP/UGC hide caption</p><p>CAIRO — A projectile struck a passenger terminal at the international airport in Riyadh on Sunday, a day after a missile hit the same terminal and killed 12 people, the Saudi-led coalition fighting Iran-backed Houthi rebels in Yemen said. The Houthis claimed responsibility for those attacks and others.</p><p>Saudi authorities said one person, described as a Pakistani national, was killed, and 11 were injured in the latest attack on the domestic terminal complex at King Khalid International Airport.</p><p>The airport — struck four times in the past five days — has been closed since Saturday's missile attack, which was the deadliest in a Gulf Arab nation since the Iran war began. Over 300 other people were wounded, some critically.</p><p>The sharp escalation in the war's new front threatens to draw in greater U.S. military involvement. President Donald Trump has said he is weighing joining the fight against the Houthis. There was no White House comment Sunday.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/10/g-s1-147682/attack-on-riyadh-airport-killed-12-people-and-wounded-over-300-more-saudi-authorities-say" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/13 02:33</span>
+    </div>
+
+    
+    <p class="title-ja">インドの有権者名簿変更で新たな抗議活動が勃発</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/10/12/indias-voter-list-changes-sparks-fresh-protests?traffic_source=rss" target="_blank" rel="noopener">India’s voter list changes sparks fresh protests</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>インドの有権者名簿変更で新たな抗議活動が勃発</p><p>物議を醸している有権者名簿の改訂はニューデリーで新たな抗議活動を引き起こし、野党指導者ラーフル・ガンジーはインドの選挙管理委員長に説明責任を要求した。 1億3000万人以上の名前がリストから削除され、選挙の透明性に対する懸念が高まっている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>India’s voter list changes sparks fresh protests</p><p>A controversial voter roll revision has triggered fresh protests in New Delhi, with opposition leader Rahul Gandhi demanding accountability from India’s election chief. More than 130 million names have been removed from the lists, prompting concerns over electoral transparency.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/10/12/indias-voter-list-changes-sparks-fresh-protests?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/13 01:01</span>
+    </div>
+
+    
+    <p class="title-ja">インドの野党、有権者名簿を巡る抗議活動が激化、最高裁判所へ行進</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/12/nx-s1-5998831/india-opposition-protests" target="_blank" rel="noopener">India's opposition parties march to top court as protests over voter lists escalate</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>月曜日、インドのニューデリーで、ギャネーシュ・クマール選挙管理委員長の辞任を求めて最高裁判所に向かうデモ行進に集まるインド野党・国民会議派の職員らを護衛するために暴動鎮圧用の装備を着た警備員らが到着した。マニッシュ スワラップ/AP キャプションを隠す</p><p>ニューデリー — ニューデリーでの大規模な弾圧で警察が週末にかけて数千人の活動家を拘束したことを受け、インドの野党は月曜日、ナレンドラ・モディ首相の政党を支持する有権者リストの削除に抗議するために最高裁判所まで行進した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>数人の野党議員と数千人の支持者が首都を行進し、全国的な有権者名簿の改定に不正があったと主張する請願書を最高裁判所長官に提出した。</p><p>選挙当局が昨年改正を開始し、１億３０００万人以上の有権者を名簿から削除して以来、若者の「ゴキブリ」運動が主導する抗議活動が激化している。野党を含むデモ参加者はギャネシュ・クマール選挙管理委員長の辞任を要求している。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Security personnel in riot gear arrive to escort workers of India's opposition Congress party as they gather for a march toward the Supreme Court demanding the resignation of Chief Election Commissioner Gyanesh Kumar in New Delhi, India, on Monday. Manish Swarup/AP hide caption</p><p>NEW DELHI — India's opposition parties marched to the Supreme Court on Monday to protest a purge of voter lists they say favors Prime Minister Narendra Modi's party, after police detained thousands of activists over the weekend in a sweeping crackdown in New Delhi.</p><p>Several opposition lawmakers and thousands of supporters marched through the capital and submitted a petition to the chief justice alleging irregularities in the nationwide revision of voter lists.</p><p>Protests led by the "Cockroach" youth movement have intensified since election authorities began the revision last year, removing more than 130 million voters from the lists. The protesters, including opposition parties, are demanding the resignation of Chief Election Commissioner Gyanesh Kumar.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/12/nx-s1-5998831/india-opposition-protests" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/12 23:43</span>
+    </div>
+
+    
+    <p class="title-ja">ネパール中部を新たな鉄砲水が襲い、5人が行方不明</p>
+    <p class="title-en"><a href="https://www.france24.com/en/video/20261012-five-people-missing-as-fresh-flash-floods-hit-central-nepal" target="_blank" rel="noopener">Five people missing as fresh flash floods hit central Nepal</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>新たな鉄砲水によりブディ・ガンダキ川沿いの家屋200軒以上と5つの橋が流された翌日の月曜日、ネパールの救助隊は行方不明者5人の捜索を行った。同国は、8月26日に起きた山岳氷河崩壊に端を発した壊滅的な洪水からまだ復興途上にあり、1,400人以上が死亡、5,000人以上が行方不明となっている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Nepali rescuers searched for five missing people on Monday, a day after new flash floods swept away more than 200 houses and five bridges along the Budhi Gandaki River. The country is still recovering from devastating floods, triggered by a mountain glacial collapse on August 26, which killed more than 1,400 people and left over 5,000 missing.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261012-five-people-missing-as-fresh-flash-floods-hit-central-nepal" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/12 23:33</span>
+    </div>
+
+    
+    <p class="title-ja">スターリンク・インドでのローンチ：イーロン・マスクがまだ待っている理由</p>
+    <p class="title-en"><a href="https://www.dw.com/en/starlink-india-launch-why-elon-musk-is-still-waiting/a-79643043?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Starlink India launch: Why Elon Musk is still waiting</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>スペースX社CEOのイーロン・マスク氏は、インドでのスターリンク打ち上げの遅れに対する批判を強めた。同氏は先週、インド有数の富豪の一人でリライアンス・インダストリーズ会長のムケシュ・アンバニ氏を皮肉を込めて「アンバニ首相」と呼び、彼の支持者らが独占を守っていると非難した。</p><p>「それでもスターリンクに競争させることを検討しますか？」マスク氏はXについて、このサービスがインド全土の十分なサービスを受けられていないコミュニティにインターネットアクセスをもたらす可能性があると主張した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>野党インド国民会議のリーダー、ラーフル・ガンジー氏も議論に加わり、「インドへようこそ、イーロン。相手を見つけるまで待ってください」と書いた。マスク氏は「ありがとう、ラーフル。これは実に憂慮すべきことだ」と答えた。</p><p>ナレンドラ・モディ首相率いる与党インド人民党（BJP）は、マスク氏の利益を擁護しているとしてガンジー氏を非難する一方、党幹部らはこの問題への政府の対応を擁護した。</p><p>先週ニューデリーで開催されたインド・モバイル・コングレス2026で講演したリライアンス・ジオ会長のアカシュ・アンバニ氏はマスク氏の発言についてコメントを控えた。同氏は「コメントすることはない。われわれは頭を下げてインドの消費者に価値を提供したい」と述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Elon Musk, the CEO of SpaceX, has escalated his criticism of the delay in launching Starlink in India . Last week, he sarcastically referred to Mukesh Ambani, one of India's richest people and chairman of Reliance Industries, as "Prime Minister Ambani" and accused his supporters of protecting a monopoly.</p><p>"Would you nonetheless consider allowing Starlink to compete?" Musk wrote on X, arguing that the service could bring internet access to underserved communities across India.</p><p>Rahul Gandhi, a leader of the opposition Indian National Congress, joined the discussion, writing: "Welcome to India, Elon. Wait till you discover the other guy." Musk replied: "Thank you, Rahul. This is indeed troubling."</p><p>Prime Minister Narendra Modi's ruling Bharatiya Janata Party (BJP) accused Gandhi of championing Musk's interests, while party leaders defended the government's handling of the issue.</p><p>Speaking during the India Mobile Congress 2026 in New Delhi last week, Reliance Jio chairman Akash Ambani declined to comment on Musk's remarks. He said: "I have no comments to make. We want to keep our heads down and deliver value to our Indian consumers."</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/starlink-india-launch-why-elon-musk-is-still-waiting/a-79643043?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/13 04:06</span>
+    </div>
+
+    
+    <p class="title-ja">ローマ法王レオ、ローマで肺結節除去手術を受ける</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/12/pope-leo-to-undergo-surgery-to-remove-lung-nodule-in-rome?traffic_source=rss" target="_blank" rel="noopener">Pope Leo to undergo surgery to remove lung nodule in Rome</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ローマ法王レオ14世が肺結節を除去する手術を受けるとバチカンが発表した。</p><p>71歳の教皇は、手術のため火曜日の朝遅くにローマのジェメリ病院に入ることになっているが、回復には約1週間の入院が必要と見込まれており、予定されていた教皇謁見の中止を余儀なくされている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>日曜日にサン・ピエトロ広場で行った週に一度の祝福の中で、レオは巡礼者らに対し、定期検査で左肺に小さな結節が見つかったと語り、それは「よく収まっていて」早期に発見されたと述べた。</p><p>サン・ピエトロ広場でイタリア語で行われた演説で、同氏は「医師らは行動を起こすのが最善だと信じているので、医師のアドバイスに従って切除手術を受けることにした」と語った。</p><p>その後、バチカンはレオさんの手術後は回復までに1週間の時間が見込まれ、10月20日まで彼の謁見は中止されたと発表した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Pope Leo XIV is to undergo surgery to remove a lung nodule, the Vatican has announced.</p><p>The 71-year-old pontiff will enter Rome’s Gemelli Hospital late on Tuesday morning for the procedure, which is expected to require about a week of inpatient recovery and has forced the cancellation of upcoming papal audiences.</p><p>During his weekly blessing in St. Peter’s square on Sunday , Leo told pilgrims that a small nodule was found on his left lung during a routine check-up and said it was “well-contained” and had been spotted early.</p><p>“The doctors believe it’s best to take action, so, following their advice, I’ve decided to have surgery to remove it,” he said at St Peter’s Square during remarks delivered in Italian.</p><p>Later, the Vatican said a week of recovery time is expected after Leo’s surgery and his audiences have been cancelled until October 20.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/12/pope-leo-to-undergo-surgery-to-remove-lung-nodule-in-rome?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/13 02:09</span>
+    </div>
+
+    
+    <p class="title-ja">入国管理局がイルハン・オマル議員の自宅を家宅捜索</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cvp8glg97393o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Immigration agents search Congresswoman Ilhan Omar's home</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米国の入国管理官は月曜朝、「犯罪捜査」の一環としてミネソタ州下院議員イルハン・オマル氏の自宅を家宅捜索した。</p><p>米司法省報道官はＢＢＣに対し、国土安全保障捜査（ＨＳＩ）職員らがワシントンＤＣ地域の住宅に対して「司法的に認可された捜索令状を執行した」と語った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>捜索は「現在進行中の連邦犯罪捜査の一環」であると報道官は述べたが、それ以上の詳細は明らかにされていない。米国議会は現在閉会中で、オマル氏が自宅にいたかどうかは不明だ。</p><p>民主党員でドナルド・トランプ大統領を率直に批判するオマール氏は、捜索を「政敵を標的にし、連邦法執行機関を武器にする試み」だと述べた。</p><p>オマル氏は声明で「10年間、トランプ大統領は根拠のない嘘や中傷キャンペーンで私を標的にしてきた」と述べた。 「これは彼の政治的脅迫活動の最近のエスカレーションに過ぎない。私は黙るつもりはない。」</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>US immigration agents searched the home of Minnesota Representative Ilhan Omar on Monday morning as part of a "criminal investigation".</p><p>Homeland Security Investigations (HSI) agents "executed a judicially authorised search warrant" for the home in the Washington, DC area, a US justice department spokesperson told the BBC.</p><p>The search "is part of an ongoing federal criminal investigation," the spokesperson said, but no further details were given. US Congress is currently out of session and it is unclear if Omar was at the home.</p><p>Omar, a Democrat and outspoken critic of President Donald Trump, described the search as "an attempt to target political enemies and weaponise federal law enforcement".</p><p>"For ten years, Trump has targeted me with baseless lies and smear campaigns," Omar said in a statement. "This is just the latest escalation in his campaign of political intimidation. I will not be silenced."</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cvp8glg97393o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/13 01:23</span>
+    </div>
+
+    
+    <p class="title-ja">数千人のインド人が選挙長官の更迭を求めて最高裁判所へ行進</p>
+    <p class="title-en"><a href="https://www.france24.com/en/thousands-of-indians-march-to-supreme-court-to-oust-election-chief" target="_blank" rel="noopener">Thousands of Indians march to Supreme Court to oust election chief</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ニューデリーでは、同国のトップ選挙管理委員の辞任を要求するデモ参加者が街頭に出続けている。有力紙の調査で有権者名簿の改訂をめぐり党内で懸念の声が上がっていることが明らかになり、不満が高まっている。デラノ・ドゥスーザ氏が報じた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Protesters in New Delhi continue to take to the streets demanding the country's top election commissioner resign. Frustrations have been mounting after an investigation in a leading newspaper revealed concerns had been raised within the body, over the revision of voter lists. Delano D'Souza reports.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/thousands-of-indians-march-to-supreme-court-to-oust-election-chief" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/12 22:14</span>
+    </div>
+
+    
+    <p class="title-ja">ベネズエラ贈収賄事件で逃亡中の実業家を米国で拘束</p>
+    <p class="title-en"><a href="https://www.theguardian.com/us-news/2026/oct/12/fugitive-venezuela-bribery-case" target="_blank" rel="noopener">Fugitive businessman taken into US custody in Venezuela bribery case</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ベネズエラ政府高官への贈賄容疑で米国で指名手配されていた実業家が拘留された</p><p>ベネズエラの有利な国家契約と引き換えにベネズエラ政府高官に賄賂を支払った容疑で長年米国で指名手配されていた実業家が拘留された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>アルバロ・プリド氏は、長年のビジネスパートナーであり、追放されたベネズエラ大統領ニコラス・マドゥロ氏のかつての同盟者であるアレックス・サーブ氏に対する捜査の一環として、2019年にマイアミ連邦裁判所で起訴され、2021年にも再び起訴された。米国麻薬取締局（DEA）と国務省は、同氏の逮捕につながる情報に対し、最大1000万ドルの報奨金を提示していた。</p><p>プリドさん（62）はDEA、FBI、国土安全保障捜査（HSI）機関主導の捜査の結果、米国で拘留されたと米当局者が日曜日に発表した。</p><p>プリドさんがどのようにして米国の拘留に至ったのかは不明だ。同氏は火曜日にマイアミで初出廷する予定だった。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A businessman wanted in the US for allegedly bribing top Venezuelan officials has been taken into custody</p><p>A businessman wanted for years in the US for allegedly paying bribes to top Venezuelan officials in exchange for lucrative state contracts in Venezuela has been taken into custody.</p><p>Alvaro Pulido was indicted in Miami federal court in 2019 and again in 2021 as part of an investigation into his longtime business partner, Alex Saab, a one-time ally of ousted Venezuelan president Nicolás Maduro . The US Drug Enforcement Administration (DEA) and the state department had been offering a reward of up to $10m for information leading to his arrest.</p><p>Pulido, 62, was taken into US custody after an investigation led by the DEA, FBI and Homeland Security Investigations (HSI) agencies, American officials said on Sunday.</p><p>It was unclear how Pulido ended up in US custody. He was scheduled to make his initial court appearance on Tuesday in Miami.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/us-news/2026/oct/12/fugitive-venezuela-bribery-case" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/13 03:21</span>
+    </div>
+
+    
+    <p class="title-ja">エジプトの記者組合組合長、拘束されたジャーナリストに対する圧力を拒否</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/12/egypts-press-union-chief-rejects-pressure-over-detained-journalists?traffic_source=rss" target="_blank" rel="noopener">Egypt’s press union chief rejects pressure over detained journalists</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>エジプトのジャーナリスト・シンジケートの会長は、先月拘束され「テロリスト」グループへの参加容疑で起訴されたジャーナリスト6人を擁護したことで批判を浴びたことを受けて、同組織は報道の自由を求めて戦い続けると主張した。</p><p>「一人の同僚に起こったことは私たち全員に影響するし、明日は他の同僚にも起こるかもしれない」とハリド・エルバルシ氏は日曜日の声明で述べた。 「一人のジャーナリストの自由の侵害は、全員の自由の侵害であり、その自由を守る安全装置の弱体化となる。」</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>同氏のコメントは、調査ウェブサイト「マツァダーシュ」で働く拘束されたジャーナリストらが拷問を受けた疑いでシンジケートがエジプト検察に告訴状を提出した後に発表された。エジプト当局は告発を否定したが、親政府派の評論家らは同組織がジャーナリストを擁護していると批判した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The head of Egypt’s Journalists Syndicate has insisted the organisation will continue to fight for press freedom after it came under fire for defending six journalists who were detained last month and charged with joining a “terrorist” group.</p><p>“What happens to one colleague affects us all, and may happen to others tomorrow,” Khaled Elbalshy said in a statement on Sunday. “An infringement of one journalist’s freedom is an infringement of everyone’s freedom and a weakening of the safeguards protecting that freedom.”</p><p>His comments came after the syndicate filed a complaint with Egypt’s public prosecutor over allegations that the detained journalists, who work for the investigative website Matsadaash, had been tortured. Egyptian authorities denied the accusations, while pro-government commentators criticised the organisation for defending the journalists.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/12/egypts-press-union-chief-rejects-pressure-over-detained-journalists?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/13 01:46</span>
+    </div>
+
+    
+    <p class="title-ja">南アフリカ警察副署長、性犯罪容疑で辞任</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c8wy9d940pyko?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">South Africa's deputy police chief resigns after being charged with sexual offences</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>南アフリカの警察副署長が性犯罪で起訴されてから３週間後に辞任した。</p><p>警察報道官によると、シャドラック・シビヤ中将の代理人弁護士が月曜日の懲戒公聴会で辞任届を提出した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>59歳のシビヤ氏は、組織犯罪のボスとの関係も持た​​れていると告発されており、その容疑により昨年停職処分となった。</p><p>同氏はこれらの容疑を否定しており、16歳の少女に性的手入れをし、18歳の女性を強姦したという容疑も否定している。彼は人身売買の罪にも問われている。</p><p>シビヤさんは、18歳の少女と性行為をしたことはあったが、それは合意の上だったと主張した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>South Africa's deputy police chief has resigned three weeks after he was charged with sexual offences.</p><p>A lawyer representing Lt Gen Shadrack Sibiya submitted his resignation letter at his disciplinary hearing on Monday, a police spokesperson said.</p><p>Sibiya, 59, is also accused of having links to organised crime bosses - allegations which led to him being suspended last year.</p><p>He denies those allegations, as well as charges that he sexually groomed a 16-year-old girl and raped an 18-year-old woman. He also faces a charge of human trafficking.</p><p>Sibiya says he did have sex with the 18-year-old but that it was consensual.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c8wy9d940pyko?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-10-13";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
