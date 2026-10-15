@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年10月15日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/15 22:32</span>
+    </div>
+
+    
+    <p class="title-ja">スターシールドとは何ですか? ウクライナのスターシールドへのアクセスを制限したのは誰ですか?</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/15/what-is-starshield-and-who-limited-ukraines-access-to-it?traffic_source=rss" target="_blank" rel="noopener">What is Starshield, and who limited Ukraine’s access to it?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ウクライナ国防省関係者によると、米国がサービスを制限したと報じられてからわずか数日後、ウクライナ軍のスターシールド衛星接続が復旧したという。</p><p>ロイター通信は関係者の話として、火曜から水曜にかけてスターシールドのサービスが中断された理由について、キエフは依然としてスターシールドの親会社スペースXに説明を求めていると報じた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ウクライナは、ロシアとの戦争の最中に情報を提供するために、SpaceXのインターネットサービスStarlinkの軍​​用バージョンであるStarshieldに依存している。</p><p>ドナルド・トランプ大統領がワシントンは依然としてキエフと情報を共有していると主張したにもかかわらず、スペースXのCEOイーロン・マスクは同社の関与を否定し、それを妨害できたのは米国政府だけだと示唆した。</p><p>Starshield は、Starlink の姉妹サービスです。Starlink は、遠隔地でも高速インターネット接続を提供するために、SpaceX によって地球の低軌道に配置された 11,000 個の衛星のアレイです。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Ukraine’s military Starshield satellite connection has been restored, a Ukrainian Ministry of Defence source says, just days after the United States reportedly restricted the service.</p><p>The Reuters news agency, quoting a source, reported that Kyiv is still seeking clarifications from Starshield’s parent company, SpaceX, as to why its service was disrupted between Tuesday and Wednesday.</p><p>Ukraine relies on Starshield, the military-grade version of SpaceX’s internet service, Starlink, to provide intelligence amid its war with Russia.</p><p>SpaceX CEO Elon Musk has denied the company’s involvement and suggested only the US government could have disrupted it, despite President Donald Trump’s insistence that Washington is still sharing intelligence with Kyiv.</p><p>Starshield is a sister service to Starlink, an array of 11,000 satellites placed by SpaceX into Earth’s low orbit to provide high-speed internet connectivity even in remote areas.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/15/what-is-starshield-and-who-limited-ukraines-access-to-it?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/15 22:31</span>
+    </div>
+
+    
+    <p class="title-ja">フランスの仮想通貨ユニコーン、レジャー社がAIのセキュリティリスクを警告</p>
+    <p class="title-en"><a href="https://www.france24.com/en/tv-shows/people-profit/20261015-french-crypto-unicorn-ledger-warns-of-ai-security-risks" target="_blank" rel="noopener">French crypto unicorn Ledger warns of AI security risks</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>人工知能は「セキュリティの状況を変えている」。デジタルセキュリティにおいてより大きな役割を模索しているフランスの仮想通貨ユニコーン企業レジャー社によると、これは明らかだ。最高技術責任者 Charles Guillemet 氏は次のように述べています。「脆弱性を見つけてそれを悪用するのには、ほとんどコストがかかりません。つまり、セキュリティ業界全体として、これが私たちが直面している新たな課題です。システムを破るのが非常に困難になるように、セキュリティの水準をどのように引き上げることができるでしょうか?そして、ハードウェアも方程式の一部であると思います。」</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Artificial intelligence is "changing the security landscape". That's according to Ledger, a French unicorn of cryptocurrency that's seeking a bigger role in digital security. Chief Technology Officer Charles Guillemet says: "Finding vulnerabilities and exploiting them costs almost nothing. So this is the new challenge that we have, as the security industry in general – how can we raise the bar for security so it becomes so difficult to break systems? And I think hardware is part of the equation."</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/tv-shows/people-profit/20261015-french-crypto-unicorn-ledger-warns-of-ai-security-risks" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/15 21:59</span>
+    </div>
+
+    
+    <p class="title-ja">スターリンク: イーロン・マスクの会社が地政学に与える影響</p>
+    <p class="title-en"><a href="https://www.dw.com/en/starlink-how-elon-musk-s-company-influences-geopolitics/a-75963477?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Starlink: How Elon Musk's company influences geopolitics</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>インターネット アクセスの欠如は、今日世界の多くの地域で大きな問題となっています。</p><p>Starlink は当初、この問題を解決するためにアメリカのハイテク億万長者イーロン・マスクによって開発されました。これは、従来の方法では不可能だった、あるいは費用がかかりすぎて試す価値がなかった世界中の地域にインターネットを迅速に導入する方法として設計されました。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>それ以来、Starlink の応用分野は大幅に拡大しました。これは災害地域での通信手段として使用されているだけでなく、既存のインターネットが敵の砲撃によって破壊されたり、独裁政府によって閉鎖されたりした地域など、軍隊や抗議運動でも使用されています。</p><p>しかし、マイナス面もあります。たとえば、ウクライナ軍はマスク氏の衛星システムに大きく依存しているのです。このことは、サービスが外部からの混乱に直面するにつれて特に顕著になっています。</p><p>マスク氏のスペースX社が運営するスターリンクは、世界中に設置された1万基の小型衛星で構成される衛星ベースのシステムである。レーザー リンクを介してデータ パッケージを転送するため、地上局への常時直接の視覚的リンクは必要ありません。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Lack of internet access is a major problem in many regions of the world today.</p><p>Starlink was initially developed by the American tech billionaire Elon Musk to solve this problem. It was designed as a way of quickly getting the internet into regions all over the world where this was either impossible to do by conventional methods, or so expensive that it wasn't worth attempting.</p><p>Since then, Starlink's field of application has widened significantly. It's used as a means of communication in disaster zones, but also by armies or protest movements, for example in regions where the existing internet has been destroyed by enemy fire or shut down by authoritarian governments.</p><p>But there is a downside: Ukraine's military, for example, is heavily dependent on Musk's satellite system. This has become especially apparent as the service faces external disruption.</p><p>Starlink, which is operated by Musk's SpaceX company, is a satellite-based system consisting of 10,000 small satellites located around the world. They transfer data packages via laser links and do not require a constant, direct visual link to a ground station.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/starlink-how-elon-musk-s-company-influences-geopolitics/a-75963477?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/15 20:12</span>
+    </div>
+
+    
+    <p class="title-ja">ルーマニア沖でタンカーが炎上、ドローン攻撃で乗組員8人行方不明</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c60qkgpp592yo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Eight crew missing after drone attack leaves tanker ablaze off Romania's coast</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ルーマニア沖でドローン攻撃によりタンカーが炎上し、乗組員12人中8人が行方不明だと海軍当局が発表した。</p><p>サンマリノ船籍のワイン・トレーダーは木曜朝、爆発と火災が発生したと通報したとき、ドナウ川河口の東13海里（24キロ）のスリナにいた。ルーマニアのニクエオール・ダン大統領は後にドローンによる攻撃を受けたことを認めた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>黒海の西海岸では最近、ドローンによる攻撃が相次いでいる。ウクライナのスネーク島近くで、ロシアの無人機の群れが現場からほど近い場所で一夜に発見された。</p><p>ロシア政府は、ウクライナのオデッサ港に向かう軍事貨物を積んだ貨物船２隻が海を渡る際に衝突されたと発表した。船の名前は明らかにしなかった。</p><p>火曜日、ルーマニアの隣国ブルガリアのさらに南の海岸沿いで商船２隻がドローンの攻撃を受け、そのうち１隻が沈没し、乗組員１１人が行方不明となった。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Eight of 12 crew members are missing after a drone attack left a tanker ablaze off Romania's coast, naval authorities say.</p><p>The San Marino-flagged Wine Trader was 13 nautical miles (24km) east of the mouth of the River Danube at Sulina, when it reported blasts and a fire on Thursday morning. Romanian President NicuÈor Dan later confirmed it was struck by drones.</p><p>The west coast of the Black Sea has recently seen a spate of drone attacks. A swarm of Russian drones was detected overnight not far from the scene, near Ukraine's Snake Island.</p><p>Moscow said two cargo ships with military cargo heading to Ukraine's Odesa port were hit during the sea crossing. It did not name the vessels.</p><p>On Tuesday, two merchant ships were struck by drones further south along the coast of Bulgaria, Romania's neighbour, and one of the vessels sank, leaving 11 crew members missing.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c60qkgpp592yo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/15 23:16</span>
+    </div>
+
+    
+    <p class="title-ja">フーシ派とリヤドの間で戦争が激化：どうやってここにたどり着いたのか？</p>
+    <p class="title-en"><a href="https://www.france24.com/en/tv-shows/perspective/20261015-war-escalates-between-houthis-and-riyadh-how-did-we-get-here" target="_blank" rel="noopener">War escalates between Houthis and Riyadh: How did we get here?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>フーシ派反政府勢力とサウジ支援連合との間で進行中の紛争について議論するために、フーシ派運動を専門とするフランスのCNRS研究機関の研究者、ジュール・グランジュ・ガスティネルに話を聞いた。彼は紛争が激化した理由とフーシ派が何を望んでいるのかを語ります。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>To discuss the ongoing conflict between the Houthi rebels and the Saudi-backed coalition, we speak to Jules Grange Gastinel, a researcher at France's CNRS research body specialising in the Houthi movement. He tells us why the conflict has escalated and what the Houthis want.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/tv-shows/perspective/20261015-war-escalates-between-houthis-and-riyadh-how-did-we-get-here" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/15 22:35</span>
+    </div>
+
+    
+    <p class="title-ja">アルジャジーラの捜査でイスラエルの反動映画の偽視聴者数が暴露される</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/15/al-jazeera-probe-exposes-fake-viewing-numbers-for-israeli-counter-film?traffic_source=rss" target="_blank" rel="noopener">Al Jazeera probe exposes fake viewing numbers for Israeli counter-film</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>アルジャジーラの調査により、高評価を得たドキュメンタリー「NAZA」に対するイスラエルのカウンター映画が4,400万回以上の視聴回数を記録したという主張の穴が明らかになった。調査では、ドメイン レジストリ、ウェブ アーカイブ、ソース コード、および 3 つの独立したトラフィック ツールを調査することにより、映画を宣伝するためにイスラエルの公式団体が採用した捏造された数字が明らかになりました。</p><p>受賞歴のあるオリジナル映画『NAZA』は、24人の匿名のイスラエル軍内部告発者の証言に基づいており、軍が人工知能を活用した標的システムを使用してガザで多数の民間人を殺害したと非難している。このドキュメンタリーの名前は、空爆で予想される民間人の死傷者を指すイスラエル軍用語に由来している。ヴェネチア国際映画祭で審査員特別賞を受賞し、歴史的な25分間のスタンディングオベーションを受けた後、この映画は56か国で上映される予定でした。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>オリジナルのドキュメンタリーの成功はイスラエルに政治的嵐を引き起こした。ベンヤミン・ネタニヤフ首相は、参謀総長、シン・ベト党首、司法長官に対し、参加者に対する包括的な調査を開始し、情報セキュリティ違反で訴追するよう要求した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>An Al Jazeera investigation has exposed holes in claims that an Israeli counter-film to the acclaimed documentary NAZA achieved more than 44 million views. By examining domain registries, web archives, source code, and three independent traffic tools, the investigation exposed the fabricated numbers adopted by official Israeli entities to promote the film.</p><p>The original award-winning film, NAZA, draws on testimony from 24 unnamed Israeli military whistleblowers, accusing the army of using artificial intelligence-powered targeting systems to kill numerous civilians in Gaza. The documentary takes its name from the Israeli military term for civilian casualties expected in air strikes. After winning the special jury prize at the Venice International Film Festival and receiving a historic 25-minute standing ovation , the film was scheduled to screen in 56 countries.</p><p>The success of the original documentary triggered a political storm in Israel. Prime Minister Benjamin Netanyahu demanded that the chief of general staff, the head of the Shin Bet, and the attorney general launch a comprehensive investigation into the participants and prosecute them for information security violations.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/15/al-jazeera-probe-exposes-fake-viewing-numbers-for-israeli-counter-film?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/15 21:09</span>
+    </div>
+
+    
+    <p class="title-ja">世界の偵察機市場を深く掘り下げる</p>
+    <p class="title-en"><a href="https://www.france24.com/en/tv-shows/the-observers/20261015-deep-dive-global-spy-plane-market" target="_blank" rel="noopener">A deep dive into the global spy plane market</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>メキシコ国境からシリア、サヘル地域に至るまで、世界中で企業が政治任務のために強力なセンサーを搭載した飛行機を軍隊や諜報機関にレンタルしている。市場は目立たないかもしれませんが、目に見えないわけではありません。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>All over the globe – from the Mexican border to Syria to the Sahel – companies are renting out planes equipped with powerful sensors to armies and intelligence services for political missions. The market may be discreet, but it isn’t invisible.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/tv-shows/the-observers/20261015-deep-dive-global-spy-plane-market" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/15 19:05</span>
+    </div>
+
+    
+    <p class="title-ja">イスタンブールで84年ぶりの豪雨で2人死亡、知事発表</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cq398x7j1lrwo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Two dead in Istanbul after heaviest rainfall in 84 years, governor says</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イスタンブール知事が84年ぶりの豪雨だったと発表したことによる大洪水で2人が死亡したとBBCトルコが報じた。</p><p>14歳の少年が水たまりに足を踏み入れ感電死し、道路を横断しようとしていた34歳の男性が滑って転倒し、歩道に頭を打った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>同市副市長によると、一部の地区では車が水没し、立ち往生した６００人近くが救出された。</p><p>イスタンブールのダブット・ギュル知事は住民に対し、絶対に必要な場合を除いて外出を避けるよう指示した。</p><p>市知事は感電死した10代の少年の死を調査している。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Two people have died after severe flooding caused by what the governor of Istanbul said was the heaviest rainfall in 84 years, BBC Turkish has reported.</p><p>A14-year-old boy died after he was electrocuted when he stepped in a puddle, while a 34-year-old man attempting to cross the road slipped and fell, hitting his head on the pavement.</p><p>Nearly 600 people have been rescued after becoming stranded, the city's deputy mayor said, with cars submerged in water in some districts.</p><p>Residents have been told by Istanbul Governor Davut GÃ¼l to avoid leaving their homes unless absolutely necessary.</p><p>The city's governorship is investigating the death of the teenaged boy who was electrocuted.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cq398x7j1lrwo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/15 21:54</span>
+    </div>
+
+    
+    <p class="title-ja">写真：中国と北朝鮮、関係深化の中で新たな国境橋を開通</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/gallery/2026/10/15/photos-china-and-north-korea-open-new-border-bridge-amid-deepening-ties?traffic_source=rss" target="_blank" rel="noopener">Photos: China and North Korea open new border bridge amid deepening ties</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>長く遅れていた中国と北朝鮮を結ぶ橋の開通は、北朝鮮が中国とモスクワの経済的孤立を緩和するよう働きかけている中、隣国両国間の関係の深化を浮き彫りにしている。</p><p>中国国営新華社通信は、中国北東部の都市丹東市と北朝鮮国境の都市新義州を結ぶ新鴨緑江橋の開通式が木曜日に開催されたと伝えた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>国営メディアのビデオには、両国の国旗で装飾されたトラックが4車線の道路に並ぶ様子が映されており、道路自体も中国と北朝鮮の国旗で飾られていた。</p><p>新華社通信によると、中国の李強首相はビデオ演説で、この橋を両国の「伝統的な友好関係」の「新たなランドマーク」と称賛し、この橋を利用して接続を深め、国境地域での新たな協力を模索するよう双方に促した。北朝鮮の朴泰成首相もビデオメッセージを発表した。</p><p>全長3km（1.8マイル）のこの道路橋は、老朽化し​​た中朝友好橋への負担を軽減すると期待されている。この橋は同じルートにある数十年前に建設され、鉄道線路と車両が通っているが、一度に一方通行の交通しか受け入れられない。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The opening of a long-delayed bridge linking China and North Korea underscores the deepening ties between the two neighbours as Pyongyang courts both Beijing and Moscow to ease its economic isolation.</p><p>China’s official Xinhua news agency said a launch ceremony was held on Thursday for the New Yalu River Bridge, which connects the northeastern Chinese city of Dandong with the North Korean border city of Sinuiju.</p><p>Video from state media showed trucks decorated with the national flags of both countries lined up on the four-lane span, which itself was festooned with Chinese and North Korean flags.</p><p>In a video address, Chinese Premier Li Qiang hailed the bridge as a “new landmark” of the countries’ “traditional friendship” and urged both sides to use the opening to deepen connectivity and explore new cooperation in border areas, Xinhua reported. North Korean Premier Pak Thae Song also delivered a video message.</p><p>The 3km (1.8-mile) road bridge is expected to ease pressure on the ageing Sino-Korean Friendship Bridge, a decades-old structure on the same route that carries a railway line and vehicles but can accommodate only one-way traffic at a time.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/gallery/2026/10/15/photos-china-and-north-korea-open-new-border-bridge-amid-deepening-ties?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/15 21:28</span>
+    </div>
+
+    
+    <p class="title-ja">パキスタンで学校屋根崩壊、生徒と教師少なくとも33人死亡</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cked326llddgo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">At least 33 pupils and teacher killed after school roof collapses in Pakistan</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>病院関係者によると、パキスタン北西部の都市ペシャワールで学校の屋根が崩壊し、少なくとも生徒３３人と教師１人が死亡した。</p><p>他にも十数人が負傷し、重篤な状態にある人もいる。数人の子供たちが瓦礫の下敷きになる恐れがある。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>救助当局者によると、ディル・コロニーの私立アル・ハイル学校では木曜午前８時４８分（グリニッジ標準時午後３時４８分）、授業が始まった後、この事件が発生したと救急隊に通報があった。</p><p>同氏はBBCに対し、上階の教室の屋根が崩壊し、下の天井も陥没したと語った。</p><p>警告: この記事には悲惨な詳細が含まれています</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>At least 33 pupils and a teacher have been killed after a school roof collapsed in the north-western Pakistani city of Peshawar, according to hospital officials.</p><p>More than a dozen others are injured, with some in a critical condition. Several children are feared to be trapped under the rubble.</p><p>Emergency services were alerted to the incident at the private Al-Khair school in Dir Colony at 08:48 (03:48 GMT) on Thursday after lessons had begun, a rescue official said.</p><p>He told the BBC the roof of an upper-floor classroom had collapsed, causing ceilings below to cave in as well.</p><p>Warning: This article contains distressing details</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cked326llddgo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/15 21:02</span>
+    </div>
+
+    
+    <p class="title-ja">極超音速ミサイルは朝鮮半島の軍拡競争を浮き彫りにする</p>
+    <p class="title-en"><a href="https://www.dw.com/en/hypersonic-missiles-highlight-arms-race-on-korean-peninsula/a-79667084?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Hypersonic missiles highlight arms race on Korean Peninsula</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>北朝鮮は水曜、東海岸沖で2種類の潜水艦発射巡航ミサイルの実験を行ったと発表した。その翌日、国営朝鮮中央通信は、金正恩朝鮮労働党委員長が新設の防衛産業博物館を訪問し、米国本土の目標を攻撃できるとされる大陸間弾道ミサイルを鑑賞したと報じた。</p><p>この訪問は、韓国の李在明大統領が同国初の国産極超音速ミサイルの発射実験を視察した５日後に行われた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>韓国の躍進は、北朝鮮が10月3日に目標に衝突するまでに350キロメートル（220マイル）飛行する極超音速中距離ミサイルとされるものの実験を発表した後に起こった。</p><p>朝鮮中央通信は、「金正恩同志は、各国のミサイル部隊が責任ある戦闘態勢で共和国の主権と安全を守るという任務に忠実であり続けるとの期待と信念を表明した」と報じた。</p><p>北朝鮮と韓国は主に極超音速技術の開発を競っているが、それはインド太平洋地域の緊張が悪化している中で、極超音速技術が攻撃能力の強化につながるからである。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>North Korea announced that it had tested two types of submarine-launched cruise missiles off its east coast on Wednesday — a day after the state-run Korean Central News Agency reported that leader Kim Jong Un had visited a new defense industry museum, where he admired an intercontinental ballistic missile reportedly capable of hitting targets in the continental United States.</p><p>The visit came five days after South Korean President Lee Jae-myung observed the test launch of his country's first domestically developed hypersonic missile.</p><p>South Korea's breakthrough came after Pyongyang announced a test on October 3 of what it described as a hypersonic intermediate-range missile that traveled 350 kilometers (220 miles) before striking its target.</p><p>"Comrade Kim Jong Un expressed the expectation and belief that all the nation's missile forces would remain faithful to their missions of defending the sovereignty and security of the republic in a responsible combat posture," the KCNA reported.</p><p>Both North Korea and South Korea are primarily racing to develop hypersonic technology because it offers a step-up in offensive capabilities at a time of worsening tensions in the Indo-Pacific region.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/hypersonic-missiles-highlight-arms-race-on-korean-peninsula/a-79667084?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/15 19:38</span>
+    </div>
+
+    
+    <p class="title-ja">米国のインフレとAI債務への懸念でハイテク市場の下落が深刻化</p>
+    <p class="title-en"><a href="https://www.theguardian.com/business/2026/oct/15/tech-market-sell-off-deepens-amid-fears-over-us-inflation-and-ai-debt" target="_blank" rel="noopener">Tech market sell-off deepens amid fears over US inflation and AI debt</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>潜在的な金利上昇が市場を動揺させる中、サムスンやソフトバンクなどの半導体メーカーやハイテク投資家が急落</p><p>ラリー・エリオット: 世界経済は混乱しています。でも嵐が来るよ</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>インフレ上昇と将来の金利上昇に対する懸念により、トレーダーらはすでに重債務セクターに警戒を強めており、AI関連株の売り加速が世界市場に打撃を与えている。</p><p>メモリチップを製造する企業に大きく偏っている韓国の指標コスピ200指数は、一夜にして6カ月ぶりの終値安値まで8％以上下落し、さまざまな時点で取引を停止するサーキットブレーカーが発動された。</p><p>ＳＫハイニックスやサムスン電子などの半導体株の一部は、それぞれ１１％近く、９．５％下落した。同指数は８．１％下落し、６カ月ぶりの安値で取引を終えた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Chip makers and tech investors such as Samsung and SoftBank plunge as potential interest rate hikes spook markets</p><p>Larry Elliott: the global economy is muddling through. But a storm is coming</p><p>An accelerating sell-off of AI-linked shares has hit global markets, as fears over rising inflation and future interest rate hikes spooked traders already wary of the heavily indebted sector.</p><p>South Korea’s benchmark Kospi 200 index, which is heavily skewed towards the companies that make memory chips, fell more than 8% overnight to a six-month closing low, triggering circuit breakers that brought trading to a halt at various points.</p><p>Some of those semiconductor stocks, such as SK Hynix and Samsung Electronics, plunged nearly 11% and 9.5%, respectively. The index closed at a six-month low, down 8.1%.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/business/2026/oct/15/tech-market-sell-off-deepens-amid-fears-over-us-inflation-and-ai-debt" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/15 19:05</span>
+    </div>
+
+    
+    <p class="title-ja">ブラジル議会、ルラ氏勝利で週労働時間短縮を承認</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cmwy43pp08elo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Brazil's Congress approves shorter working week in win for Lula</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ブラジル議会は、週労働時間を44時間から40時間に短縮し、給与を減らさずに従業員に週2日の休日を与える憲法改正案を承認した。</p><p>この変更は、1988年のブラジルの民主主義復帰以来、労働者の権利に対する最大の見直しを意味する。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>上院議員らは、左派のルイス・イナシオ・ルーラ・ダ・シルバ大統領が支持していたこの修正案を、ラテンアメリカ国家大統領選挙の第２回投票まで２週間を切ったタイミングで可決した。</p><p>ルーラ氏の支持者らは、3,000万人以上の労働者に利益をもたらすと推定されるこの法案可決により、10月25日の決選投票で右翼のライバル、フラビオ・ボルソナロ氏に迫る可能性が高まることを期待している。</p><p>ジャイール・ボルソナロ元大統領の息子が大統領選挙の第1回投票で47％の得票率で勝利し、ルラ氏の45.2％を上回った。どちらも決定的な第2ラウンドを阻止するために必要な有効投票の50％に届かなかった。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Brazil's Congress has approved a constitutional amendment that will cut the working week from 44 hours to 40 and give employees two days off per week without cutting their salary.</p><p>The change represents the biggest overhaul to workers' rights since Brazil's return to democracy in 1988.</p><p>Senators passed the amendment, which left-wing President Luiz InÃ¡cio Lula da Silva had championed, less than two weeks before a second round in the Latin American nation's presidential election.</p><p>Lula's supporters are hoping that its passage, which is estimated to benefit more than 30 million workers, will boost his chances of closing in on his right-wing rival, FlÃ¡vio Bolsonaro, in the 25 October run-off.</p><p>The son of former President Jair Bolsonaro won the first round of the presidential election with 47% of the vote, ahead of Lula on 45.2%. Both fell short of the 50% of valid votes needed to stave off a decisive second round.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cmwy43pp08elo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/15 19:00</span>
+    </div>
+
+    
+    <p class="title-ja">闘牛禁止令でもマタドールの訓練を止められないメキシコシティからこんにちは。</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/15/nx-s1-6001550/mexico-city-bullfighting-ban-matador-training" target="_blank" rel="noopener">Greetings from Mexico City, where a bullfighting ban doesn't stop this matador training</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>彼らはメキシコシティの大きな都市公園の真ん中で練習しています。一対の本物の角を持った角のうちの 1 つが、フクシアの闘牛岬に向かって滑走して牛を演じています。彼らは殺しの練習をしているが、木漏れ日が差し込み、闘牛士が腰を横に倒し、両腕を完全に垂直にして優雅に身をかわす姿は、違和感なく美しく見える。</p><p>「これは死のバレエです」とホセ・ルイス・エロスは説明する。しかし、雄牛の動きは遅すぎるし、優雅すぎるように見える、と私は彼に言いました。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「それが雄牛の動き方です」と彼は言う。彼らが頭を下げ、角であなたを突き刺す準備ができているとき、それはゆっくりとあなたに向かって来ると彼は説明します。</p><p>「闘牛の要点は、私たちが持っているとされる知性を使って恐怖と死に直面することだ」と彼は言う。 「雄牛は短剣を2本持っています。私たちはこの布切れを持っています。」</p><p>ここに集まる人々は本物の闘牛士です。メキシコ市は雄牛を殺すことを禁止しており、雄牛はスポーツのために首都の外へ旅行する。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>They practice in the middle of Mexico City's big urban park. With a pair of real horns, one of them plays the bull by gliding toward the fuchsia bullfighting cape. They're practicing to kill, but as the sunlight filters through the trees and the bullfighter dodges with grace, his hips to one side, his arms perfectly perpendicular, it looks incongruently beautiful.</p><p>"It's the ballet of death," José Luis Herros explains. But the movement from the bull looks too slow, too graceful, I tell him.</p><p>"That's the way bulls move," he says. When their head is down and it's ready to gore you with its horns, he explains, it comes at you slowly.</p><p>"The whole point of bullfighting is to face fear and death with the intelligence that we supposedly have," he says. "The bull has two daggers, we have this piece of cloth."</p><p>The people who gather here are real bullfighters. Mexico City has banned killing bulls so they travel outside the capital city for their sport.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/15/nx-s1-6001550/mexico-city-bullfighting-ban-matador-training" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/15 18:52</span>
+    </div>
+
+    
+    <p class="title-ja">ブラジルの選挙は地球にとって重要です。これが理由です</p>
+    <p class="title-en"><a href="https://www.dw.com/en/brazil-s-elections-matter-for-the-planet-this-is-why/a-79659928?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Brazil's elections matter for the planet. This is why</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ブラジルの大統領選挙ほど、環境に大きな影響を与える国政選挙はほとんどありません。そして、この事件は国境を越えて遠くから監視されています。</p><p>アマゾン熱帯雨林の最大の部分を抱えるブラジルは極めて重要な二酸化炭素吸収源の守護者であり、同国の保護政策は世界的に重要なものとなっている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>環境活動家らはすでに、右派ジャイール・ボルソナロ元大統領の息子であるフラビオ・ボルソナロ氏が第1回選挙で現職のルイス・イナシオ・ルーラ・ダ・シルバ氏を2％上回る結果を出したことに警戒の声を上げている。</p><p>ブラジルのNGOネットワークである気候観測所の国際政策コーディネーター、クラウディオ・アンジェロ氏は、「ボルソナロ氏の再来、つまりより過激なボルソナロ氏となるだろう」と語った。</p><p>「警戒心が強いように聞こえるのを覚悟で言えば、ルーラ氏の再選が私たちとアマゾンの終焉との間に立ちはだかる唯一のものだと言えます。」</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Few national elections carry as much environmental weight as Brazil 's presidential race. And this one is being watched from far beyond the country's boundaries.</p><p>Home to the largest section of the Amazon rainforest , Brazil is guardian of a carbon sink of vital importance, making the country's conservation policies globally relevant.</p><p>Environmentalists have already voiced alarm at Flávio Bolsonaro — son of right-wing former president Jair Bolsonaro — coming out 2% ahead of incumbent Luiz Inácio Lula da Silva in the first round of elections.</p><p>"It's going to be a second coming of Bolsonaro, therefore a more radical Bolsonaro," said Claudio Angelo, international policy coordinator at Climate Observatory, a network of Brazilian NGOs.</p><p>"At the risk of sounding alarmist, I would say Lula's re-election is the only thing standing between us and the end of the Amazon."</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/brazil-s-elections-matter-for-the-planet-this-is-why/a-79659928?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/14 17:39</span>
+    </div>
+
+    
+    <p class="title-ja">ジョニ・ミッチェル、米国市民権取得：「62年前に始まった旅」</p>
+    <p class="title-en"><a href="https://www.theguardian.com/music/2026/oct/14/joni-mitchell-becomes-us-citizen-a-journey-that-began-62-years-ago" target="_blank" rel="noopener">Joni Mitchell becomes US citizen: ‘A journey that began 62 years ago’</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>カナダ生まれのシンガーソングライター、82歳が市民権授与式の映像をインスタグラムに投稿</p><p>ジョニ・ミッチェルは、1960年代半ばに初めてアメリカに移住した後、アメリカ国民となった。カナダ生まれのシンガーソングライター（82）は、自身のインスタグラムアカウントに市民権授与式の映像と、星条旗の隣に写った写真を投稿し、「62年前に始まった旅」というキャプションを添えた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>これは、ミッチェルさんができないと訴えていた米国選挙で投票できるようになったということだ。</p><p>2024年のコンサートで、ミッチェルはYGのラップトラックについて「くたばれ、ドナルド・トランプ、私はあの曲が大好きだ」と語った。さらに、「投票できたらいいのに…私はカナダ人です。ひどい移民の一人です」と付け加えた。</p><p>ミッチェルは 1943 年にアルバータ州フォート マクラウドで生まれ、最終的に家族とともにサスカチュワン州サスカトゥーンに定住しました。彼女の最初のギグはそこのフォーククラブで行われ、続いてカルガリーとトロントで米国のフォーク歌手チャック・ミッチェルと出会った。彼らは1965年に結婚し、ミッチェルは米国に移住した。結婚生活は長くは続かず、2年後に終わりを迎えたが、その時までにミッチェルは活気に満ちたアメリカのフォークミュージック界において、温和で独創的な声としての地位を確立していた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Canada-born singer-songwriter, 82, posts footage of citizenship ceremony to Instagram</p><p>Joni Mitchell has become a US citizen, after first moving to the country in the mid-1960s. The Canada-born singer-songwriter, 82, posted footage of her citizenship ceremony on her Instagram account, along with a photo of her next to an American flag, accompanied by the caption: “A journey that began 62 years ago.”</p><p>It means that Mitchell can now vote in US elections, something that she had complained she wasn’t able to do.</p><p>At a concert in 2024, Mitchell said: “Fuck Donald Trump, I love that song,” referring to the rap track by YG. She added: “I wish I could vote ... I’m a Canadian. I’m one of those lousy immigrants.”</p><p>Mitchell was born in Fort Macleod, Alberta, in 1943, and eventually settled with her family in Saskatoon, Saskatchewan. Her earliest gigs were at folk clubs there, followed by Calgary and Toronto, where she met US folk singer Chuck Mitchell. They married in 1965 and Mitchell moved to the US. The marriage didn’t last, ending two years later, but by that time Mitchell had established herself as a mellifluous, original voice on the vibrant US folk music circuit.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/music/2026/oct/14/joni-mitchell-becomes-us-citizen-a-journey-that-began-62-years-ago" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/15 22:48</span>
+    </div>
+
+    
+    <p class="title-ja">ザ・レベル・ツアーズ: お金か道徳か？</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/game-theory/2026/10/15/aje-onl-gm_rebel_v8-151026?traffic_source=rss" target="_blank" rel="noopener">The Rebel Tours: Money or morals?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ゲーム理論: お金のためにスポーツボイコットを破ったらどうなるでしょうか?</p><p>人生を変えるほどのお金を求めてスポーツ界最大のボイコットを打ち破りますか? 1980年代、西インド諸島のクリケット選手の一部がアパルトヘイトの南アフリカを遠征し、怒りを引き起こした。アルジャジーラのサマンサ・ジョンソンが、物議を醸したツアーの背後にある金銭、道徳、そして結果について探ります。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Game Theory: What happens when you break a sporting boycott for money?</p><p>Would you break one of sport’s biggest boycotts for life-changing money? In the 1980s, some West Indies cricketers toured apartheid South Africa, sparking outrage. Al Jazeera’s Samantha Johnson explores the money, morals and consequences behind the controversial tours.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/game-theory/2026/10/15/aje-onl-gm_rebel_v8-151026?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/15 21:36</span>
+    </div>
+
+    
+    <p class="title-ja">チャドのICC離脱計画でスーダン戦争犯罪捜査への懸念が高まる</p>
+    <p class="title-en"><a href="https://www.france24.com/en/video/20261015-chad-s-icc-exit-plans-raise-concerns-over-sudan-war-crimes-probes" target="_blank" rel="noopener">Chad’s ICC exit plans raise concerns over Sudan war crimes probes</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>昨年7月、チャドは国際刑事裁判所が非効率でアフリカ諸国を不当に標的にしているとして国際刑事裁判所から脱退する計画を発表した。この決定は、特にICCの捜査官がチャド東部に避難しているスーダン難民と関わっていることから、隣国スーダンの紛争に関連した戦争犯罪容疑に対する今後の捜査を複雑にする可能性がある。フランス24のハロルド・ジラールが報じているように、政治的な逆風にもかかわらず、人道団体は現場で活動を続け、危機によって避難民を支援している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Last July, Chad announced plans to withdraw from the International Criminal Court, accusing it of inefficiency and of disproportionately targeting African nations. The decision could complicate future investigations into alleged war crimes linked to the conflict in neighbouring Sudan, particularly as ICC investigators engage with Sudanese refugees sheltering in eastern Chad. Despite the political headwinds, humanitarian organisations remain on the ground, supporting those displaced by the crisis, as FRANCE 24’s Harold Girard reports.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261015-chad-s-icc-exit-plans-raise-concerns-over-sudan-war-crimes-probes" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-10-15";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
