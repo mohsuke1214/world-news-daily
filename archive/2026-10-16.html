@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年10月16日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/16 23:19</span>
+    </div>
+
+    
+    <p class="title-ja">米上院議員らがウクライナのスターリンク規制への調査を要求</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cq398zl8jmvdo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">US senators call for investigation into Ukraine's Starlink restrictions</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米国上院議員の超党派グループが、ウクライナにあるスペースX社のスターリンク・インターネット・ネットワークの混乱に関する緊急調査を要求する書簡に署名した。</p><p>スターリンクは、キエフがドローンをロシアの目標に誘導し、自国の空を守ることを可能にする重要なツールだが、ウクライナは火曜日の夜、インターネット接続を維持しながらドローンが飛行できる速度を予想外に制限したと発表した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>上院議員らは米国防総省監察総監に宛てた書簡の中で、10月12日から14日にかけて行われた速度規制に関する報道について「重大な懸念」を表明している。</p><p>米国が景気減速に関与したのではないかとの質問に対し、米当局者は「大統領（ドナルド・トランプ氏）からそのような要請は一度もなかった」とBBCに語った。</p><p>上院外交委員会の民主党員ジーン・シャヒーン氏が主導したこの書簡は、監察長官に対し、制限が米国防総省やその請負業者によって引き起こされたのかどうかを解明するよう求めている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A bipartisan group of US senators has signed a letter demanding an urgent investigation into disruptions to SpaceX's Starlink internet network in Ukraine.</p><p>Starlink is a vital tool allowing Kyiv to guide drones to Russian targets and protect its own skies, but on Tuesday night Ukraine said it had unexpectedly restricted how fast drones could fly while maintaining internet connection.</p><p>In the letter, sent to the US defence department inspector general, the senators express "grave concern" about reports of speed curbs between 12 and 14 October.</p><p>Asked whether the US might have had a role in the slowdown, a US official told the BBC "no such request was ever made by the president [Donald Trump]".</p><p>The letter, led by Jeanne Shaheen - a Democrat on the Senate's Foreign Relations Committee - calls for the inspector general to find out whether the restrictions were caused by the US defence department or its contractors.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cq398zl8jmvdo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/16 22:40</span>
+    </div>
+
+    
+    <p class="title-ja">チャンピオンズカップデビューを前に、南アフリカのラグビー選手がフランスのホテルで死亡しているのが発見される</p>
+    <p class="title-en"><a href="https://www.france24.com/en/sport/20261016-south-african-rugby-player-found-dead-in-french-hotel-ahead-of-champions-cup-debut" target="_blank" rel="noopener">South African rugby player found dead in French hotel ahead of Champions Cup debut</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ライオンズチームの南アフリカのラグビー選手が金曜、欧州チャンピオンズカップのラ・ロシェル戦の前夜、フランスのホテルで死亡しているのが発見されたと地元メディアが報じた。同選手の身元はまだ公表されていない。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A South African rugby player for the Lions team was found dead at a hotel in France Friday on the eve of a European Champions Cup game with ​La ‌Rochelle, local media reported. The player's identity has yet not been made public.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/sport/20261016-south-african-rugby-player-found-dead-in-french-hotel-ahead-of-champions-cup-debut" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/16 22:13</span>
+    </div>
+
+    
+    <p class="title-ja">スペイン、エジプト親善試合中にイスラム嫌悪のチャントを唱えてFIFAから処分</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/sports/2026/10/16/spain-punished-by-fifa-for-islamophobic-chants-in-egypt-friendly?traffic_source=rss" target="_blank" rel="noopener">Spain punished by FIFA for Islamophobic chants during Egypt friendly</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>FIFAは声明で、3月のエジプト戦でサポーターがイスラム嫌悪のスローガンを2度唱えたため、スペイン代表に2万ドルの罰金と次の親善試合に向けてスタジアムの一部閉鎖を命じたと発表した。</p><p>この制裁は、ラ・リーガのエスパニョールの本拠地、バルセロナ近郊のRCDEスタジアムで起きた事件に関連したもので、0-0の引き分けに終わったワールドカップの強化試合中に一部のスペインファンが「ジャンプしない者はイスラム教徒だ」と叫んだ。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>2度目のチャントの発生後、スタジアムのアナウンサーが警告を発し、スコアボードには差別的行為に対するメッセージが表示された。</p><p>イスラム教徒であるスペイン代表ウインガーのラミネ・ヤマルは、当時のチャントを無礼で耐え難いものだと非難し、責任者を「無知で人種差別主義者」と呼んだ。</p><p>スペイン警察は翌日捜査を開始し、その後世界統括団体FIFAはスペインサッカー連盟(RFEF)に対する懲戒手続きを開始した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Spain have ‌‌‌‌been fined $20,000 and ordered to partially close their stadium ⁠⁠⁠⁠for their ⁠⁠⁠⁠next friendly after supporters twice chanted Islamophobic slogans during the game against Egypt in March, FIFA said ⁠⁠⁠⁠in a statement.</p><p>The sanctions relate to incidents at the RCDE Stadium near Barcelona, home of LaLiga club Espanyol, ⁠⁠⁠⁠where some Spain fans chanted, “Who doesn’t jump is a Muslim” during a World Cup warm-up match which ended in a 0-0 draw.</p><p>After the second occurrence of the chant, the stadium announcer ‌‌‌‌issued a warning and the scoreboard displayed a message against discriminatory behaviour.</p><p>Spain winger Lamine Yamal, who is Muslim, condemned the chants at the time, describing them as disrespectful and intolerable and calling those responsible “ignorant and racist”.</p><p>Spanish police launched an investigation the following day, while world governing ⁠⁠⁠⁠body FIFA later started disciplinary proceedings against ⁠⁠⁠⁠the Spanish football federation (RFEF).</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/sports/2026/10/16/spain-punished-by-fifa-for-islamophobic-chants-in-egypt-friendly?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/16 22:12</span>
+    </div>
+
+    
+    <p class="title-ja">EUはAI革命を望んでいる。しかし、誰の条件で？</p>
+    <p class="title-en"><a href="https://www.dw.com/en/the-eu-wants-an-ai-revolution-but-on-whose-terms/a-79673456?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">The EU wants an AI revolution. But on whose terms?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ステップダンサーは暗いホールの真ん中にある円形ステージを回転しながら横切り、政策立案者やテクノロジー企業の責任者らの聴衆を魅了した。今週ダブリンで開催された国際 AI サミットは、単なる官僚的な会議ではなく、より壮観なもの、つまりヨーロッパが人工知能 (AI) 革命に向けて準備ができているという壮大な発表を目指していました。</p><p>予想される 1,500 名を超えるゲストの中には、欧州連合とアイルランドの高官に加えて、Google DeepMind の共同創設者兼会長のデミス・ハサビス氏、マイクロソフト社長のブラッド・スミス氏も含まれていました。このイベントはアイルランドのEU理事会議長としての任期の重要な部分を占めたが、表れているAIへの熱意を相殺する批判的な声が不足しており、テクノロジー促進主義の非難を招いている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>コーク大学ユニバーシティ・カレッジのAI教授バリー・オサリバン氏は、サミットは「AIを代表する党の政治放送のようなものだった」とDWに語った。</p><p>最も重要なテーマは、AIを活用して欧州の低迷する経済をどう動かし、イノベーションを促進し、米国や中国に追いつくかというものだった。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Step-dancers spun across the circular stage in the middle of a dark hall, entrancing an audience of policymakers and tech bosses. Not simply another bureaucratic conference, the International AI Summit , hosted in Dublin this week, aspired to something more spectacular — a grand announcement that Europe is ready for its artificial intelligence (AI) revolution.</p><p>Among the more than 1,500 expected guests were Google DeepMind co-founder and chair Demis Hassabis and Microsoft president Brad Smith, in addition to high-ranking European Union and Irish officials . The event was a key part of Ireland's term as president of the EU Council , but a lack of critical voices to counterbalance the AI enthusiasm on display has drawn accusations of tech boosterism.</p><p>The summit was "almost like a party political broadcast on behalf of AI," Barry O'Sullivan, an AI professor at University College Cork, told DW.</p><p>The overarching theme was how to use AI to get Europe's sluggish economy moving, boost innovation and catch up with the US and China.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/the-eu-wants-an-ai-revolution-but-on-whose-terms/a-79673456?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/16 23:12</span>
+    </div>
+
+    
+    <p class="title-ja">イスラエル企業の「ゼロクリック」マルウェア攻撃が世界的なセキュリティリスクに及ぼす影響</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/16/how-israeli-firms-zero-click-malware-attack-poses-global-security-risk?traffic_source=rss" target="_blank" rel="noopener">How Israeli firm’s ‘zero-click’ malware attack poses global security risk</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ページにアクセスしたり、アプリを更新したりするだけで、ラップトップや携帯電話から個人データが盗まれるマルウェア攻撃の被害に遭う可能性があることが研究者らによって判明しました。何かを「クリック」する必要さえありません。</p><p>イスラエルのスパイウェア会社が、詐欺師やスパイが個人データを盗んで外部サーバーに送信する「ゼロクリック」ターゲット広告の最初の事例の背後にいたことが判明し、被害者の中にはアルジャジーラのジャーナリストも含まれていた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>2025 年 6 月、アルジャジーラのスタッフが使用していた 45 台のデバイス (機密性の高い主題について報道した数台を含む) が、ファイルを開いたりダウンロードしたりすることなく自動的にインストールされるスパイウェアの標的になりました。</p><p>この問題に対するアルジャジーラの最初の内部調査に触発された、カナダに本拠を置く学術研究機関シチズン・ラボによる調査により、イスラエル企業カンディルが攻撃の背後にいたことが判明した。</p><p>アナリストらは、この調査結果は新たな世界的な安全保障上の脅威の存在を裏付けるものであり、「非常に憂慮すべき」ものであると述べている。 「私たちはこの方向に進んでいることは分かっていましたが、今それが公になっています」と、米国ロサンゼルスにあるカリフォルニア大学情報学教授のレメッシュ・スリニバサン氏はアルジャジーラに語った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Just visiting a page or refreshing an app can be enough to fall victim to a malware attack in which your personal data is stolen from a laptop or phone, researchers have found. You are not even required to “click” on anything.</p><p>An Israeli spyware firm has been found to be behind the first-known instance of “zero-click” targeted advertising in which fraudsters or spies can steal private data and send it to external servers, with Al Jazeera journalists among the victims.</p><p>In June 2025, 45 devices used by Al Jazeera staff – including several who reported on sensitive subjects – were targeted with spyware which installed itself without the need to open or download any files.</p><p>An investigation by the Canada-based academic research unit Citizen Lab, prompted by Al Jazeera’s initial internal probe into the issue, discovered that the Israeli company Candiru was behind the attacks.</p><p>Analysts say the findings are “incredibly concerning”, as they confirm the existence of a new global security threat. “We knew we were headed in this direction and now it is out in the public,” Remesh Srinivasan, professor of information studies at the University of California in Los Angeles, US, told Al Jazeera.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/16/how-israeli-firms-zero-click-malware-attack-poses-global-security-risk?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/16 23:01</span>
+    </div>
+
+    
+    <p class="title-ja">カタールFM、イスラエルのレバノンからの撤退を要求</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/10/16/qatar-fm-calls-for-israeli-withdrawal-from-lebanon?traffic_source=rss" target="_blank" rel="noopener">Qatar FM calls for Israeli withdrawal from Lebanon</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>カタールFM、イスラエルのレバノンからの撤退を要求</p><p>カタールの首相兼外務大臣はベイルート訪問中に同国のレバノン支持を再確認し、同国の南部で攻撃が続く中イスラエルの撤退を求めた。同氏はまた、エネルギー協力とレバノン軍への継続的な支援についても議論した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Qatar FM calls for Israeli withdrawal from Lebanon</p><p>Qatar’s prime minister and minister of foreign affairs has reaffirmed his country’s support for Lebanon during a visit to Beirut, calling for Israel’s withdrawal amid continuous attacks in the country’s south. He also discussed energy cooperation and continued support for the Lebanese army.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/10/16/qatar-fm-calls-for-israeli-withdrawal-from-lebanon?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/16 22:52</span>
+    </div>
+
+    
+    <p class="title-ja">エルサレム日報：イスラエル入植者がパレスチナのオリーブ畑を焼く</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/10/16/jerusalem-daily-israeli-settlers-burn-palestinian-olive-groves?traffic_source=rss" target="_blank" rel="noopener">Jerusalem Daily: Israeli settlers burn Palestinian olive groves</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>エルサレム日報：イスラエル入植者がパレスチナのオリーブ畑を焼く</p><p>イスラエル人入植者は、ラマラ近郊のアブ・ファラとトゥルムス・アイヤの町にあるパレスチナのオリーブ畑で暴力的なポグロムを行っている。数人のパレスチナ人とジャーナリストが負傷した。アルジャジーラのモハマド・サレハ氏が報じた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Jerusalem Daily: Israeli settlers burn Palestinian olive groves</p><p>Israeli settlers carry out violent pogroms on Palestinian olive groves in the towns of Abu Falah and Turmus Ayya, near Ramallah. Several Palestinians and journalists were injured. Al Jazeera’s Mohammad Saleh reports.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/10/16/jerusalem-daily-israeli-settlers-burn-palestinian-olive-groves?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/16 01:48</span>
+    </div>
+
+    
+    <p class="title-ja">警察がトルコの大手親野党ハルクTVチャンネルを強制捜査</p>
+    <p class="title-en"><a href="https://www.dw.com/en/police-raid-the-major-pro-opposition-halk-tv-channel-in-turkey/a-79671673?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Police raid the major pro-opposition Halk TV channel in Turkey</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>水曜日の朝、生放送は停止され、イスタンブール市にあるハルクテレビ本社が家宅捜索され、メディア運営を担当する新しい管理者が政府によって任命された。同局のCEO、カフェ・マヒログル氏（現在ロンドン在住）に逮捕状が出された。検察によると、１１人が逮捕された。</p><p>トルコは報道の自由に対する制限をめぐって長年批判にさらされてきた。 Halk TV は国内で最も有名な野党系テレビ局の 1 つで、トルコのレジェップ・タイイップ・エルドアン大統領とその正義発展党 (AKP) に関する批判的な報道を定期的に放送しています。襲撃後、当初ジャーナリストらは建物への立ち入りを阻止された。ライブレポートの代わりに、事前に録画された番組が放送されました。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>タイミングは特に微妙だ。ハルクTVは、投獄されたイスタンブール市長エクレム・イマモルが法廷で汚職容疑に対する弁護を開始する予定だったまさにその日に家宅捜索を受けた。このチャンネルは裁判を追う人々にとって重要な情報源となっている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>On Wednesday morning, the live broadcast was halted , Halk TV's headquarters in the city of Istanbul were searched, and a new administrator was appointed by the government to run the media outlet. An arrest warrant was issued for the station's CEO, Cafer Mahiroglu, who currently lives in London. According to prosecutors, 11 people were arrested.</p><p>Turkey has faced criticism for years over restrictions on press freedom . Halk TV is one of the country's best-known opposition television stations and regularly broadcasts critical reports about Turkish President Recep Tayyip Erdogan and his Justice and Development Party (AKP) . After the raid, journalists were initially prevented from entering the building. Pre-recorded programs were broadcast instead of live reports.</p><p>The timing is particularly sensitive: Halk TV was raided on the very day that jailed Istanbul Mayor Ekrem İmamoglu was scheduled to begin his defense against corruption charges in court. The channel has been an important source of information for those following the trial.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/police-raid-the-major-pro-opposition-halk-tv-channel-in-turkey/a-79671673?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/16 22:56</span>
+    </div>
+
+    
+    <p class="title-ja">ロシアはパキスタンとアフガニスタン間の緊張緩和に貢献できるだろうか？</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/16/can-russia-help-ease-tensions-between-pakistan-and-afghanistan?traffic_source=rss" target="_blank" rel="noopener">Can Russia help ease tensions between Pakistan and Afghanistan?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>パキスタン・イスラマバード – 10月14日にラーワルピンディで会談するため、ロシアの内務大臣ウラジミール・コロコルツェフは膝に肘をついて座り、パキスタン軍司令官アシム・ムニル元帥に寄りかかった。</p><p>コロコルツェフ氏がパキスタンにいる間、ロシア対外情報局（SVR）長官セルゲイ・ナルイシキン氏はタリバンの情報長官アブドゥル・ハク・ワシク氏に会うためカブールに飛んだ。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>公式には、ロシア、パキスタン、アフガニスタンはこの会談に関して標準的な声明をほとんど出していない。しかし、その兆候は明らかだ。パキスタンとアフガニスタンは過去1年間、銃撃と公衆の脅迫を交わしてきた。カタールとトルキエは昨年10月にドーハで停戦を仲介し、4月には中国がウルムチで会談を主催したが、パキスタン国内での攻撃は続いた。イスラマバードは6月、9月、今月と再びアフガニスタン領土を攻撃した。</p><p>ロシアは現在、仲介者として介入しているようだ。</p><p>モスクワのアフガニスタン特別代表ザミル・カブロフ氏は今月初め、ロシアのタス通信に対し、両国の要請があれば、ロシアはカブールとイスラマバードの間で和平仲介役を務める用意があると語った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Islamabad, Pakistan – Sitting with his elbows on his knees, Russia’s Interior Minister Vladimir Kolokoltsev leaned towards Pakistan’s army chief, Field Marshal Asim Munir, for talks in Rawalpindi on October 14.</p><p>While Kolokoltsev was in Pakistan, Sergey Naryshkin, director of Russia’s Foreign Intelligence Service (SVR), flew into Kabul to meet the Taliban’s intelligence chief, Abdul Haq Wasiq.</p><p>Officially, Russia, Pakistan and Afghanistan have issued little beyond standard statements about the meetings. But the signs are clear: Pakistan and Afghanistan have spent the past year exchanging fire and public threats. Qatar and Turkiye brokered a ceasefire in Doha last October and China hosted talks in Urumqi in April, but attacks inside Pakistan continued. Islamabad again struck Afghan territory in June, September and this month.</p><p>Russia now appears to be stepping in as a mediator.</p><p>Moscow’s special representative for Afghanistan, Zamir Kabulov, told Russia’s TASS news agency earlier this month that his country was ready to play peace broker between Kabul and Islamabad if both sides requested it.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/16/can-russia-help-ease-tensions-between-pakistan-and-afghanistan?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/16 22:26</span>
+    </div>
+
+    
+    <p class="title-ja">抗議活動が激化する中、ニューデリーに群衆が集まりインドの国旗を振る</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/16/g-s1-148383/crowds-throng-new-delhi-and-wave-indian-flags-amid-escalating-protests" target="_blank" rel="noopener">Crowds throng New Delhi and wave Indian flags amid escalating protests</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>2026年10月16日金曜日、インドのニューデリーで、インドの選挙区長ギャネーシュ・クマール氏の辞任を求める若者たちのデモ中に警察に拘束され、スローガンを叫ぶ著名な学生リーダー、ネハ・ボラさん（中央）。Vipin/AP キャプションを隠す</p><p>ニューデリー — 数千人のインド人が首都中心部のにぎやかな大通りに群がり、国旗を振りながら同国の選挙管理責任者の辞任を要求したが、これはナレンドラ・モディ首相の政府に対する国民の反対の最新の表明となった。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>デモ参加者らは、若者の「ゴキブリ」運動の呼びかけに応じて、ニューデリーで最もにぎやかな商業地区の一つであるコンノート・プレイスに結集したが、その指導者アビジート・ディプケ氏はデモに先立って警察に拘束された。世代を超えた抗議参加者が集会に参加し、広範な国民の怒りを反映し、国の選挙管理トップに対する圧力が強まった。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Prominent student leader Neha Bora, center, shouts slogans as she is detained by the police during a youth demonstration demanding the resignation of the country's election chief Gyanesh Kumar, in New Delhi, India, Friday, Oct. 16, 2026. Vipin/AP hide caption</p><p>NEW DELHI — Thousands of Indians thronged a bustling thoroughfare in the heart of the capital, waving the national flag and demanding the resignation of the country's election chief, the latest show of public dissent against Prime Minister Narendra Modi's government.</p><p>The protesters rallied in Connaught Place, one of New Delhi's busiest commercial districts, responding to a call by the youth "Cockroach" movement, whose leader Abhijeet Dipke was detained by police ahead of the demonstration. Protesters spanning generations joined the rally, reflecting broad public anger and intensifying pressure on the country's top election official.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/16/g-s1-148383/crowds-throng-new-delhi-and-wave-indian-flags-amid-escalating-protests" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/16 20:22</span>
+    </div>
+
+    
+    <p class="title-ja">インドの若い労働者に新しい同僚ができました: AI</p>
+    <p class="title-en"><a href="https://www.dw.com/en/india-s-young-workers-have-a-new-colleague-ai/a-79678342?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">India's young workers have a new colleague: AI</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>インド全土で、ニュース記事の調査、コピーの翻訳、ビジネスデータの分析、法的文書の分類など、日常業務をスピードアップするために若い労働者が人工知能 (AI) に注目するケースが増えています。</p><p>しかし、テクノロジーは問題を引き起こす可能性があり、テクノロジーに過度に依存するとリスクが伴います。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ニューデリーのニュースポータルで働くジャーナリストのファラー・カズミさん（28）は、ゲート付きコミュニティでの野良動物の管理と餌やりに関する規則についてレポートする際に AI を活用した。彼女は AI モデルに、最高裁判所の最新のガイドライン、以前の裁判所の判決、最近の犬咬傷事件を見つけるように依頼しました。</p><p>「裁判所の判決、過去の判決、最近の犬咬傷事件に関する特定の記事をGoogleで検索するにはかなりの時間がかかるため、AIに検索してもらうようにしました」とカズミさんはDWに語った。</p><p>それが彼女に関連する記事や事例の出発点となり、それを読んで自分自身でクロスチェックしました。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Across India , young workers are increasingly turning to artificial intelligence (AI) to speed up routine tasks, whether researching news stories, translating copy, analyzing business data or sorting legal documents.</p><p>But the technology can get things wrong , and relying on it too heavily carries risks.</p><p>Journalist Farah Kazmi, 28, who works for a news portal in New Delhi, used AI while reporting on rules governing stray animals and feeding them in gated communities. She asked an AI model to find the Supreme Court's latest guidelines, earlier court rulings and recent dog-bite cases.</p><p>"Since it can take quite a lot of time to search Google for specific articles about court rulings, previous judgments or recent dog-bite cases, I asked AI to find them for me," Kazmi told DW.</p><p>It gave her a starting point for relevant articles and cases, which she then read and cross-checked herself.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/india-s-young-workers-have-a-new-colleague-ai/a-79678342?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/16 19:09</span>
+    </div>
+
+    
+    <p class="title-ja">アメリア・イアハートが墜落した可能性のある島の歴史的写真を博物館が公開</p>
+    <p class="title-en"><a href="https://www.theguardian.com/us-news/2026/oct/16/amelia-earhart-new-zeland-museum-aerial-survey-photos-nikumaroro-island" target="_blank" rel="noopener">Museum releases historical photos of island where Amelia Earhart may have crashed</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>1938年のニクマロロのニュージーランド航空調査の画像は、飛行士の失踪に関する新たな手がかりを提供する</p><p>ニュージーランドの博物館は、アメリア・イアハートが不時着したとされる島の1938年の航空調査から撮影された約50枚の写真を公開し、アマチュア探偵らに先駆的な飛行家とその飛行機の痕跡を探すための新たな証拠を提供した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>この白黒画像は、新たな手がかりを求めてニクマロロ環礁への米国遠征隊をきっかけに、20世紀最大の謎の一つに対する新たな関心が高まったことを受けて、ニュージーランド空軍博物館によって公開された。</p><p>一部の低解像度のコピーはブログにアップロードされているが、ニュージーランド空軍博物館は写真のリクエストを数件受けており、デジタル高解像度フォーマットで47枚の画像の完全なセットをウェブサイトで公開したと述べた。</p><p>ネガは10年以上前、クライストチャーチの美術館で写真の管理をしていたマシュー・オサリバンによって発見された。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Images from New Zealand aerial survey of Nikumaroro in 1938 offer new clues over aviator’s disappearance</p><p>A New Zealand museum has released nearly 50 photos from a 1938 aerial survey of the island where Amelia Earhart is believed to have crash-landed, offering amateur sleuths new evidence to scour for traces of the pioneering aviator and her plane.</p><p>The black-and-white images were published by the Air Force Museum of New Zealand after renewed interest in one of the biggest mysteries of the 20th century, spurred by a US expedition to the Pacific atoll of Nikumaroro in search of new clues.</p><p>While some low-resolution copies have been uploaded on blogs, the Air Force Museum of New Zealand said it had received several requests for the photos and had released the full set of 47 images in digital high-resolution format on its website.</p><p>The negatives were found more than a decade ago by Matthew O’Sullivan, the keeper of photographs at the museum in Christchurch.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/us-news/2026/oct/16/amelia-earhart-new-zeland-museum-aerial-survey-photos-nikumaroro-island" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/16 21:55</span>
+    </div>
+
+    
+    <p class="title-ja">「この大統領を擁するアメリカは我々の同盟国ではない。トランプは嘘つきだ」：フランス議員バーナード・ゲッタ</p>
+    <p class="title-en"><a href="https://www.france24.com/en/tv-shows/talking-europe/20261016-america-with-this-president-is-not-our-ally-trump-is-a-liar-french-mep-bernard-guetta" target="_blank" rel="noopener">'America, with this president, is not our ally. Trump is a liar': French MEP Bernard Guetta</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>私たちのゲストは、中道派「レニュー」グループの欧州議会議員であるベテランフランス人ジャーナリスト兼コメンテーターのベルナール・ゲッタ氏です。同氏は番組に対し、ドナルド・トランプ氏は「ディーゼル価格の原因はゼレンスキー氏とウクライナの抵抗勢力にあるとアメリカ国民に伝えようとしたのだから嘘つきだ。これは全くの嘘だ。イランとの戦争を始めたのだから彼（トランプ氏）には責任がある」と語った。ゲッタ氏は続けて、「アメリカの情報共有がなければ、ウクライナはますます弱体化する。アメリカ大統領がウクライナに対してプーチンに手を貸すなんて、ひどいことだ」と述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Our guest is veteran French journalist and commentator Bernard Guetta, who is a Member of the European Parliament for the centrist Renew group. He tells the programme that Donald Trump is "a liar, because he tried to tell the American people that Zelensky and the Ukrainian resistance were responsible for the price of diesel. This is a pure lie. He (Trump) is responsible because he started the war with Iran." Guetta goes on to say that "without American intelligence sharing, Ukraine is weaker and weaker. That's terrible, to see the president of the United States giving a hand to Putin against Ukraine."</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/tv-shows/talking-europe/20261016-america-with-this-president-is-not-our-ally-trump-is-a-liar-french-mep-bernard-guetta" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/16 13:24</span>
+    </div>
+
+    
+    <p class="title-ja">カーニー氏、アルバータ州独立住民投票の最中に米国がカナダを「破壊」しようとしていると示唆</p>
+    <p class="title-en"><a href="https://www.dw.com/en/carney-implies-us-trying-to-break-canada-amid-vote-for-alberta-independence-referendum/a-79675652?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Carney implies US trying to 'break' Canada amid vote for Alberta independence referendum</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>カナダのマーク・カーニー首相は、石油資源が豊富なアルバータ州の人々に差し迫った脅威について警告し、米国がカナダを「自分のもの」にするためにカナダを「破壊」しようとしていると示唆した。</p><p>カーニー氏は不満を抱える西部州がカナダからの分離に向けた法的手続きを開始するかどうかを決定する投票を前に、カルガリーで行われた親カナダ集会で演説した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「世界はますます危険になり、分断されている。国境の外にいる何人かが、私たちを自分のものにするために、私たちを破壊しようと働いている」と彼は、米国やドナルド・トランプ大統領の名前は挙げなかったが、語った。</p><p>カーニー氏がこうした主張をするのは今回が初めてではない。同氏の警告は、ワシントンとオタワが貿易戦争の真っただ中にあり、トランプ大統領がカナダを米国の51番目の州にすると脅している中で発せられた。</p><p>一方、カーニー氏がカナダの米国への依存度を下げる方向に推し進めていることは、トランプ氏を苛立たせている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Canadian Prime Minister Mark Carney warned the people of oil-rich Alberta against looming threats, suggesting that the United States was trying to "break" Canada so it could "own us."</p><p>Carney was speaking at a pro-Canada rally in Calgary, ahead of a vote which will decide if the disgruntled western province will begin a legal process toward separation from Canada.</p><p>"The world has become more dangerous and divided. Some outside our borders are working to break us so they can own us," he said, without naming the US or its president, Donald Trump .</p><p>This is not the first time Carney has made such a claim. His warning comes as Washington and Ottawa are in the middle of a trade war and Trump has threatened to make Canada the 51st US state.</p><p>Meanwhile, Carney's push toward making Canada less dependent on the US has irked Trump.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/carney-implies-us-trying-to-break-canada-amid-vote-for-alberta-independence-referendum/a-79675652?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/16 02:47</span>
+    </div>
+
+    
+    <p class="title-ja">トランプ大統領、フォートフッド襲撃犯の銃殺刑のライブ配信を中止</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/crx23qlnj27qo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Trump calls off livestream of Fort Hood attacker's execution by firing squad</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ドナルド・トランプ米大統領は、元米軍精神科医ニダル・ハサンの銃殺刑をライブストリーミングする計画を中止した。</p><p>トランプ大統領は以前、フォートフッド襲撃犯の死亡映像を放映することに同意すると述べていたが、JDバンス副大統領はそれが実現するかどうか疑問を投げかけ、視聴しないと述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ライブ配信を中止するというトランプ大統領の決定は、米国内および世界的に広範な批判を受けて行われた。木曜日、同氏は「多くの非常に善良で善意のある人々は、彼の死を見たくないと思っている」と語った。</p><p>トランプ大統領は「処刑をストリーミング配信して全員が見ることができたことは、米国がテロリストやハサンのようなスカムにどのように対処するかを世界が目撃する強力な抑止力になったのではないかと思う」と述べた。</p><p>大統領はトゥルース・ソーシャルへの投稿で、「彼は予定通り銃殺刑で死亡するが、この出来事はストリーミング配信されない」と付け加えた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>US President Donald Trump has called off plans to livestream the execution of former US army psychiatrist Nidal Hasan by firing squad.</p><p>Trump had previously said he approved of showing the death of the Fort Hood attacker, while Vice-President JD Vance cast doubt on whether it would happen and said he would not watch it.</p><p>Trump's decision to cancel the livestream came after widespread criticism in the US and globally. On Thursday, he said that "many very good and well meaning people would rather not watch him die".</p><p>"I think streaming the execution for all to see might have been a strong deterrent for the World to witness how America deals with Terrorists and SCUM like Hasan," Trump said.</p><p>"He will die, as scheduled, by firing squad, but this event will not be streamed," the president added in the post on Truth Social.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/crx23qlnj27qo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/16 01:38</span>
+    </div>
+
+    
+    <p class="title-ja">ニコラス・マドゥロ大統領、ニューヨーク法廷、新たな拷問疑惑は「虚偽」だと語る</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/oct/15/nicolas-maduro-torture-allegations-cilia-flores" target="_blank" rel="noopener">Nicolás Maduro tells New York court new torture allegations are ‘false’</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>書き直された起訴状は元ベネズエラ大統領とシリア・フローレス夫人を拷問の主導者として告発</p><p>ニコラス・マドゥロ大統領は木曜日、ニューヨーク法廷に出廷し、退陣させられたベネズエラ大統領とその夫人に対する書き直された麻薬密売起訴状における拷問疑惑は「冤罪」であると主張した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>足首に手かせをされたマドゥロ氏は、米国人３人を含む多数の犠牲者を拷問した国家主導の弾圧キャンペーンを主導したとして夫妻を告発する新たな罪で法廷に持ち込まれた。</p><p>アルビン・K・ヘラースタイン判事は、マドゥロ氏とその妻シリア・フローレス氏に代わって無罪の申し立てを行った。彼らは1月の夜間襲撃でカラカスの自宅​​から米軍に押収された。</p><p>ヘラースタイン氏は、マドゥロ氏が裁判官の嘆願書の要請に二度応じ、起訴内容には「虚偽の告発と虚偽の証言」が含まれていると批判し、マドゥロ氏に代わって答弁書を提出すると発表した。マドゥロ大統領は通訳を介して話した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Rewritten indictment accuses ex-Venezuela president and wife Cilia Flores of leading campaign of torture</p><p>Nicolás Maduro insisted on Thursday during an appearance in a New York court that torture allegations in a rewritten drug trafficking indictment against the deposed Venezuelan president and his wife were “false accusations”.</p><p>Maduro, shackled at the ankles, was brought to court to face the new charges accusing the couple of leading a state-sponsored campaign of repression that tortured scores of victims, including three Americans.</p><p>Judge Alvin K Hellerstein entered a not-guilty plea on behalf of Maduro and his wife, Cilia Flores. They were seized from their Caracas home by the US military in a night-time raid in January.</p><p>Hellerstein announced that he was entering the plea on behalf of Maduro after Maduro twice responded to the judge’s request to enter a plea by criticizing the indictment, saying it contained “false accusations and false testimony”. Maduro spoke through an interpreter.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/oct/15/nicolas-maduro-torture-allegations-cilia-flores" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/16 23:02</span>
+    </div>
+
+    
+    <p class="title-ja">南アフリカの違法リハビリ施設と思われる施設から鎖につながれた患者が救出される</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cmwyvxj49gpwo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Patients in chains rescued from suspected illegal rehab centre in South Africa</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>南アフリカで、同国北東部にある違法とされるリハビリテーションセンターで、鎖につながれた人も含めた200人が拘束されているのが発見され、牧師夫妻が逮捕された。</p><p>この施設はムプマランガ州の教会で運営されており、木曜日に地元当局による作戦中に発見された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>当局は、施設を強制捜査した際に「著しく非人道的な状況」を発見し、一部の患者は「体中にただれ」があり、他の患者は「鎖でつながれている」状態で発見されたと発表した。</p><p>警察はその後、施設を運営していた夫婦を誘拐容疑で起訴したが、さらに罪を追加する可能性がある。彼らはまだコメントを出していない。</p><p>南アフリカでは近年、薬物使用のスパイラルを受けて、違法なリハビリテーションセンターが急増している。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A pastor and his wife have been arrested in South Africa after 200 people, some in chains, were found held at a suspected illegal rehabilitation centre in the north-eastern part of the country.</p><p>The facility, operated from a church in Mpumalanga province, was discovered during an operation by officials in the area on Thursday.</p><p>Authorities said they uncovered "gross inhumane conditions" when they raided the facility, with some patients found with "sores all over their bodies" and "others chained to each other".</p><p>Police have since charged the couple, who were running the facility, with kidnapping but could add more charges. They have not yet commented.</p><p>Illegal rehabilitation centres have mushroomed in South Africa in recent years as drug use spirals in the country.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cmwyvxj49gpwo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/16 22:54</span>
+    </div>
+
+    
+    <p class="title-ja">エチオピア、ティグレ州に暫定政権発足を発表</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/16/ethiopia-announces-instalment-of-interim-government-in-tigray?traffic_source=rss" target="_blank" rel="noopener">Ethiopia announces instalment of interim government in Tigray</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>エチオピアは、国軍が北部地域の制圧を奪還したことを受け、暫定政府がティグレ州を制圧すると発表した。</p><p>金曜日のアビー・アハメッド首相の声明で、6か月間の政権の発足が発表された。同氏はその後、同州で自由選挙を実施すると約束した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>この動きは、ティグレ人民解放戦線（TPLF）が先月起こした反乱をエチオピア軍が押し返したことを受けて行われた。ティグレ州の主要政党は4月に同地域の支配権を奪還し、エチオピア連邦政府との和平協定を事実上終了させると発表した後、反乱を開始していた。</p><p>政府は、自由選挙が実施できるよう暫定政府がティグレ州に「安定した政治状況」を作り出すと約束した。同州は首都メケレ市長を含む５人の役人を州運営に任命した。</p><p>当局者は連邦政府から直接伝えられる「指示と指示」を実行することになる。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Ethiopia has announced that an interim government will take control of the state of Tigray, after its armed forces retook control of the northern region.</p><p>The installation of the six-month administration was announced in a statement by Prime Minister Abiy Ahmed on Friday. He pledged that free elections would then be held in the state.</p><p>The move comes after the Ethiopian military pushed back an uprising launched last month by the Tigray People’s Liberation Front (TPLF). Tigray’s main political party had launched the insurrection after announcing in April that it was retaking control of the region, effectively ending a peace deal with Ethiopia’s federal government.</p><p>The government promised that the interim government would create “a stable political situation” in Tigray so that free elections could be held. It has appointed five officials to run the state, including the mayor of the capital, Mekelle.</p><p>The officials will carry out “directives and instructions” delivered directly from the federal government.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/16/ethiopia-announces-instalment-of-interim-government-in-tigray?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-10-16";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
