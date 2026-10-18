@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年10月18日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/18 22:36</span>
+    </div>
+
+    
+    <p class="title-ja">写真で見る一週間: ヨーロッパ全土で激化する抗議活動と移民船の悲劇的な転覆</p>
+    <p class="title-en"><a href="https://www.france24.com/en/france/20261018-the-week-in-pictures-escalating-protests-across-europe-and-the-tragic-capsize-of-a-migrant-boat" target="_blank" rel="noopener">The week in pictures: Escalating protests across Europe and the tragic capsize of a migrant boat</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>学生の抗議活動や10月17日のフランスのデモでの緊張の高まりから、アルバニアで続く反政府行進、ジブチ沖での移民船の悲劇的な沈没事件まで、フランス24は先週の最も印象的な映像のいくつかを振り返る。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>From student protests and heightened tensions across French demonstrations on October 17, to ongoing anti-government marches in Albania and the tragic sinking of a migrant boat off the coast of Djibouti, FRANCE 24 looks back at some of the most striking images from the past week.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/france/20261018-the-week-in-pictures-escalating-protests-across-europe-and-the-tragic-capsize-of-a-migrant-boat" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/18 21:44</span>
+    </div>
+
+    
+    <p class="title-ja">パリ住民らアルジャジーラに対し、抗議活動による被害にがっかりしていると語る</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/10/18/paris-residents-tell-al-jazeera-theyre-dismayed-by-protest-damage?traffic_source=rss" target="_blank" rel="noopener">Paris residents tell Al Jazeera they’re dismayed by protest damage</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>パリ住民らアルジャジーラに対し、抗議活動による被害にがっかりしていると語る</p><p>パリの住民らはアルジャジーラに対し、土曜日の抗議活動が暴徒化した際に生じた被害の程度に愕然としていると語った。暴動や略奪が発生し、フランス警察は1,000人以上を逮捕した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Paris residents tell Al Jazeera they’re dismayed by protest damage</p><p>Paris residents tell Al Jazeera they’re dismayed by the level of damage caused when Saturday’s protests turned violent. French police arrested more than 1,000 people as riots and looting broke out.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/10/18/paris-residents-tell-al-jazeera-theyre-dismayed-by-protest-damage?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/18 21:07</span>
+    </div>
+
+    
+    <p class="title-ja">抗議活動が暴動と略奪に変わり、パリの路上で車が焼け落ち、ガラスが割れた</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c574pdzl0k4no?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Burnt out cars and shattered glass on Paris streets after protests turn to riots and looting</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>暴動とデモが続いた一日を経て日曜日にフランスが目を覚ますと、店先は粉々に砕け、焼け落ちた車、黒焦げの自転車、パリの歩道にはガラスや瓦礫の山が積み重なった。</p><p>土曜日、約55万人のデモ参加者がほぼ平和的に街頭に繰り出した中、警察は約1,800人を逮捕した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>彼らは燃料価格の高騰、生活費、学校などの公共サービスの低下に反対してデモを行っていた。</p><p>パリ、マルセイユ、その他の町や都市でも、黒い服を着てマスクや目出し帽をかぶった暴徒の集団が現れ、車や建物に放火する者もいた。</p><p>パリ、マルセイユ、リールの各都市やその他の地域で広範な略奪が発生した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>France awoke to scenes of widespread damage on Sunday after a day of riots and demonstrations, with shopfronts shattered, burnt out cars, charred bikes, and piles of glass and debris on the pavements of Paris.</p><p>Police arrested about 1,800 people on Saturday as some 550,000 demonstrators took to the streets for protests that were largely peaceful.</p><p>They were demonstrating against rising fuel prices, the cost of living and deteriorating public services, including schools.</p><p>Groups of rioters, some dressed in black and wearing masks and balaclavas, also came out in Paris, Marseille and other towns and cities, with some setting fire to cars and buildings.</p><p>Widespread looting took place across the cities of Paris, Marseille and Lille, as well as other areas.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c574pdzl0k4no?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/18 17:58</span>
+    </div>
+
+    
+    <p class="title-ja">ウクライナは、米国が管理するスターリンク インターネット サービスにどの程度依存していますか?</p>
+    <p class="title-en"><a href="https://www.dw.com/en/how-reliant-is-ukraine-on-the-us-controlled-starlink-internet-service/a-79689729?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">How reliant is Ukraine on the US-controlled Starlink internet service?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ウクライナ戦争において、ウクライナ軍の通信、偵察、無人機作戦の中心であるスターリンクほど重要な役割を果たした技術システムはほとんどない。現在、ウクライナにおけるイーロン・マスク氏の衛星インターネットサービスが制限されたり、停止されたりするのではないかという懸念が広がっている。ここ数日、キエフはその使用に影響を与える混乱や制限を繰り返し報告している。</p><p>2022年にロシアが本格侵攻を開始して以来、ウクライナは米スペースXが運営する衛星インターネットサービスを広く利用してきた。これにより、インフラが破壊されたり、携帯電話ネットワークがダウンしたりしても、軍関係者は通信やデータ交換を続けることができます。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>チューリッヒ工科大学安全保障研究センター (CSS) によると、2025 年には約 50,000 台の Starlink 端末がウクライナで使用されていました。これらはシステムの特殊な受信および送信デバイスであり、戦場での通信を可能にします。また、コマンドレベル間で命令を中継したり、ドローン映像を受信したりするためにも使用されます。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Few technological systems have played such an important role in the war in Ukraine as Starlink , central to the communications, reconnaissance and drone operations of the Ukrainian armed forces. There are currently widespread concerns that Elon Musk 's satellite internet service in Ukraine may be restricted or even switched off. In recent days, Kyiv has repeatedly reported disruptions and restrictions affecting its use.</p><p>Since the start of Russia's full-scale invasion in 2022, Ukraine has made extensive use of the satellite internet service, which is operated by the US company SpaceX. With it, military personell can continue to communicate and exchange data, even when infrastructure has been destroyed or cellphone networks are down.</p><p>According to the Center for Security Studies (CSS) at ETH Zurich, around 50,000 Starlink terminals were in use in Ukraine in 2025. These are the system's specialised receiving and transmitting devices, which enable communications on the battlefield. They are also used to relay orders between command levels and receive drone footage.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/how-reliant-is-ukraine-on-the-us-controlled-starlink-internet-service/a-79689729?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/18 21:16</span>
+    </div>
+
+    
+    <p class="title-ja">ヨルダン川西岸で欧州外交官がイスラエル人入植者に襲撃される</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c962ydpmjm3zo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">European diplomats attacked by Israeli settlers in West Bank</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>占領下のヨルダン川西岸で、欧州外交官の代表団が覆面をしたイスラエル人入植者に襲撃された。</p><p>ベルギーは総領事や他の特使らへの襲撃を非難し、フランスは襲撃を「恐ろしい」と非難した。両者ともイスラエルに対し、責任者を裁判にかけるよう求めた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>イスラエル国防軍（IDF）も「重大な暴力行為」と称する行為を非難し、調査を行っていると述べた。</p><p>しかし、ベンヤミン・ネタニヤフ首相の事務所は、これが「イスラエルを中傷するための組織的なキャンペーン」の一環であることを示唆し、何が起こったかに疑問を投げかけた。</p><p>この攻撃は、ヨルダン川西岸の別の村で入植者らによる別の襲撃で多数のパレスチナ人とワシントン・ポストのカメラマン、ハイディ・レヴィンが負傷したわずか１日後に起きた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A delegation of European diplomats has been attacked by masked Israeli settlers in the occupied West Bank.</p><p>Belgium condemned the assault on its consul general and the other envoys, while France decried the attack as "appalling". Both called for Israel to bring those responsible to justice.</p><p>The Israel Defense Forces (IDF) also condemned what they called "the severe act of violence" and said they were investigating.</p><p>But the office of the Prime Minister Benjamin Netanyahu cast doubt on what happened, suggesting it was part of a "co-ordinated campaign to smear Israel".</p><p>The attack came only a day after a number of Palestinians and Heidi Levine, a Washington Post photographer, were injured in a separate assault by settlers in another village in the West Bank.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c962ydpmjm3zo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/18 21:07</span>
+    </div>
+
+    
+    <p class="title-ja">「新しい中東」は存在するが、イスラエルが計画したものではない</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/pinch-point/2026/10/18/pp-new-middle-east?traffic_source=rss" target="_blank" rel="noopener">There’s a ‘New Middle East’, but not the one Israel planned</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イスラエルの指導者たちは中東を描き直し、パレスチナを消滅させることを夢見ていた。しかし、その拡大戦争により、この地域は協力してそれに対抗しようとしている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Israeli leaders dreamt of redrawing the Middle East and erasing Palestine. But its wars of expansion have pushed the region to work together against it.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/pinch-point/2026/10/18/pp-new-middle-east?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/18 21:00</span>
+    </div>
+
+    
+    <p class="title-ja">テクノロジーに重点を置いたイランの新しい国防大臣、メヘルダード・アクラギとは誰ですか?</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/18/who-is-mehrdad-akhlagh-irans-new-tech-focused-defence-minister?traffic_source=rss" target="_blank" rel="noopener">Who is Mehrdad Akhlaghi, Iran’s new tech-focused defence minister?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イラン・テヘラン – 米国との戦争の激化が予想される中、メヘルダード・アフラギ・ケタブチ氏がイラン国防大臣に任命された。</p><p>68歳の同氏は日曜、米国・イスラエルによる対イラン戦争が始まった2月28日以来オンラインで召集されてきた議会で、国防省・国軍兵站省の指導者に就任することが承認された。合計237人の議員がアフラギ氏の任命に賛成票を投じ、15人が反対票を投じた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>元国防大臣アジズ・ナシルザデは、最高指導者アリ・ハメネイを含む他の多数の要人とともに開戦初日に殺害された。</p><p>このポストには一時的にマジッド・エブンエ・レザー氏が就任し、今後アフラギ氏の副首相となる。</p><p>アフラギ氏は、米国とイスラエルが激しく標的にしているイランの軍産インフラの再建と拡大を担当する。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Tehran, Iran – Mehrdad Akhlaghi Ketabchi has been appointed Iran’s defence minister at a time when the war with the United States is expected to escalate.</p><p>The 68-year-old was approved on Sunday by parliament, which has convened online since the start of the US-Israel war on Iran on February 28, to assume leadership of the Ministry of Defence and Armed Forces Logistics. In total, 237 lawmakers voted in favour of Akhlaghi’s appointment and 15 against.</p><p>Former Defence Minister Aziz Nasirzadeh was killed along with a large number of other senior figures, including Supreme Leader Ali Khamenei, on the opening day of the war.</p><p>The position was filled temporarily by Majid Ebn-e Reza, who will now become Akhlaghi’s deputy.</p><p>Akhlaghi will be responsible for rebuilding and expanding Iran’s military-industrial infrastructure, which has been heavily targeted by the US and Israel.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/18/who-is-mehrdad-akhlagh-irans-new-tech-focused-defence-minister?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/16 23:27</span>
+    </div>
+
+    
+    <p class="title-ja">イランにおける殺人事件：「名誉」が死刑判決となるとき</p>
+    <p class="title-en"><a href="https://www.dw.com/en/femicide-in-iran-when-honor-becomes-a-death-sentence/a-79681977?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Femicide in Iran: When 'honor' becomes a death sentence</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>マリアム・ヤルモハンマディさんの人生は、10月5日未明、イラン南部のケシュム島で兄夫婦にナイフで襲われ、2児の母である28歳の非情な終わりを迎えた。彼女の性器は切断されていた。彼女はその後すぐに病院で亡くなった。彼女の夫と弟は逮捕された。</p><p>メディアは、約50人の親族が逮捕に抗議するために病院の外に集まったと報じた。彼らは、死がマリアム・ヤルモハマディに値する「最も軽い刑罰」であると信じていたと伝えられている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>若い女性の親族が彼女が何の罪を犯したとみなしたかは公表されていない。しかし、事件の状況とそれに伴う極端な暴力は、いわゆる名誉殺人で見られるよくあるパターンに従っています。</p><p>このような場合、その根底にある信念は、男性が姉妹、娘、または妻によって家族にもたらした認識された「不名誉」を消去しなければならないということであることがよくあります。そうしないと、コミュニティ内で拒絶、屈辱、または社会的排除にさらされる可能性があります。</p><p>このビデオを表示するには、JavaScript を有効にし、HTML5 ビデオをサポートする Web ブラウザへのアップグレードを検討してください。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The life of Maryam Yarmohammadi came to a violent end in the early hours of October 5, when the 28-year-old mother of two was attacked with knives by her brother and husband on Qeshm Island in southern Iran . Her genitalia were mutilated. She died shortly afterward in hospital. Both her husband and brother were arrested.</p><p>Media reported that about 50 relatives gathered outside the hospital to protest the arrests. They reportedly believed that death had been the "least severe punishment" Maryam Yarmohammadi deserved.</p><p>What the young woman's relatives considered her guilty of has not been publicly reported. Yet both the circumstances of the case and the extreme violence involved follow a familiar pattern seen in so-called honor killings.</p><p>In such cases, the underlying belief is often that a man must erase a perceived "dishonor" brought upon the family by a sister, daughter or wife. Failure to do so may expose him to rejection, humiliation or social exclusion within his community.</p><p>To view this video please enable JavaScript, and consider upgrading to a web browser that supports HTML5 video</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/femicide-in-iran-when-honor-becomes-a-death-sentence/a-79681977?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/18 20:14</span>
+    </div>
+
+    
+    <p class="title-ja">インドのヒンズー教祭りでトラック暴走、13人死亡</p>
+    <p class="title-en"><a href="https://www.france24.com/en/video/20261018-out-of-control-truck-kills-13-at-hindu-festival-in-india" target="_blank" rel="noopener">Out-of-control truck kills 13 at Hindu festival in India</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>インドでスピード違反のトラックがヒンズー教の祭りで群衆に突っ込み、13人が死亡したと当局者が日曜日に発表し、ドルーパディ・ムルム大統領はその死を「悲痛な」出来事だと述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A speeding truck in India killed 13 people when it ploughed into a crowd at a Hindu festival, officials said on Sunday, with President Droupadi Murmu describing the deaths as "heartbreaking".</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261018-out-of-control-truck-kills-13-at-hindu-festival-in-india" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/18 18:00</span>
+    </div>
+
+    
+    <p class="title-ja">陽気なジョークと「100,000 ボルト」のエネルギー: アフロビート ミュージックを再定義するハイプマン (と女性)</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/oct/18/lagos-hypemen-redefining-afrobeats-music-afrohype" target="_blank" rel="noopener">Hilarious quips and ‘100,000-volt’ energy: the hypemen (and women) redefining Afrobeats music</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>アドリブで力強いボーカルをベースにした司会スタイルが、観客を魅了する独特の方法で人気を博しました</p><p>ラゴス大学の歴史学位プログラムの 2015 年の新入生は、クラスメイトの最初の学期のプレゼンテーションが非常に魅力的だったので、彼が焦点を当てていた 16 世紀の中国王朝にちなんで、彼をトビー・シャンと呼ぶようになりました。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>この日の彼の観客の関与は、高校時代にスリーマンバンドのジンジャーマン（元気づける者）として、また家庭教師として務めていたことが活かされていた。大学の最終学年までに、彼のバイラルなキャッチフレーズと伝染性のエネルギーがヒット曲「シェディバラバラ」を生み出しました。今日、彼は、一部の人がアフロハイプまたはランバと呼んでいるアフロビートのサブジャンルにおける自称「伝道者であり先駆者」の 1 人です。</p><p>「今では母親でさえ私のことをシャンと呼んでいます」と、トビ・マイケル・アデイアイ生まれの32歳は、大学のラグーンウォーターフロント近くでインタビューに応じ、かつて集会の司会を務めたことがあると語った。</p><p>それ以来、彼は自身のレイブを主催し、EP を 2 枚リリースし、オンライン指導付きの 1 日マスタークラスである School of Hype を 4 回開催し、何人かの新星を輩出してきました。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Style of emceeing based on high-octane, ad-libbed vocals has flourished thanks to its unique way of captivating crowds</p><p>F or the 2015 freshmen cohort of the history degree programme at the University of Lagos, their classmate’s first-semester presentation was so captivating that they began calling him Toby Shang, after the 16th-century Chinese dynasty he had focused on.</p><p>His crowd engagement that day had been harnessed from his high school days as a ginger-man (energiser) in a three-man band and as a private tutor. By his final year at university, his viral catchphrases and infectious energy had resulted in a hit song, Shedibalabala. Today, he is one of the self-acclaimed “evangelists and pioneers” in the Afrobeats sub-genre some are now calling Afrohype or lamba.</p><p>“Even my mother calls me Shang now,” the 32-year-old, born Tobi Michael Adeyeye, said in an interview near the university’s lagoon waterfront, where he once emceed gatherings.</p><p>Since then he has hosted his own rave, released two EPs and run four editions of his School of Hype – a one-day masterclass with online mentoring that has launched several rising stars.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/oct/18/lagos-hypemen-redefining-afrobeats-music-afrohype" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/17 23:49</span>
+    </div>
+
+    
+    <p class="title-ja">ゲーム業界における中国の影響力が拡大</p>
+    <p class="title-en"><a href="https://www.dw.com/en/china-s-influence-in-the-gaming-industry-is-growing/a-79484755?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">China's influence in the gaming industry is growing</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>暗い地下の隠れ家で、数個の石油ランプから薄暗い光がこぼれます。同志がライフルをいじっている。粗く切り出された石の壁の一つには、中国労農赤軍の象徴である白い星の上にハンマーと鎌が描かれた赤い旗が掲げられている。地面には武器が散乱している。そのうちの1人が拾われ、すぐに行動は雪の森に移り、木々の間で銃声が上がります。</p><p>このようなシーンは、プレイヤーを過去、現在、未来の戦場に連れて行く人気の一人称シューティング ゲームである「コール オブ デューティ」の新作に適合する可能性があります。しかし、実際には「The Defiant」からのものです。このゲームは現在、杭州にある中国のスタジオ Hoothanes Technology によって開発されています。 1930年代と1940年代に中国軍が日本軍を撃退する物語です。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>開発者の Connor Xu は、ゲームに登場する武器はユニークであると DW に語った。これらはアジアでのみ使用されていたため、多くの西洋プレーヤーには馴染みがないと彼は言います。同じことがストーリーにも当てはまり、Xu 氏によれば、これまでビデオ ゲームで語られたことはありませんでした。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>In a dark underground hideout, dim light spills from a handful of oil lamps. A comrade fiddles with a rifle. A red flag hangs on one of the roughly hewn stone walls, bearing a hammer and sickle on a white star — the symbol of the Chinese Workers' and Peasants' Red Army. Weapons are scattered on the ground. One is picked up, and soon the action moves into the snowy forest, where gunfire erupts among the trees.</p><p>Such a scene could fit in a new installment of "Call of Duty," the popular first-person shooter game that transports players to battlefields past, present, and future. But it is actually from "The Defiant." The game is currently being developed by the Chinese studio Hoothanes Technology in Hangzhou. It tells the story of Chinese forces fending off the Japanese army in the 1930s and 1940s.</p><p>Developer Connor Xu tells DW the weapons featured in the game are unique. They were used only in Asia and are therefore unfamiliar to many Western players, he says. The same goes for the story, which Xu says has never before been told in a video game .</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/china-s-influence-in-the-gaming-industry-is-growing/a-79484755?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/17 21:11</span>
+    </div>
+
+    
+    <p class="title-ja">中国で数百人の児童毒殺で保育園経営者に終身刑</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cqe9lx54g7x9o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Nursery owner in China jailed for life after hundreds of children poisoned</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>保育園の経営者とそのスタッフ5人が、鉛汚染食品で200人以上の子どもたちを毒殺したことが判明し、投獄された。</p><p>中国国営メディアによると、甘粛省天水市で和石培心幼稚園を運営していた李恵芳氏は、有毒で有害な食品を製造・販売した罪で終身刑を言い渡された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>2025年7月、子どもたちが病気になり始めた後、保育園の児童と職員247人の血中鉛濃度が異常に高いことが判明した。</p><p>この事件に関する報告書によると、和石培鑫のシェフたちは、より多くの生徒を引き付けるために、食事の「見栄えを良くする」ために、非食用の塗料を使用していたことが判明した――塗料にはその旨が明記されていたにもかかわらず。</p><p>蘭州市中級人民法院は判決に加え、李氏の個人資産50万元（5万6,200ポンド、7万4,700ドル）の没収も命じたと国営放送CCTVが報じた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A nursery owner and five members of her staff have been jailed after they were found to have poisoned more than 200 children with lead-tainted food.</p><p>Li Huifang, who operated the Heshi Peixin Kindergarten in Tianshui, in the Gansu province, was sentenced to life in prison for producing and selling toxic and harmful food, according to Chinese state media.</p><p>In July 2025, 247 pupils and staff at the nursery were found to have abnormally high blood lead levels after children began falling ill.</p><p>A report into the incident found that chefs at Heshi Peixin had used inedible paint to "enhance the look" of its meals to attract more students - despite the paint being being clearly marked as such.</p><p>In addition to the sentence, the Lanzhou Intermediate People's Court also ordered the confiscation of 500,000 yuan (Â£56,200; $74,700) of Li's personal assets, state broadcaster CCTV reported.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cqe9lx54g7x9o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/18 21:49</span>
+    </div>
+
+    
+    <p class="title-ja">FIFAはトランプ米大統領に平和賞を授与した後、廃止するつもりか?</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/sports/2026/10/18/fifa-peace-prize-football-us-president-donald-trump?traffic_source=rss" target="_blank" rel="noopener">Is FIFA scrapping its peace prize after awarding it to US President Trump?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ワールドカップの6か月前にドナルド・トランプ米国大統領にFIFA平和賞が授与されたことを覚えているだろうか?さて、それは現在廃棄に近づいており、そうなれば米国大統領が最初で唯一の勝者となるだろう。</p><p>FIFAのジャンニ・インファンティーノ会長が2026年ワールドカップの抽選会で賞を授与し、米国の首都でトランプ氏を称賛してから1年も経たないうちに、FIFA評議会の複数のメンバーがその価値に疑問を呈し、賞の廃止を含む変更を要求している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>精査を求める声は、インファンティーノ氏がワールドカップ売却計画に対する継続的な批判に直面しており、それが同氏の罷免を求める声にもつながっている中で起きている。</p><p>では、その賞は何についてのものだったのでしょうか?なぜ廃止される可能性があるのでしょうか?以下にその様子を示します。</p><p>11月5日、サッカーの世界統括団体は「FIFA平和賞 – フットボールは世界を団結させる」と呼ばれる新しい年次賞を発表した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Remember the FIFA Peace Prize awarded to United States President Donald Trump six months before the World Cup? Well, it is now close to being scrapped, which would make the US president its first and only winner.</p><p>Less than a year after FIFA President Gianni Infantino extolled Trump in the US capital while presenting the award at the World Cup 2026 draw, several members of the FIFA Council are questioning its merit and have demanded changes, including scrapping the award.</p><p>The calls for scrutiny come at a time when Infantino faces ongoing criticism for his World Cup sell-off plan, which also led to calls for his removal from office.</p><p>So what was the prize about, and why might it be scrapped? Here’s a look:</p><p>On November 5, football’s global governing body announced a new annual award called the “FIFA Peace Prize – Football Unites the World”.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/sports/2026/10/18/fifa-peace-prize-football-us-president-donald-trump?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/18 21:41</span>
+    </div>
+
+    
+    <p class="title-ja">カナダ軍基地の大規模火災で数名が死傷</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cr86z0w4lxdxo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Several dead or injured in major fire at Canada military base</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>アルバータ州のカナダ軍基地近くで発生した大規模火災により、数名が死傷したと同国軍が発表した。</p><p>カナダ国軍（CAF）は、事件の影響の全容を調査中であり、それが完了するまで死傷者や負傷者の詳細は公表されないと述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>土曜日の現地時間16時（日本時間22時）頃に火災が発生したカナダ軍ウェインライト基地は、国内で最も混雑する軍事訓練基地の一つである。</p><p>カナダのテレビ局グローバルニュースは、匿名の軍関係者の話として、実弾射撃訓練中にガス管やガス井が直撃され、少なくとも７人が死亡、さらに数十人が負傷したと報じた。</p><p>デビッド・マクギンティ国防大臣は、CAFと地元当局が火災を管理していると述べ、状況は「非常に活発かつデリケート」だと述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Several people have been killed or injured as a result of a large fire near a Canadian military base in Alberta, the nation's military has said.</p><p>The Canadian Armed Forces (CAF) said the full extent of the incident's impact was being assessed and that details of casualties and injuries would not be made public until that was complete.</p><p>Canadian Forces Base Wainwright, where the fire broke out around 16:00 local time (22:00 GMT) on Saturday, is one of the country's busiest military training bases.</p><p>Canadian TV network Global News reported that at least seven were killed and dozens more injured when a gas line or gas well was hit during a live-fire training exercise, citing unnamed military sources.</p><p>Defence Minister David McGuinty said the CAF and local authorities were managing the fire, describing the situation as "very, very active and delicate".</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cr86z0w4lxdxo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/18 13:00</span>
+    </div>
+
+    
+    <p class="title-ja">「4,000人が自分たちのことを考えている」：40年後、フォークランドは再び敵対的なアルゼンチンと対峙する</p>
+    <p class="title-en"><a href="https://www.theguardian.com/news/ng-interactive/2026/oct/18/4000-people-minding-our-own-business-four-decades-on-falklands-again-face-a-hostile-argentina" target="_blank" rel="noopener">‘4,000 people minding our own business’: four decades on, Falklands again face a hostile Argentina</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>世論調査の不振に直面して、アルゼンチン大統領は島の石油産業を経済攻撃し、次は主要な水産業になる可能性があると示唆している</p><p>十数人の地元住民と制服を着た憲兵（「座ってもよろしいですか？」）は、フォークランド諸島の議会を兼ねている立派な木板張りの法廷の後ろの席に着いた。外に出ると、いつものように風が吹く夕方だった。名目上は南大西洋の春かもしれないが、濃い灰色の海に歴史的な難破船が点在するスタンレー港は、うねりと渦の大釜だった。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>議会の議員８人のうち６人（男性５人、女性１人）は、並んだ机とマイクの前で辛抱強く待った。暖房は不快なレベルまで上げられていました。その後ろにはチャールズ王の肖像画。他の壁からは、さまざまな人気の知事の埃っぽい写真が無関心に現場を見つめていた。</p><p>会議は隅でヘッドフォンをした退屈そうな若者の挙手で始まった。彼は、778 の島嶼を構成する 12 ほどの有人島に無線で質疑応答の様子を送信していた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Facing a slump in the polls, Argentina’s president is making economic attacks on the islands’ oil industry, and suggesting its key fisheries industry could be next</p><p>A dozen local people and a uniformed military police officer (“Do you mind if I sit in?”) took their seats at the back of the handsome wood-panelled courtroom that doubles as the Falkland Islands’ legislative assembly. Outside, it was a typically blowy early evening. It may nominally be spring in the south Atlantic, but Stanley harbour, with its dark grey water speckled with historical shipwrecks, was a cauldron of swells and churn.</p><p>Six of the assembly’s eight members – five men, one woman – waited patiently at a row of desks and microphones. The heating had been turned up to just short of uncomfortable. Behind them, a portrait of King Charles. From the other walls, dusty photographs of governors, of varying popularity, gazed disinterestedly at the scene.</p><p>Proceedings started at the raised hand of a bored-looking young man wearing headphones in the corner. He was transmitting the question and answer session via radio across the dozen or so inhabited islands that make up the 778-strong archipelago.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/news/ng-interactive/2026/oct/18/4000-people-minding-our-own-business-four-decades-on-falklands-again-face-a-hostile-argentina" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/18 06:18</span>
+    </div>
+
+    
+    <p class="title-ja">キンバリー・ギルフォイル事件後の国務省の現状</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/17/nx-s1-6001729/the-state-of-the-state-department-in-the-wake-of-the-kimberly-guilfoyle-scandal" target="_blank" rel="noopener">The state of the State Department in the wake of the Kimberly Guilfoyle scandal</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>NPRのジョエル・ローズが、元駐ベネズエラ米国大使のジェームズ・B・ストーリーとキンバリー・ギルフォイル事件後の国務省の現状について語る。</p><p>NPR トランスクリプトの精度と可用性は異なる場合があります。トランスクリプト テキストは、エラーを修正したり、音声の更新に一致させるために改訂される場合があります。 npr.org の音声は、元の放送または公開後に編集される場合があります。 NPR の番組の信頼できる記録は音声記録です。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>NPR は、取材やインタビューに対して金銭を提供したり受け取ったりしません。そのような申し出や要求を行う者は、NPR の従業員ではなく、NPR を代表するものでもありません。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>NPR's Joel Rose talks with James B. Story, former U.S. Ambassador to Venezuela, about the state of the State Department in the wake of the Kimberly Guilfoyle scandal.</p><p>Accuracy and availability of NPR transcripts may vary. Transcript text may be revised to correct errors or match updates to audio. Audio on npr.org may be edited after its original broadcast or publication. The authoritative record of NPR’s programming is the audio record.</p><p>NPR does not offer or accept money for coverage or interviews. Anyone who makes such an offer or request is not an NPR employee and does not represent NPR.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/17/nx-s1-6001729/the-state-of-the-state-department-in-the-wake-of-the-kimberly-guilfoyle-scandal" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/18 16:00</span>
+    </div>
+
+    
+    <p class="title-ja">並外れた人生：ヴィクトリア女王に「贈られた」女性の伝記を子孫が歓迎</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/oct/18/sarah-forbes-bonetta-biography-queen-victoria" target="_blank" rel="noopener">An extraordinary life: descendant welcomes biography of woman ‘gifted’ to Queen Victoria</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>アニナと呼ばれる少女はアフリカの王に捕らえられ、その後イギリスに連れて行かれ、帝国君主の弟子サラ・フォーブス・ボネッタとなった。</p><p>バヨ・ランドルさんの曾祖母サラ・フォーブス・ボネッタさんは7歳のとき、アフリカの王からの「外交贈り物」としてウィンザー城のビクトリア女王に贈られた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ヴィクトリアはボネッタの教育費を払い、西アフリカで最も裕福な男性との結婚を承認し、長女のゴッドマザーになることになった。</p><p>しかし、ヴィクトリアはボネッタの福祉に真の関心を持ち、孤児を王室の保護者にし、長年にわたって彼女と会っていたが、二人の関係はより大きな議題の一部だった。</p><p>現在、伝記『サラ・フォーブス・ボネッタになる：ヴィクトリア女王宮廷のヨルバ女性になる』が出版される中、ランドルは自身の家族の歴史について語った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A girl called Àìná was captured by an African king and later taken to England to become Sarah Forbes Bonetta, protege of the imperial monarch</p><p>When she was seven years old, Bayo Randle’s great-great-grandmother Sarah Forbes Bonetta was presented to Queen Victoria at Windsor Castle as a “diplomatic gift” from an African king.</p><p>Victoria would go on to pay for Bonetta’s education, approve her marriage to one of west Africa’s wealthiest men, and become godmother to her eldest daughter.</p><p>But while Victoria took a genuine interest in Bonetta’s welfare, making the orphan a royal protege and meeting with her over the years, their relationship was part of a bigger agenda.</p><p>Now, as a biography is published – Becoming Sarah Forbes Bonetta: A Yorùbá Woman in Queen Victoria’s Court – Randle has spoken of his family history.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/oct/18/sarah-forbes-bonetta-biography-queen-victoria" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/17 20:00</span>
+    </div>
+
+    
+    <p class="title-ja">アパルトヘイトから数十年、南アフリカ人は過去の犯罪に対する正義を求める</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/17/nx-s1-5987671/south-africa-justice-sharpeville-apartheid" target="_blank" rel="noopener">Decades after apartheid, South Africans seek justice for crimes of the past</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>1960年3月30日、南アフリカのシャープビルで、反アパルトヘイト抗議活動中に警察によって殺害された69人の集団葬儀が行われた。 60年以上が経ち、被害者の家族は正義を求める闘いを新たにしている。 AP のキャプションを隠す</p><p>南アフリカ、シャープビル – パウリナ・マチニエさんは、父親が埋葬されている墓地で、雑草が生い茂り、ゴミが散乱する墓の列を見て苦悶の表情を浮かべた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「見てください、彼らが眠っている場所です」と、ここに埋葬されている数十人の黒人抗議活動参加者について彼女は言う。アパルトヘイト史上最も血なまぐさい日の一つとなった1960年3月21日に警察が発砲し、全員が死亡した。</p><p>花柄のドレスとおしゃれな日よけ帽子をかぶった71歳の祖母は、「なぜ汚いの？それは恥ずべきことだ」と言う。</p><p>ヨハネスブルグから車で約1時間のこの目に見えて貧しい町の他の墓地と同様、この墓地も朽ちるまま放置されている。しかしマチニエ氏は、南アフリカの政治エリートたちが虐殺を追悼するために少なくとも年に1日だけは墓地がきれいになると指摘する。この記念日は人権デーとして知られる祝日です。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A mass funeral is held in Sharpeville, South Africa, on March 30, 1960, for 69 people killed by police during an anti-apartheid protest. More than six decades later, victims' families are renewing their fight for justice. AP hide caption</p><p>SHARPEVILLE, South Africa – Paulina Mathinye gestures with anguish at the rows of garbage-strewn graves, overrun with weeds, in the cemetery where her father is buried.</p><p>"Look at that, where they sleep," she says of the dozens of Black protesters buried here, all of whom were killed when police opened fire on March 21, 1960 in what became one of the bloodiest days in apartheid history.</p><p>"Why are they dirty? It's a disgrace," says the 71-year-old grandmother, who wears a floral dress and a smart sunhat.</p><p>The cemetery, like much else in this visibly poor township about an hour's drive from Johannesburg, has been left to decay. But Mathinye notes that for one day a year at least, when South Africa's political elite descend to commemorate the massacre, the graveyard is spotless. The anniversary is a public holiday known as Human Rights Day.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/17/nx-s1-5987671/south-africa-justice-sharpeville-apartheid" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-10-18";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
