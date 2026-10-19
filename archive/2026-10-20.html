@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年10月20日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/20 00:58</span>
+    </div>
+
+    
+    <p class="title-ja">DZマフィア殺人事件の裁判がマルセイユ近郊で始まる予定</p>
+    <p class="title-en"><a href="https://www.france24.com/en/video/20261019-dz-mafia-murder-trial-set-to-begin-near-marseille" target="_blank" rel="noopener">DZ Mafia murder trial set to begin near Marseille</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>主要な犯罪組織DZマフィアとの関係が疑われる5人の男が、2020年に反麻薬活動家のアミン・ケサシ（現在エクス・アン・プロヴァンス副市長）の兄を殺害した容疑で起訴された。月曜日に始まる予定のこの裁判は、この地域におけるマフィア風の麻薬密売ネットワークがもたらす脅威を浮き彫りにしている。 FRANCE 24のデラノ・デスーザ記者が報じた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Five men with alleged connections to the major criminal group DZ Mafia are accused of murdering, in 2020, the elder brother of anti-drug activist Amine Kessaci – now deputy mayor of Aix-en-Provence. The trial, set to begin on Monday, highlights the threat posed by mafia-style drug trafficking networks in the region. FRANCE 24’s Delano D’Souza reports.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261019-dz-mafia-murder-trial-set-to-begin-near-marseille" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/20 00:19</span>
+    </div>
+
+    
+    <p class="title-ja">フランス、イタリア、スペイン、ポルトガルでは生活費はどう変化しましたか?</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/19/how-has-the-cost-of-living-changed-in-france-italy-spain-and-portugal?traffic_source=rss" target="_blank" rel="noopener">How has the cost of living changed in France, Italy, Spain and Portugal?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>フランスの学生抗議活動は2か月目に入り、ヨーロッパ全土でデモに拡大している。</p><p>フランスでは9月に過密教室と教師不足に対する生徒たちの抗議活動から始まったこの運動は、生活費の負担や計画されている公共サービスの削減に対する広範な怒りに成長した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>アルバニア、ベルギー、ギリシャ、イタリア、ポルトガル、スペインのデモ参加者も、手頃な価格の住宅の不足、物価上昇、公共サービスの不全を訴えて街頭に出ており、多くの若者が親より裕福な暮らしができるとはもう期待していないと述べている。</p><p>彼らの怒りに直面しているのは、フランスのエマニュエル・マクロン大統領、イタリアのジョルジア・メローニ首相、スペインのペドロ・サンチェス首相、ポルトガルのルイス・モンテネグロ首相などの指導者たちだ。サンチェス氏は左派、メローニ氏は右派で、マクロン氏とモンテネグロ氏は保守寄りの中道派だ。しかし、政治はさまざまだが、どの国も生活費の高騰による不安の増大に直面している。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Student protests in France are into their second month , escalating into demonstrations across Europe.</p><p>What began in September in France with pupils protesting against overcrowded classrooms and teacher shortages has grown into wider anger at the cost of living and planned cuts to public services.</p><p>Protesters in Albania, Belgium, Greece, Italy, Portugal and Spain have also taken to the streets over the lack of affordable housing, rising costs and failing public services – with many young people saying they no longer expect to be better off than their parents.</p><p>Facing their anger are leaders such as French President Emmanuel Macron , Italy’s Prime Minister Giorgia Meloni, Spain’s PM Pedro Sanchez and Portugal’s PM Luis Montenegro. Sanchez belongs to the left, Meloni to the right and Macron and Montenegro are conservative-leaning centrists. But while their politics vary, they all face mounting unrest because of soaring costs of living.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/19/how-has-the-cost-of-living-changed-in-france-italy-spain-and-portugal?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/19 23:06</span>
+    </div>
+
+    
+    <p class="title-ja">カタルーニャ元反政府勢力大統領、スペインに帰国可能、裁判所判決</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cvp8gzg4e143o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Catalonia's former rebel president can return to Spain, court rules</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>スペイン最高裁判所は、カタルーニャ州の元大統領カルレス・プチデモン氏が、独立運動を主導して失敗して自主亡命してから約10年ぶりに、逮捕の恐れなく帰国できるとの判決を下した。</p><p>裁判所は、マドリードに反抗して2017年に彼の地方政府が開催した住民投票に関連した同氏の逮捕状を取り消す決定を支持した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>投票直後にこの地域に直接統治が課され、プチデモン氏はベルギーに逃亡し、以来同地に拠点を置いているが、2024年にバルセロナに突然姿を現したことで警察の捜査が始まった。</p><p>しかし、彼が帰国する可能性のあるスペインは10年前とは大きく異なり、カタルーニャ独立は現在、政治問題としては重要視されていない。</p><p>月曜日の判決により、スペイン司法当局と元カタルーニャ大統領との間の長期にわたる法的争いに終止符が打たれた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Spain's Supreme Court has ruled the former president of Catalonia, Carles Puigdemont, can return without fear of arrest nearly a decade after going into self-imposed exile having led a failed independence bid.</p><p>The court upheld a decision to lift an arrest warrant for him linked to the referendum his regional government organised in 2017, in defiance of Madrid.</p><p>Direct rule was imposed on the region soon after the vote and Puigdemont fled to Belgium, where he has been based ever since - with a surprise appearance in Barcelona in 2024 prompting a police manhunt.</p><p>But the Spain to which he may return is much different from a decade ago, with Catalan independence now a marginal political issue.</p><p>Monday's ruling brings to an end a lengthy legal wrangle between the Spanish judiciary and the former Catalan president.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cvp8gzg4e143o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/19 20:15</span>
+    </div>
+
+    
+    <p class="title-ja">２０２６年の中間選挙は過去最高の選挙費用となる可能性がある。そしてマクロン大統領は抗議活動を非難</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/19/g-s1-148733/up-first-newsletter-ukraine-russia-campaign-finances-france-protests" target="_blank" rel="noopener">2026 midterms could be the most expensive on record. And, Macron condemns protests</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>2026年の中間選挙は史上最高の選挙費用となる見通しだ。議会の結果と支配に影響を与えるために、150億ドル以上が集められました。</p><p>昨日、ロシアの旧帝都サンクトペテルブルクに対するウクライナによる大規模な無人機攻撃で、少なくとも1人が死亡、十数人が負傷した。この攻撃は、主要な港湾の石油ターミナルを含む戦略的拠点を標的とした。先週末、ロシアによるウクライナへのミサイル攻撃により、少なくとも11人が死亡した。トランプ大統領がロシアへの圧力を緩和することが戦争を終わらせる最善の方法であると述べているため、この紛争は続いている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>フランスのエマニュエル・マクロン大統領は、週末の暴力行為が国中のほぼ平和的な抗議活動に影を落としていると非難した。この暴動は環境改善を求める学生の抗議活動として始まり、エネルギー価格の高騰、生活費の上昇、社会的不平等に抗議する公共部門の労働者まで拡大した。内務省は、約2,300人の逮捕者と約1,000人の警察官が負傷したと報告した。</p><p>2026年9月25日、ノルウェーのオスロで開催された国際サウナ会議2026でサウナに参加するフィンランド出身のトニー・ステパノウさん。NPRのシブ・ドルメン氏 キャプションを隠す</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The 2026 midterm elections are set to become the most expensive on record. More than $15 billion has been raised to influence the outcome and control of Congress.</p><p>At least one person died and more than a dozen were injured in a major Ukrainian drone strike yesterday on Saint Petersburg, Russia's former imperial capital. The attack targeted strategic sites, including a key port oil terminal. Over the weekend, Russian missile strikes in Ukraine killed at least 11 people. This conflict continues as President Trump says that relieving pressure on Russia is the best way to end the war.</p><p>French President Emmanuel Macron denounced violence over the weekend that he says has overshadowed largely peaceful protests across the country. The unrest began as a student protest for better conditions and has expanded to include public-sector workers protesting high energy prices, the rising cost of living and social inequality. The Interior Ministry reported about 2,300 arrests and nearly 1,000 injured police officers.</p><p>Tony Stepanow, from Finland, attends a sauna during the International Sauna Congress 2026 in Oslo, Norway, Sept. 25, 2026. Siv Dolmen for NPR hide caption</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/19/g-s1-148733/up-first-newsletter-ukraine-russia-campaign-finances-france-protests" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/20 01:22</span>
+    </div>
+
+    
+    <p class="title-ja">装置を植え付けた疑いで告発された元OpenAI従業員、サウジの支援を受けていたと裁判所に提出</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c6gel2dlyxvyo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Ex-OpenAI worker accused of planting device had Saudi support says court filing</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>カリフォルニア州外の裁判所への提出文書によると、OpenAIの会議室の1つに秘密裏に録音装置を設置した罪で起訴されたサウジアラビア人が、サウジ政府から「相当な支援」を受けていたとして告発された。</p><p>米検察当局は、AI企業に勤務していたアブドゥルラフマン・アルフォザン氏が「サウジ王室の一員と頻繁に連絡を取り合っていた」と主張し、同国の軍関係者が逮捕後に妻と息子のためにサウジアラビアへの片道航空券を支払ったと述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>したがって、35歳の技師は逃亡の危険があるため、裁判が行われるまで拘留されるべきであると主張された。</p><p>サウジ政府はBBCのコメント要請にすぐには応じなかった。</p><p>アルフォザン氏はオーディオレコーダーを設置しようとしたとされる前に、約1年間OpenAIで働いていた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A Saudi national charged with secretly planting a recording device in one of OpenAI's meeting rooms has been accused of having "considerable support" from the Saudi government, according to a court filing , external in California.</p><p>US prosecutors claimed Abdulrahman Alfozan, who worked for the AI firm, was in "frequent communication... with a member of the Saudi royal family", and say a member of the country's military paid for a one-way flight to Saudi Arabia for his wife and son after his arrest.</p><p>It was argued the 35-year-old engineer therefore posed a flight risk and should be detained, pending trial.</p><p>The Saudi government did not immediately respond to BBC requests for comment.</p><p>Alfozan had worked at OpenAI for around a year before he allegedly made his attempt to plant an audio recorder.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c6gel2dlyxvyo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/20 01:06</span>
+    </div>
+
+    
+    <p class="title-ja">国連WFPが食糧援助削減を発表、ガザは飢餓の悪化に直面</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/10/19/gaza-faces-worsening-hunger-as-wfp-announces-food-aid-cuts?traffic_source=rss" target="_blank" rel="noopener">Gaza faces worsening hunger as WFP announces food aid cuts</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>国連WFPが食糧援助削減を発表、ガザは飢餓の悪化に直面</p><p>世界食糧計画は、資金不足によりガザ地区のパレスチナ人50万人への食糧援助を一時停止し、その他の人々への配給を削減することを余儀なくされると発表した。ガザ政府メディア局は「壊滅的な結果」を警告し、緊急援助を届けるために国境検問所を再開するよう求めた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Gaza faces worsening hunger as WFP announces food aid cuts</p><p>The World Food Programme has announced that funding shortages will force it to suspend food assistance for half a million Palestinians in Gaza and reduce rations for others. Gaza’s Government Media Office has warned of “catastrophic consequences” and called for the reopening of border crossings to allow the delivery of urgent aid.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/10/19/gaza-faces-worsening-hunger-as-wfp-announces-food-aid-cuts?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/19 17:26</span>
+    </div>
+
+    
+    <p class="title-ja">ディープフェイク、ボット、不信感: AI がイスラエルの選挙をどのように形作るか</p>
+    <p class="title-en"><a href="https://www.dw.com/en/deepfakes-bots-and-distrust-how-ai-is-shaping-israel-s-election/a-79657988?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Deepfakes, bots and distrust: How AI is shaping Israel's election</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>Xに投稿された19秒の動画では、首相候補のガディ・アイゼンコットが両手を広げて満面の笑みを浮かべて立っている。スローモーションで、彼は「イスラエル統一」と書かれたシャツを着た息子に似た人物に向かって草原を駆け抜けます。しかし、アイゼンコットは彼の前を通り過ぎ、代わりに選挙に出馬しているラーム党を率いる著名なアラブ政治家マンスール・アッバスと抱き合う。</p><p>このビデオはベンヤミン・ネタニヤフ首相のアカウントに投稿された。世論調査によると、ネタニヤフ首相と元イスラエル国防軍参謀長でもあるアイゼンコット氏が接戦を繰り広げている。 AIが生成したこの動画は、ネタニヤフ首相のキャンペーンの大きな部分である反アラブ感情を利用するように設計されているようだ。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>このクリップは100万回以上再生され、怒りを引き起こした。アイゼンコットの息子は、2023年にイスラエル・ハマス戦争中に殺害された。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>In a 19-second clip posted to X, Gadi Eisenkot, a candidate for prime minister, stands with his arms outstretched and a huge smile on his face. In slow motion, he runs through a meadow toward a person who resembles his son, wearing a shirt with the words "Israeli Unity." But Eisenkot sails past him and instead embraces Mansour Abbas, a prominent Arab politician who leads the Ra'am party , running in the elections.</p><p>The video was posted on Prime Minister Benjamin Netanyahu's account. Opinion polls show Netanyahu and Eisenkot, who also happens to be a former chief of staff of the Israel Defense Forces, in a tight race. The AI-generated video appears to be designed to play on anti-Arab sentiment — a big part of Netanyahu's campaign.</p><p>The clip was viewed more than 1 million times and stirred outrage. Eisenkot's son was killed in 2023 during the Israel-Hamas war .</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/deepfakes-bots-and-distrust-how-ai-is-shaping-israel-s-election/a-79657988?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/19 06:00</span>
+    </div>
+
+    
+    <p class="title-ja">「ガザでの生活はまったく過酷だ」と世界食糧計画責任者が語る</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/18/nx-s1-6001709/life-is-absolutely-brutal-in-gaza-says-world-food-programme-head" target="_blank" rel="noopener">'Life is absolutely brutal in Gaza,' says World Food Programme head</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>国連の世界食糧計画は、米国の仲介によるハマス・イスラエル停戦にもかかわらず、ガザ地区の140万人が深刻な食糧不足に苦しんでおり、資金不足により重要な援助の削減を余儀なくされていると述べた。</p><p>NPR トランスクリプトの精度と可用性は異なる場合があります。トランスクリプト テキストは、エラーを修正したり、音声の更新に一致するように改訂される場合があります。 npr.org の音声は、元の放送または公開後に編集される場合があります。 NPR の番組の信頼できる記録は音声記録です。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>NPR は、取材やインタビューに対して金銭を提供したり受け取ったりしません。そのような申し出や要求を行う者は、NPR の従業員ではなく、NPR を代表するものでもありません。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The UN's World Food Programme says 1.4 million people in Gaza are suffering acute food shortages and that funding gaps are forcing cutbacks in critical aid, despite the U.S. brokered Hamas-Israel ceasefire.</p><p>Accuracy and availability of NPR transcripts may vary. Transcript text may be revised to correct errors or match updates to audio. Audio on npr.org may be edited after its original broadcast or publication. The authoritative record of NPR’s programming is the audio record.</p><p>NPR does not offer or accept money for coverage or interviews. Anyone who makes such an offer or request is not an NPR employee and does not represent NPR.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/18/nx-s1-6001709/life-is-absolutely-brutal-in-gaza-says-world-food-programme-head" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/19 23:09</span>
+    </div>
+
+    
+    <p class="title-ja">オーストラリア国会議員、暴行を受けて車にはねられ重傷</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cwp9g43g2p07o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Australian MP critically injured after being hit by car in apparent attack</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>オーストラリアの国会議員ヘレン・ヘインズは車にはねられ、メルボルンの病院で重体となっているが、アンソニー・アルバニーズ首相は意図的な攻撃だった可能性があると主張している。</p><p>65歳の無所属議員は月曜午後、ビクトリア州ワンガラッタの選挙区事務所前で殴られた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>近くの町タラウィンジー在住の男性（43）が現場で通行人に拘束され、警察によると車の中からナイフが見つかった。</p><p>警察はそれが「意図的な行為」だったかどうか捜査しているが、「地域社会に対する継続的な脅威」があるとは考えていないとしている。</p><p>政治指導者らは衝撃と失望を表明し、アルバニア人は「民主主義に暴力の余地はない」と述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Australian MP Helen Haines is critically ill in hospital in Melbourne after being hit by a car in what Prime Minister Anthony Albanese says may have been a deliberate attack.</p><p>The independent MP, 65, was struck outside her constituency office in Wangaratta, in the state of Victoria, on Monday afternoon.</p><p>A man, 43, from the nearby town of Tarrawingee was detained at the scene by a passerby and police say a knife was found in the car.</p><p>Police are investigating whether it was an "intentional act" but say they do not believe there is an "ongoing threat to the community".</p><p>Political leaders have expressed shock and dismay, with Albanese saying "there is no place for violence in a democracy".</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cwp9g43g2p07o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/19 21:31</span>
+    </div>
+
+    
+    <p class="title-ja">ルビオ氏、世界最大の製油所訪問を議題にインドを訪問</p>
+    <p class="title-en"><a href="https://www.dw.com/en/rubio-visits-india-with-a-trip-to-the-world-s-largest-oil-refinery-topping-the-agenda/a-79699826?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Rubio visits India with a trip to the world's largest oil refinery topping the agenda</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>マルコ・ルビオ米国務長官は月曜日、金融の中心地ムンバイで３日間のインド訪問を開始し、その後産業大手リライアンス・インダストリーズが所有する大手製油所のあるジャムナガルに向かった。</p><p>ルビオ氏のビジネス志向の訪問は、インドによるロシア産原油購入を巡る米国の懲罰的措置が依然として曖昧な中、通商交渉が行き詰まっている中で行われた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>リライアンスはベネズエラ石油のトップバイヤーです。この製油所は 1 日あたり 140 万バレルの原油を処理できるため、世界市場へのディーゼル燃料の貴重な輸出国です。同製油所はロシアのウラル原油の主要な購入者でもあり、インドとロシアのエネルギー関係の重要な部分を占めている。</p><p>3月、ワシントンはリライアンスの支援を受けてテキサス州に新たな製油所を建設する計画を発表した。</p><p>ドナルド・トランプ米大統領は、このプロジェクトの価値を3,000億ドル（2,580億ユーロ）と見積もっており、米国の対インド貿易赤字を削減する手段として提案した。プロジェクトが進むかどうか、そしてどのような条件で進むかが注目される。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>US Secretary of State Marco Rubio kicks off a three-day visit to India on Monday in the finance hub of Mumbai, before heading to Jamnagar, home to a major oil refinery owned by industrial titan Reliance Industries.</p><p>Rubio's business-oriented visit comes as trade talks remain stalled amid continued ambiguity on punitive measures from the US over India's purchases of Russian oil .</p><p>Reliance is a top buyer of Venezuelan oil . The refinery can process 1.4 million barrels of crude oil a day, so it's a valuable exporter of diesel fuel for global markets. The refinery has also been a major buyer of Russian Urals crude, making it a significant part of India's energy relationship with Russia.</p><p>In March, Washington unveiled plans for a new oil refinery in Texas, backed by Reliance.</p><p>US President Donald Trump has put the value of the project at $300 billion (€258 billion) and presented it as a way to help reduce the US trade deficit with India. Whether the project moves forward, and on what terms, will be closely watched.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/rubio-visits-india-with-a-trip-to-the-world-s-largest-oil-refinery-topping-the-agenda/a-79699826?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/19 18:27</span>
+    </div>
+
+    
+    <p class="title-ja">AIブームで輸出が増加、中国経済は予想を上回るペースで成長</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/oct/19/china-economy-grows-faster-than-forecast-after-ai-boom-boosted-exports" target="_blank" rel="noopener">China’s economy grows faster than forecast after AI boom boosts exports</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>エレクトロニクス需要によって工業生産が支えられ、第3四半期のGDPは前年比4.5%増加</p><p>輸出の急増により今年第 3 四半期の中国経済成長は押し上げられ、工場生産高は消費支出をはるかに上回るペースで増加しました。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>中国国家統計局が月曜日に発表したところによると、7月から9月にかけて中国のGDPは前年比4.5％増加した。この数字はエコノミストの予想を上回り、第２・四半期の成長率４．３％を上回った。</p><p>中国経済は今年最初の９カ月で４．６％成長し、追加刺激策なしで２０２６年の政府目標４．５─５％成長を達成できる軌道に乗っている。</p><p>９月の鉱工業生産は８月の５．２％から５．５％増加したが、小売売上高は０．４％から１．１％の増加にとどまった。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Third-quarter GDP up by 4.5% compared with last year as industrial output is buoyed by electronics demand</p><p>Roaring exports lifted China’s economic growth in the third quarter of this year, with factory output growing much faster than consumer spending.</p><p>China’s GDP grew by 4.5% year-on-year between July and September, the National Bureau of Statistics of China reported on Monday. The figures were better than economists had expected and up from the second quarter’s growth rate of 4.3%.</p><p>China’s economy has now grown by 4.6% in the first nine months of the year, putting it on track to hit the government’s 2026 target of 4.5%-5% growth without extra stimulus measures.</p><p>Industrial production rose 5.5% in September, up from 5.2% in August, while retail sales only increased 1.1%, up from 0.4%.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/oct/19/china-economy-grows-faster-than-forecast-after-ai-boom-boosted-exports" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/19 17:45</span>
+    </div>
+
+    
+    <p class="title-ja">太陽光発電はパキスタンの農業を変えつつあるが、問題を引き起こすのではないかと懸念する人もいる</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/19/nx-s1-5993523/solar-power-is-changing-agriculture-in-pakistan-but-some-fear-it-could-cause-issues" target="_blank" rel="noopener">Solar power is changing agriculture in Pakistan, but some fear it could cause issues</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>太陽光発電はパキスタンの農業を変革しています。しかし、すでに水不足と異常気象に直面しているこの国では、その広範な使用が問題を引き起こすのではないかと懸念する人もいる。</p><p>NPR は、取材やインタビューに対して金銭を提供したり受け取ったりしません。そのような申し出や要求を行う者は、NPR の従業員ではなく、NPR を代表するものでもありません。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Solar power is transforming agriculture in Pakistan. But in a country already facing water scarcity and extreme weather, some fear their widespread use could cause problems.</p><p>NPR does not offer or accept money for coverage or interviews. Anyone who makes such an offer or request is not an NPR employee and does not represent NPR.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/19/nx-s1-5993523/solar-power-is-changing-agriculture-in-pakistan-but-some-fear-it-could-cause-issues" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/20 01:16</span>
+    </div>
+
+    
+    <p class="title-ja">オバマ大統領、イルハン・オマル議員に対する連邦捜査を「非常に恐ろしい」と非難</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cr15jl7dd42vo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Obama blasts federal probe of congresswoman Ilhan Omar as 'so appalling'</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>バラク・オバマ大統領は、イルハン・オマル下院議員がドナルド・トランプ大統領を率直に批判しているというだけの理由で連邦犯罪捜査を受けていると述べた。</p><p>「大統領をあえて批判したという理由で、法を遵守して選出された役人に連邦政府の重みが全面的に下されることになる」と元米国大統領はXに書き、この捜査は「非常に恐ろしい」ものであると述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ホワイトハウスは司法省が「法と秩序の回復に注力している」と述べ、捜査を擁護した。</p><p>先週、国土安全保障当局は彼女の入国ステータスに関する捜査の一環として、ミネソタ州民主党のワシントンDCの家宅捜索を行った。ソマリアで生まれたオマールさんは、子供の頃に家族とともに米国に移住しました。</p><p>米メディアは、捜査は彼女のアメリカ国籍と、1995年に米国に来た際に年齢を偽っていたかどうかに関係していると報じた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Barack Obama has said congresswoman Ilhan Omar is under federal criminal investigation simply because she's an outspoken critic of the President Donald Trump.</p><p>"The full weight of the federal government is being brought down on a law-abiding elected official because she has dared to criticize the president," the former US president wrote on X, calling the probe "so appalling".</p><p>The White House defended the inquiry, saying the justice department was "focused on restoring law and order".</p><p>Last week, homeland security agents searched the Minnesota Democrat's Washington DC home as part of an investigation into her immigration status. Born in Somalia, Omar moved to the US with her family as a child.</p><p>US media outlets have reported that the probe is tied to her American citizenship and whether she lied about her age when she arrived in the US in 1995.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cr15jl7dd42vo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/20 00:09</span>
+    </div>
+
+    
+    <p class="title-ja">カナダ：アルバータ州、独立住民投票の実施に賛成票を投じる</p>
+    <p class="title-en"><a href="https://www.dw.com/en/canada-alberta-votes-on-holding-independence-referendum/a-79700283?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Canada: Alberta votes on holding independence referendum</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>カナダのアルバータ州の住民は、同州が最終的に独立につながる可能性のあるプロセスを開始すべきかどうかを問う住民投票に投票している。</p><p>この動議が成功する可能性は低いように見えるが、それでも採決が行われるということは、広大な石油が豊富な地域で経済的、政治的不満がある程度の影響力を獲得していることを意味している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>分離主義者の指導者らは、それでもなお、自分たちの大義が比較的強力に示されれば、オタワのマーク・カーニー首相政府に将来的にはもっと配慮するよう圧力をかけることができるのではないかと期待している。</p><p>投票は月曜日、州都エドモントンで現地時間午前９時（日本時間午後１５時）に始まった。</p><p>午後8時に閉店する予定です。その夜（火曜日、0200 GMT/UTC）。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Residents of Alberta in Canada are voting in a referendum on whether the province should begin a process that could ultimately lead to independence.</p><p>The motion does not appear likely to succeed but the vote taking place at all signifies economic and political grievances gaining some sway in the vast oil-rich region.</p><p>Separatist leaders hope that a comparatively strong showing for their cause could nevertheless pressure Prime Minister Mark Carney's government in Ottawa to pay them more heed in future.</p><p>Polls opened at 9 a.m. local time in the provincial capital Edmonton (1500 GMT/UTC) on Monday.</p><p>They are scheduled to close at 8 p.m. that evening (Tuesday, 0200 GMT/UTC).</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/canada-alberta-votes-on-holding-independence-referendum/a-79700283?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/19 23:25</span>
+    </div>
+
+    
+    <p class="title-ja">カナダ軍基地火災で兵士４人死亡、数十人負傷</p>
+    <p class="title-en"><a href="https://www.france24.com/en/video/20261019-four-soldiers-dead-dozens-injured-in-fire-at-canada-military-base" target="_blank" rel="noopener">Four soldiers dead, dozens injured in fire at Canada military base</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>アルバータ州の軍事基地で火災が発生し、兵士４人が死亡、数十人が負傷し、本土カナダ軍を襲った平時における最悪の悲劇の一つとなったとマーク・カーニー首相は日曜日に述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Four soldiers were killed and dozens injured in a fire at a military base in Alberta province, one of the worst peacetime tragedies to hit Canada's armed forces on home soil, Prime Minister Mark Carney said Sunday.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261019-four-soldiers-dead-dozens-injured-in-fire-at-canada-military-base" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/19 23:11</span>
+    </div>
+
+    
+    <p class="title-ja">ケニアのエボラ出血熱症例は、トランプ大統領による主要サービスの削減で米国の失敗が浮き彫りになる</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/oct/19/ebola-cases-kenya-us-quarantine" target="_blank" rel="noopener">Ebola cases in Kenya highlight US failures amid Trump cuts to key services</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>資金の大幅削減とWHOからの脱退を受けて、米国主導のケニア検疫センターに反対</p><p>史上２番目に大きな流行により同地域で4,300人以上が死亡、9,000人以上が罹患している中、同国初のウイルス集団感染で、ケニアの8人目の人がエボラ出血熱のブンディブギョ株の検査で陽性反応を示した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>これは、ケニアに物議を醸している検疫センターを建設し、世界的に医療支援を後退させ、特定の国からの旅行者を禁止することで、悪化するエボラ出血熱流行において米国が果たしてきた役割が低下していることを浮き彫りにしている。これらすべてにより、発生を特定して対応する能力も低下し、不信感が悪化しました。</p><p>米国はケニアのライキピア空軍基地に物議を醸している検疫センターを設置し、コンゴ民主共和国から帰国した米国人はそこで検疫を義務付けられることになった。このセンターは地元住民の反対を受けてケニア政府への不信感を煽り、抗議活動を引き起こし、ケニアの裁判所はセンターの閉鎖を命令した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Opposition to US-led quarantine center in Kenya follows sweeping funding cuts and withdrawal from WHO</p><p>A n eighth person in Kenya has tested positive for the Bundibugyo strain of Ebola in the country’s first-ever cluster of cases of the virus, as the second-largest outbreak in history has killed more than 4,300 and sickened more than 9,000 people in the region.</p><p>It highlights the diminished role the US has played in the worsening Ebola outbreak by building a controversial quarantine center in Kenya, pulling back health support globally, and banning travelers from certain countries. All of this has also reduced the ability to identify and respond to the outbreak and exacerbated mistrust.</p><p>The US created a controversial quarantine center at Kenya’s Laikipia airbase, where Americans returning from the Democratic Republic of the Congo would be required to quarantine. The center, opposed by locals, has stirred distrust in the Kenyan government, leading to protests and a Kenyan court ordering a halt to the center.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/oct/19/ebola-cases-kenya-us-quarantine" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/20 01:16</span>
+    </div>
+
+    
+    <p class="title-ja">ケニアのカルト指導者、191人殺害の罪で子供を餓死させるよう親に指示</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/ckd6d2l3dz4xo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Kenya cult leader who told parents to starve children guilty of 191 murders</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ケニアの終末カルトのリーダー、ポール・マッケンジーが、191人を殺害した罪で有罪判決を受け、そのうち1人を除いて全員が子供だった。</p><p>マッケンジーは、自分のカルト信者に「イエスに会える」ように子供たちを餓死させるよう命じた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>彼の教義では、教育は禁止され、現代医学は「悪」であると述べられていました。</p><p>彼のカルトの他の指導者29人も殺人罪で有罪判決を受けた。彼らは全員無罪を主張し、誰も死に追い込まれたわけではないと繰り返し主張した。</p><p>警告: この記事には、一部の人にとって不快に感じる可能性のある詳細が含まれています。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The leader of a Kenyan doomsday cult, Paul Mackenzie, has been found guilty of murdering 191 people, all but one of them children.</p><p>Mackenzie ordered members of his cult to starve their children to death so they could "meet Jesus".</p><p>His doctrine said that education was forbidden and modern medicine was "evil".</p><p>Twenty-nine other leaders of his cult were also convicted of murder. They had all pleaded not guilty, repeatedly insisting that nobody was forced to die.</p><p>Warning: This article contains details which some people might find distressing.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/ckd6d2l3dz4xo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/20 00:15</span>
+    </div>
+
+    
+    <p class="title-ja">セネガルのAFCON上告に関する決定は11月末までに下される予定</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/sports/2026/10/19/decision-on-senegals-afcon-final-appeal-to-be-made-by-end-of-november?traffic_source=rss" target="_blank" rel="noopener">Decision on Senegal’s AFCON final appeal to be made by end of November</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>今年のアフリカネイションズカップのタイトル剥奪後のセネガルの上訴に対する判決は、⁠⁠11月末に下されるとスポーツ仲裁裁判所（CAS）が認めた。</p><p>「この手続きには数週間を要し、CAS賞は2026年11月末に授与される予定だ」と裁判所は月曜日の声明で述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>1月にラバトで行われた決勝ではセネガルが延長戦の末に開催国を⁠⁠1-0で破ったにもかかわらず、セネガルはアフリカサッカー連盟（CAF）によるモロッコ王者宣言の決定に異議を唱えている。彼らの主張とモロッコとCAFの主張は、10月8日にローザンヌのCASで審理された。</p><p>当時、CASは「数日以内に決定が下されると予想していたが、現在はCAS裁定として知られる法的根拠を含む完全な判決を下すことを決定した」と述べた。</p><p>セネガルは規定時間後半にペナルティが与えられた後、14分間ピッチを去り、数人の選手が抗議してロッカールームに戻ってからプレーを再開した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A decision on Senegal’s appeal ‌‌after being stripped of this year’s Africa Cup of Nations title will be made ⁠⁠at the end of ⁠⁠November, the Court of Arbitration for Sport (CAS) has confirmed.</p><p>“This process will require several weeks, with the CAS Award expected at the end of November 2026,” the court said in a statement on Monday.</p><p>Senegal are contesting the decision by the Confederation of African Football (CAF) to declare Morocco champions, despite Senegal beating the hosts ⁠⁠1-0 after extra time in January’s final in Rabat. Their arguments, plus those of Morocco and CAF, were heard by CAS in Lausanne on October 8 .</p><p>At the time, CAS said ⁠⁠it expected a decision within days but has now decided to issue a complete ruling, including legal grounds, known as a CAS Award.</p><p>Senegal walked off the pitch for 14 minutes ‌‌after a penalty was awarded against them late in regulation time, with several players returning to the dressing room in protest before they resumed play.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/sports/2026/10/19/decision-on-senegals-afcon-final-appeal-to-be-made-by-end-of-november?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-10-20";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
