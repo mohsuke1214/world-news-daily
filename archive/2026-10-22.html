@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年10月22日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/22 23:21</span>
+    </div>
+
+    
+    <p class="title-ja">フランスのセバスチャン・ルコルヌ首相が騒乱の中、政党指導者らと会談</p>
+    <p class="title-en"><a href="https://www.france24.com/en/video/20261022-french-pm-sebastien-lecornu-meets-with-leaders-of-political-parties-amid-unrest" target="_blank" rel="noopener">French PM Sebastien Lecornu meets with leaders of political parties amid unrest</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>今週末、フランス全土で暴動が起きたことを受け、セバスチャン・レコルヌ首相は政党指導者らと会談した。その目的は、「黄色いベスト」運動が新たな動員を呼びかけた土曜日を含め、次回の抗議活動で暴力が起きる可能性を防ぐことだ。 FRANCE 24のLuke Shragoによる詳細。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>French PM Sebastien Lecornu holds a meeting with the leaders of political parties after unrest this weekend across the country. The aim is to prevent potential violence during the next protests, including on Saturday as the "Yellow vests" movement called for a new mobilisation. Details by FRANCE 24's Luke Shrago.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261022-french-pm-sebastien-lecornu-meets-with-leaders-of-political-parties-amid-unrest" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/22 22:53</span>
+    </div>
+
+    
+    <p class="title-ja">フランスで初のシャモンダウイルス感染者が検出されたと当局者が発表</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c6reyx1d9ge9o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">First human case of Shamonda virus detected in France, officials say</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>フランス当局は、シャモンダウイルス（シャブ）の人類初の感染例が、10月初旬に死亡した患者から検出されたと発表した。</p><p>保健当局者らは、これは「重度の免疫不全患者における例外的なケース」であり、現時点では国民へのリスクはないと述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>シャブ病は主に牛に影響を及ぼす病気で、感染したユスリカによって広がる可能性があります。羊、ヤギ、アルパカ、馬でも感染者は発生していますが、人への感染はこれまで前例がありませんでした。</p><p>世界保健機関（WHO）と欧州疾病予防管理センター（ECDC）は状況を監視しており、フランス当局はウイルスがどのようにして人に感染したのか調査を続けていると述べた。</p><p>この患者は現在、フランス東部でユスリカに噛まれたことでシャブに感染したと考えられていると、同国の保健省と農業省が木曜日に発表した。同国の保健省と農業省は木曜日、同国では春に動物での感染が初めて確認された。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The first known human case of the Shamonda virus (Shav) has been detected in a patient who died in early October, French authorities have said.</p><p>Health officials said it was an "exceptional case in a severely immunocompromised patient" and there was currently no risk to the public.</p><p>Shav is a disease that primarily affects cattle and can be spread by infected midges. Cases have also occurred in sheep, goats, alpacas and horses, but infections in people were previously unheard of.</p><p>The World Health Organization (WHO) and European Centre for Disease Prevention and Control (ECDC) said they were monitoring the situation, with French officials still investigating how the virus had spread to a human.</p><p>It is currently thought the patient contracted Shav through a midge bite in eastern France, the country's health and agriculture ministries said on Thursday, where cases were first identified in animals in the spring.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c6reyx1d9ge9o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/22 22:12</span>
+    </div>
+
+    
+    <p class="title-ja">フランスが一部の抗議活動を禁止する中、マクロン大統領、暴動の原因は「扇動的」極左と非難</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/22/macron-blames-seditious-ultra-left-for-unrest-as-france-bans-protests?traffic_source=rss" target="_blank" rel="noopener">Macron blames ‘seditious’ far left for unrest as France bans some protests</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>エマニュエル・マクロン大統領が週末の抗議活動で暴力を煽ったとして極左グループを非難したため、フランス当局は国内のいくつかの大都市でのデモを禁止した。</p><p>パリ警察は木曜日の抗議活動を市内の主要地域で午後８時（日本時間午後８時）まで禁止すると発表した。これには、大統領エリゼ宮殿、上下両院、市内の主要鉄道駅の近くの地域に加え、週末に略奪が発生したダウンタウンの一部も含まれる。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>警察関係者はAFP通信に対し、主催者が「暴力や破壊行為を防ぐことができない」ため禁止が必要だったと語った。</p><p>フランスの他の地域でも、当局はリヨン、リール、グルノーブルで木曜日に予定されていた抗議活動を禁止した。</p><p>この制限は、土曜日にフランス全土で50万人以上の人々が集まり、学校の条件改善を要求する学生や生活費の高さを非難するグループが結集したことを受けて導入された。いくつかの地域で暴動が発生し、店舗が略奪され、少なくとも2,500人が逮捕された。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>French authorities have barred demonstrations in several of the country’s largest cities, as President Emmanuel Macron blamed far-left groups for stoking violence during weekend protests .</p><p>The Paris Police Prefecture announced that Thursday’s protests would be banned in key parts of the city until 8pm (18:00 GMT). That includes areas near the presidential Elysee Palace, both houses of parliament, the city’s main train stations, as well as parts of downtown where looting occurred over the weekend.</p><p>A police source told the AFP news agency the ban was necessary due to organisers’ “inability to prevent violence and vandalism”.</p><p>Elsewhere in France, authorities also prohibited protests planned for Thursday in Lyon, Lille and Grenoble.</p><p>The restrictions come after more than half a million people gathered across France on Saturday in a protest that brought together students demanding better conditions in schools and groups denouncing high living costs. At least 2,500 people were arrested after riots broke out in several areas , with shops looted.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/22/macron-blames-seditious-ultra-left-for-unrest-as-france-bans-protests?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/22 20:44</span>
+    </div>
+
+    
+    <p class="title-ja">ウクライナ：スロヴィアンスクの前線近くの生活</p>
+    <p class="title-en"><a href="https://www.dw.com/en/ukraine-life-near-the-front-line-in-sloviansk/a-79722636?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Ukraine: Life near the front line in Sloviansk</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>数日前、ロシアの航空爆弾３発がスロビアスク郊外の住宅街を襲った。そのうちの1台は5階建てのアパートに衝突し、7人が負傷した。スロヴィアンスクは、隣のクラマトルスクと並んで、ウクライナ東部ドネツク地域でまだウクライナの統治下にある最後の主要都市の一つです。夏以来、この街は戦闘地域となっている。</p><p>壊れたアパートのブロックに囲まれた中庭では、ブランコの金属フレームの上に埃っぽいカーペットがかかっています。通りの向かい側の建物に住む年金受給者のテチャナさんは、瓦礫が散乱するアパートから建物を運び出して掃除した。爆弾が落ちたとき、彼女は自宅のキッチンにいました。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「爆弾は2階に落ち、4階に住んでいた女性が悲鳴を上げていました」と彼女はDWに語った。 「建物のその部分全体が崩壊する前に、彼らはなんとか彼女を救出した」と彼女は付け加えた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A few days ago, three Russian aerial bombs struck a residential neighborhood on the outskirts of Sloviansk. One hit a five-story apartment building, injuring seven people . Along with neighboring Kramatorsk, Sloviansk is one of the last major towns in the eastern Ukrainian region of Donetsk still under Ukrainian control. Since summer, the city has been a combat zone .</p><p>In a courtyard surrounded by damaged apartment blocks, a dusty carpet hangs over the metal frame of a swing set. Tetjana, a pensioner who lives in the building across the street, has brought it out of her rubble-strewn apartment to clean it. She was in her kitchen when the bombs struck.</p><p>"The bomb hit the second floor, and a woman who lived on the fourth floor was screaming," she tells DW. "They managed to rescue her before that entire section of the building collapsed," she adds.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/ukraine-life-near-the-front-line-in-sloviansk/a-79722636?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/22 22:46</span>
+    </div>
+
+    
+    <p class="title-ja">サウジアラビア東部の空港襲撃、フーシ派２人死亡、当局発表</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cqwy71ww156ro?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Two killed in Houthi attack on airport in eastern Saudi Arabia, authorities say</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イエメンのフーシ派は水曜夜、サウジアラビア東部の空港を攻撃し、サウジ当局は２人が死亡、８人が負傷したと発表した。</p><p>サウジ民間航空総局は、ダンマームのキング・ファハド国際空港で死亡した人々はサウジ国民とインド居住者であると特定した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>どのような種類の攻撃が行われたかは明らかにしていないが、イランの支援を受けるフーシ派は木曜日、同空港は過去48時間にドローンやミサイルで標的にされた場所の1つであると述べた。</p><p>サウジエネルギー省は、水曜朝、東部州の別の場所で迎撃されたドローンの破片によりさらに２人が死亡したと発表した。</p><p>同省によると、ドローンはサウジアラビアの国営石油会社アラムコがシャイバ油田に所有する処理施設を標的にしようとした際に迎撃され、請負業者の車両が放火された。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Yemen's Houthi movement has said it carried out an attack on an airport in eastern Saudi Arabia on Wednesday evening, which Saudi authorities said killed two people and injured eight others.</p><p>The Saudi General Authority of Civil Aviation identified those killed at King Fahd International Airport in Dammam as a Saudi citizen and an Indian resident.</p><p>It did not say what type of attack occurred, but the Iran-backed Houthis said on Thursday that the airport was one of the sites they had targeted with drones and missiles over the previous 48 hours.</p><p>Two more people were killed on Wednesday morning by debris from a drone that was intercepted elsewhere in Eastern Province, the Saudi energy ministry said.</p><p>The drone was intercepted as it attempted to target a processing facility owned by Saudi Arabia's state oil company Aramco in the Shaybah oil field, where a contractor's vehicle was set ablaze, according to the ministry.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cqwy71ww156ro?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/22 22:42</span>
+    </div>
+
+    
+    <p class="title-ja">フーシ派の封鎖中、イエメン人はタイズで深刻な人材不足に直面している</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/10/22/yemenis-face-severe-shortages-in-taiz-amid-houthi-blockade?traffic_source=rss" target="_blank" rel="noopener">Yemenis face severe shortages in Taiz amid Houthi blockade</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>フーシ派の封鎖中、イエメン人はタイズで深刻な人材不足に直面している</p><p>イエメンのタイズでは、フーシ派の封鎖により主要な供給ルートが遮断され、住民は深刻な食料と水の不足に直面している。国連は、紛争が激化する中、同市にはもはや援助が届かず、推計80万人が命を救う援助を受けられないと警告している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Yemenis face severe shortages in Taiz amid Houthi blockade</p><p>Residents in Yemen’s Taiz are facing severe food and water shortages after a Houthi blockade cut off a key supply route. The UN warns aid can no longer reach the city, leaving an estimated 800,000 people without life-saving assistance amid escalating conflict.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/10/22/yemenis-face-severe-shortages-in-taiz-amid-houthi-blockade?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/22 20:28</span>
+    </div>
+
+    
+    <p class="title-ja">米国とイスラエルは選挙後にイランを攻撃する可能性がある。そしてSpaceXとTeslaは合併を検討</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/22/g-s1-149315/up-first-newsletter-midterm-campaign-israel-iran-elon-musk-spacex-tesla" target="_blank" rel="noopener">U.S., Israel may attack Iran post-elections. And, SpaceX and Tesla consider merging</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>中間選挙前の最後の数日間に主要州を攻撃したのはトランプ大統領だけではない。民主党も大物議員を擁立している。バラク・オバマ前大統領は今週末オハイオ州とミシガン州を訪問し、来週にはジョージア州に向かう。本日、カマラ・ハリス元副大統領が、上院選挙戦が驚くほど激戦となっているミシシッピ州を訪問する予定だ。</p><p>米国とイスラエルは、来月初旬のイラン攻撃の可能性に向けた計画を準備していると、この件について説明を受けた関係者が本日、準備について話し合うため匿名を条件に語った、とNPRに語った。この攻撃の可能性は、米国の中間選挙と来週のイスラエルの選挙後に行われるだろう。この事態は、占領下のヨルダン川西岸でイスラエル治安部隊が昨日、ニューヨーク州の民主党下院議員候補ブラッド・ランダー氏や十数人のアメリカ人ラビらを含む約80人を拘束した後に起きた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>テスラとスペースXは合併を検討している。イーロン・マスク氏の2つの会社が一緒になれば、地球上で最も裕福な個人の1人としての彼の影響力は潜在的に増幅されるだろう。新会社は世界最大手の一つとなり、合計時価総額は約3兆7000億ドルを誇ることになる。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>President Trump isn't the only one hitting key states in the last days before the midterm elections. Democrats are bringing out big names, too. Former President Barack Obama will be in Ohio and Michigan this weekend, and next week he heads to Georgia. Today, former Vice President Kamala Harris is set to visit Mississippi, which has a surprisingly competitive Senate race.</p><p>The U.S. and Israel are preparing plans for a possible attack on Iran early next month , a person briefed on the matter, who spoke on condition of anonymity so they could discuss the preparations, told NPR today. This potential strike would occur after the U.S. midterm elections and Israel's elections next week. The development comes after Israeli security forces in the occupied West Bank detained about 80 people yesterday, including U.S. Democratic congressional nominee for New York Brad Lander and more than a dozen American rabbis.</p><p>Tesla and SpaceX are exploring a merger. Together, Elon Musk's two companies would potentially amplify his influence as one of the wealthiest individuals on Earth. The new company would become one of the largest globally, boasting a combined market cap of approximately $3.7 trillion.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/22/g-s1-149315/up-first-newsletter-midterm-campaign-israel-iran-elon-musk-spacex-tesla" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/21 03:19</span>
+    </div>
+
+    
+    <p class="title-ja">UNIFILの任務終了が近づく中、レバノンは不確実性に直面する</p>
+    <p class="title-en"><a href="https://www.dw.com/en/lebanon-faces-uncertainty-as-unifil-mandate-nears-end/a-79714491?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Lebanon faces uncertainty as UNIFIL mandate nears end</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>国連レバノン暫定軍（UNIFIL）の任務が終了に近づくにつれ、南レバノンの将来に対する不確実性が高まっている。レバノンのナワフ・サラーム首相は、「UNIFILに代わる新たな国際軍に関する合意が無い場合に、UNIFILの撤退が引き起こす可能性がある空白を回避する」必要性を警告した。</p><p>レバノン政府も土壇場でUNIFILの任務延長を求めているが、これまでのところ成功していない。 46カ国の7,565人の平和維持軍が2026年12月31日に国連が監視するいわゆるブルーライン地帯から撤退を開始する可能性が最も高い。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>全長120キロメートル（75マイル）のブルーラインは、国連が認定したイスラエルとレバノン間の撤退線であり、国際的に合意された国境ではない。設立は2000年である。しかし、パレスチナ武装勢力による攻撃に応じてイスラエルがレバノンに侵攻した後、1978年にはすでに多国籍UNIFIL部隊がこの地域を監視するためにこの地域に派遣されていた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>As the mandate of the United Nations Interim Force in Lebanon , or UNIFIL, nears its end, uncertainty over the future of southern Lebanon is growing. Lebanese Prime Minister Nawaf Salam has warned of the need to "avert the vacuum that UNIFIL's withdrawal could create, were it to take place without agreement on a new international force to replace it."</p><p>The Lebanese government has also been pushing for a last-minute extension of UNIFIL's mandate, but so far without success . It is most likely that the 7,565 peacekeepers from 46 countries will begin withdrawing from the UN-patrolled so-called Blue Line zone on December 31, 2026.</p><p>The Blue Line, which stretches for 120 kilometers (75 miles), is a UN-identified line of withdrawal between Israel and Lebanon, not an internationally agreed border. It was established in 2000. However, as early as in 1978, multinational UNIFIL troops were deployed to this region to monitor the area after Israel invaded Lebanon in response to attacks by Palestinian armed groups.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/lebanon-faces-uncertainty-as-unifil-mandate-nears-end/a-79714491?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/22 23:09</span>
+    </div>
+
+    
+    <p class="title-ja">インドがニュージーランドの反撃に抵抗し、記録樹立となるT20クリケット開幕戦で勝利</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/sports/2026/10/22/india-resist-new-zealand-fightback-to-win-record-setting-t20-cricket-opener?traffic_source=rss" target="_blank" rel="noopener">India resist New Zealand fightback to win record-setting T20 cricket opener</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>インドは木曜日、クライストチャーチで4ウィケットでスリリングな勝利を収め、好スタートを切った後、ニュージーランドの熱狂的な反撃を乗り越え、T20シリーズの5試合で1-0のリードを奪った。</p><p>インドは、オープナーのサンジュ・サムソンとアビシェク・シャルマが台を築いた後、226ランの追撃でイニング半ばのぐらつきを切り抜け、シュレヤス・アイヤーの貢献で追撃を盛り返し、ナマン・ディルが最後の仕上げを加えて19.4オーバーで勝利を決めた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「彼ら（開幕投手）がクリックすると、彼らは我々のためにゲームをセットアップし、残りの我々は船を安定させてフィニッシュしようと努める」とインドのキャプテン・アイヤーは語った。 「彼（ディール）は私たちに多くの選択肢を与えてくれます。今夜彼が見せた冷静沈着な性格は私自身も素晴らしかったと感じています。」</p><p>打席に立ったニュージーランドは、先制投手のティム・サイフェルトとフィン・アレンが調子を整え、グレン・フィリップスが見事なノックを決めてホストチームを225勝4敗と押し上げるなど、好条件を最大限に生かした。</p><p>合計得点はニュージーランドにとって本拠地でのインド戦でのT20最多得点となったが、中盤がたどたどしくあったにもかかわらず、訪問チームは史上最高のランチェイス成功を収めた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>India overcame a spirited New Zealand fightback after a blazing start to secure a thrilling four-wicket victory in Christchurch ⁠on Thursday and take a 1-0 lead in the five-match T20 series.</p><p>India survived a mid-innings wobble in a 226-run chase after openers Sanju Samson and Abhishek Sharma laid the platform, with Shreyas Iyer’s ⁠contribution reviving the chase and Naman Dhir applying the finishing touches to seal victory in 19.4 overs.</p><p>“When they [the openers] click, they set up the game for us, and the rest of us try to steady the ship and finish,” India captain Iyer said. “He [Dhir] gives us lots of options. I personally feel the calm and composed ‌nature he showed tonight, it was magnificent.”</p><p>Put in to bat, New Zealand made the most of favourable conditions as openers Tim Seifert and Finn Allen set the tone before Glenn Phillips produced a dazzling knock to propel the hosts to 225-4.</p><p>The total was New Zealand’s biggest T20 score against India on home soil, but the visitors completed their highest-ever successful run chase despite a stuttering middle phase.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/sports/2026/10/22/india-resist-new-zealand-fightback-to-win-record-setting-t20-cricket-opener?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/22 23:08</span>
+    </div>
+
+    
+    <p class="title-ja">インドの人気金融インフルエンサー自殺でユーチューバー逮捕</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/ckx2d0ej7w7do?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">YouTuber arrested after popular Indian finance influencer's suicide</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>インドで27歳の金融界のインフルエンサーが自殺したことを受けて、ネットいじめ疑惑に巻き込まれ、誰が投資家に金融上のアドバイスをすべきかについて議論が始まった。</p><p>「Finance with Harish」という非常に人気のあるインスタグラムアカウントを運営していたV・ハリッシュ氏が、火曜日の朝、南部タミル・ナドゥ州の州都チェンナイ近くの自宅で死亡しているのが発見された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>彼の自殺は、不正行為の苦情を受けてメタ社によってアカウントが無効にされたわずか数週間後に起きた。</p><p>父親のJ・ビナヤガムさんは警察に提出した訴状の中で、ユーチューバーでテクノロジー中心のベンチャースタジオゼムリアのCEOであるジェイソン・サミュエルによるオンライン嫌がらせが原因で息子が命を落としたと主張した。</p><p>警察は木曜日、「ハリッシュから金をゆすり取ろう」としたことと「ソーシャルメディアにハリッシュに対する中傷動画を投稿した」容疑でサミュエルを逮捕した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A 27-year-old finance influencer's suicide in India has been mired in allegations of cyberbullying and started a conversation around who should give financial advice to investors.</p><p>V Harish - who ran a hugely popular Instagram account called "Finance with Harish" - was found dead on Tuesday morning at his home near Chennai, capital of the southern state of Tamil Nadu.</p><p>His suicide came just weeks after his account was disabled by Meta after complaints of irregularities.</p><p>In a complaint lodged with the police, his father J Vinayagam has alleged that his son took his life because of online harassment by Jason Samuel, a YouTuber and CEO of tech-centric venture studio Zemuria.</p><p>Police arrested Samuel on Thursday under suspicion of trying to "extort money from Harish" and posting "defamatory videos against him on social media".</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/ckx2d0ej7w7do?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/22 19:22</span>
+    </div>
+
+    
+    <p class="title-ja">中国が任命したダライ・ラマは「偽物になるだろう」と亡命元チベット指導者が語る</p>
+    <p class="title-en"><a href="https://www.france24.com/en/tv-shows/t%C3%AAte-%C3%A0-t%C3%AAte/20261022-dalai-lama-appointed-by-china-is-going-to-be-a-fake-one-exiled-former-tibetan-leader-says" target="_blank" rel="noopener">Dalai Lama appointed by China 'is going to be a fake one', exiled former Tibetan leader says</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>亡命元チベット指導者ロブサン・サンゲ氏はフランス24とのインタビューで、中国が任命したダライ・ラマの後継者は「偽者になるだろう」と語った。同氏はまた、中国政府の民族統一法を「民族抹殺」に例え、米中協議ではチベットの懸念が「少し格下げされた」と述べ、ネパール・チベット国境で８月に発生した致命的な洪水について中国が警告を怠ったと非難した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>In an interview with FRANCE 24, exiled former Tibetan leader Lobsang Sangay said any successor to the Dalai Lama appointed by China "is going to be a fake one". He also likened Beijing's ethnic unity law to "an ethnic erasure", said Tibetan concerns had been "downgraded a bit" in US-China talks and accused China of failing to warn of the deadly August floods on the Nepal-Tibet border.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/tv-shows/t%C3%AAte-%C3%A0-t%C3%AAte/20261022-dalai-lama-appointed-by-china-is-going-to-be-a-fake-one-exiled-former-tibetan-leader-says" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/22 15:36</span>
+    </div>
+
+    
+    <p class="title-ja">北朝鮮、国境を越えて韓国への宣伝放送を再開すると発表</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/22/g-s1-149306/north-korea-propaganda-broadcasts" target="_blank" rel="noopener">North Korea says it will resume propaganda broadcasts across border into South Korea</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ファイル - 拡声器の隣にある北朝鮮軍の警備所に立つ兵士。2026年2月26日、北朝鮮との国境近く、韓国の坡州から見た。アン・ヨンジュン/AP キャプションを隠す</p><p>ソウル、韓国－北朝鮮は重武装した韓国との国境沿いで反ソウルのプロパガンダ放送を再開する計画だと金正恩朝鮮労働党委員長の妹が明らかにし、地雷爆発で前線の韓国軍兵士３人が負傷し緊張が高まる中、心理戦作戦が復活するという。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>兄のワシントンとソウルの最高報道官である金与正氏は、北朝鮮軍が国境警備を強化している前線地域を訪問した後、水曜日に発表した。彼女は、要塞化工事を目的とした韓国のいかなる挑発に対しても報復すると改めて脅迫した。</p><p>同氏は木曜日のフォローアップ声明で、北朝鮮は数日以内に国境沿いに「新たな対抗手段」を警戒態勢に置き、拡声器を「待機」状態にするつもりだと述べた。</p><p>金正恩氏がソウルに対して強硬姿勢を強める中、北朝鮮はすでに世界で最も重武装した国境の一つに地雷、有刺鉄線フェンス、対戦車柵、その他の要塞を追加している。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>FILE - A soldier stands at a North Korean military guard post next to loudspeakers, seen from Paju, South Korea, near the border with North Korea, on Feb. 26, 2026. Ahn Young-joon/AP hide caption</p><p>SEOUL, South Korea — North Korea plans to resume anti-Seoul propaganda broadcasts along the heavily armed border with South Korea, leader Kim Jong Un's sister said, reviving a psychological warfare campaign as tensions rise after land mine blasts injured three South Korean front-line soldiers.</p><p>Kim Yo Jong, her brother's top spokesperson on Washington and Seoul, made the announcement Wednesday after visiting front-line areas where North Korean troops are reinforcing the border. She renewed a threat to retaliate against any South Korean provocation aimed at the fortification work.</p><p>In a follow-up statement Thursday, she said the North would place "new counter means" on alert along the border and have its loudspeakers on "standby" within days.</p><p>North Korea has been adding mines, barbed wire fences, anti-tank barriers and other fortifications to what's already one of the world's most heavily armed borders as Kim Jong Un pushes a hard line toward Seoul.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/22/g-s1-149306/north-korea-propaganda-broadcasts" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/22 22:50</span>
+    </div>
+
+    
+    <p class="title-ja">記録的な速さで滝が流れるブラジルとアルゼンチンの国境からこんにちは。</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/22/g-s1-148553/argentina-brazil-iguazu-falls-waterfalls-super-el-nino" target="_blank" rel="noopener">Greetings from the Brazil-Argentina border, where waterfalls are flowing at near-record rates</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>アルゼンチン、イグアス国立公園 — 私の人生の中で、自然の巨大さと力を感じたのは数回です。ブラジルとアルゼンチンの国境にあるイグアスの滝の端に立つ男もその1人だった。</p><p>イグアスは単なる印象的な滝ではなく、両国にまたがる 1 マイル以上にわたる滝の複合体です。ブラジルでは10月に雨が降り、記録的な量に近い水量がそびえ立つ崖を越えて押し寄せた。科学者たちは、この容赦ない雨を今年のスーパーエルニーニョと結びつけ、世界中で異常気象を引き起こしていると考えています。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>IGUAZÚ NATIONAL PARK, Argentina — Few times in my life have I felt the enormity and power of nature. Standing at the edge of Iguazú Falls, on the Brazil-Argentina border, was one of them.</p><p>Iguazú isn't just one imposing fall, but a complex of cascades spanning more than a mile across both countries. A rain-soaked October in Brazil has sent near-record volumes of water surging over its towering cliffs. Scientists link the relentless rains to this year's Super El Niño , causing extreme weather events across the globe.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/22/g-s1-148553/argentina-brazil-iguazu-falls-waterfalls-super-el-nino" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/22 21:31</span>
+    </div>
+
+    
+    <p class="title-ja">ブラジルの広大な貧民街には長期的な都市計画ソリューションが必要</p>
+    <p class="title-en"><a href="https://www.france24.com/en/tv-shows/focus/20261022-brazil-s-sprawling-favelas-require-long-term-urban-planning-solutions" target="_blank" rel="noopener">Brazil's sprawling favelas require long-term urban planning solutions</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>日曜日、ブラジル人が大統領選挙の第2回投票に向けて投票に向かう中、特派員は私たちを同国の貧民街の中心部に連れて行きます。そこでは住民が不衛生な環境で暮らしています。過去 40 年間で、ブラジルのファベーラが占める面積はほぼ 3 倍になりました。 1985 年には 53,700 ヘクタールでしたが、現在では約 460,000 ヘクタールとなっています。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>As Brazilians head to the polls on Sunday for the second round of presidential elections, our correspondents take us to the heart of the country's favelas, where residents live in unsanitary conditions. Over the past 40 years, the area occupied by Brazilian favelas has almost tripled in size. They now cover around 460,000 hectares, compared with 53,700 in 1985.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/tv-shows/focus/20261022-brazil-s-sprawling-favelas-require-long-term-urban-planning-solutions" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/22 19:17</span>
+    </div>
+
+    
+    <p class="title-ja">エルサルバドル大統領、軍人質問題でハイチギャングを脅迫</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cq33xpjekve4o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">El Salvador's president threatens Haitian gangs over military hostages</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>エルサルバドル大統領は、日曜日からハイチで行方不明となっている空軍人４人を救出する軍事作戦を開始したと発表した。</p><p>ナイブ・ブケレ氏はさらなる行動を示唆し、水曜日の攻撃は、戦闘員ではないとした人質全員が生きて戻らなかった場合に何が起こるかに比べれば「何でもない」と述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>エルサルバドル国軍によると、彼らは「重武装した犯罪グループ」の待ち伏せ攻撃を受けて行方不明となった。待ち伏せ攻撃は武装勢力が支配する地域クロワ・デ・ブーケで発生した。</p><p>彼らは、ハイチで激化するギャング暴力に対抗するため、今月初めに国連安全保障理事会によって承認された、いわゆるギャング鎮圧部隊（GSF）の一員だった。</p><p>ブケレからのX投稿によると、この任務はパイロットと技術者で構成されており、彼らの主な仕事は「戦争をすることではなく、医療搬送を行って人命を救うこと」だったという。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>El Salvador's president has said he has launched a military operation to rescue four air force personnel who have been missing in Haiti since Sunday.</p><p>Threatening further action, Nayib Bukele said that Wednesday's attack was "nothing" compared with what would happen if all the hostages - who he said were not combatants - were not returned alive.</p><p>They went missing after being ambushed by "heavily armed criminal groups," El Salvador's armed forces said. The ambush occurred in Croix-des-Bouquets, an area controlled by armed groups.</p><p>They were part of the so-called Gang Suppression Force (GSF), approved by the United Nations Security Council earlier this month, to tackle escalating gang violence in Haiti.</p><p>According to an X post from Bukele, the mission consisted of pilots and technical personnel, whose primary jobs were to "carry out medical evacuations and save lives, not to wage war".</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cq33xpjekve4o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/21 01:24</span>
+    </div>
+
+    
+    <p class="title-ja">アルバータ州の有権者が住民投票でカナダ離脱計画を圧倒的に拒否</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/oct/20/canada-alberta-rejects-independence-succession-referendum" target="_blank" rel="noopener">Alberta voters overwhelmingly reject plan to leave Canada in referendum</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>結果はマーク・カーニー首相とカナダ統一支持者の勝利</p><p>カナダのアルバータ州の有権者は、独立プロセスを開始するという提案を圧倒的に拒否し、カナダの統一支持者に決定的な勝利をもたらし、分離主義運動内の分裂は深まりました。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>アルバータ州選挙局の非公式結果によると、約190万票が集計され、およそ76％の人がカナダ残留を支持し、24％が分離に向けたプロセスの開始を支持した。</p><p>アルバータ州の州都エドモントンで育ったカナダの首相マーク・カーニーはこの結果を祝福した。</p><p>「アルバータ州の人々は明確な選択をしました。彼らは団結し、共に築き、お互いをいたわり合うことを選びました。とりわけ、アルバータ州の人々はカナダを選びました。」</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Result is a victory for prime minister Mark Carney and supporters of Canadian unity</p><p>Voters in Canada’s Alberta have overwhelmingly rejected a proposal to begin the process of independence, delivering a decisive victory for supporters of Canadian unity and deepening divisions within the separatist movement.</p><p>With nearly 1.9m votes counted, roughly 76% people supported remaining in Canada, while 24% backed beginning a process toward separation, according to unofficial results from Elections Alberta.</p><p>The Canadian prime minister, Mark Carney , who grew up in Edmonton, Alberta’s capital, celebrated the result.</p><p>“Albertans made a clear choice. They chose unity, to build together, and to take care of each other. Above all, Albertans chose Canada.”</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/oct/20/canada-alberta-rejects-independence-succession-referendum" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/22 23:23</span>
+    </div>
+
+    
+    <p class="title-ja">カメルーン：大規模な列車事故から10年、被害者たちは今も正義を待っている</p>
+    <p class="title-en"><a href="https://www.france24.com/en/video/20261022-cameroon-ten-years-after-a-massive-train-disaster-victims-are-still-awaiting-justice" target="_blank" rel="noopener">Cameroon: Ten years after a massive train disaster, victims are still awaiting justice</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ヤウンデとドゥアラ間を走行していたカメルーン国鉄の都市間列車が脱線し、同国史上最悪の鉄道事故となってから10年が経過した。 79人が死亡、数百人が負傷した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>It has been ten years since a Cameroon National Railway Intercity train travelling between Yaounde and Douala derailed and became the country's worst ever railway disaster. Seventy-nine people were killed and hundreds were injured.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261022-cameroon-ten-years-after-a-massive-train-disaster-victims-are-still-awaiting-justice" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/22 22:35</span>
+    </div>
+
+    
+    <p class="title-ja">スーダンの無人機戦への移行がどのように民間危機を煽っているのか</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/22/how-sudans-shift-to-drone-warfare-is-fuelling-a-civilian-crisis?traffic_source=rss" target="_blank" rel="noopener">How Sudan’s shift to drone warfare is fuelling a civilian crisis</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>スーダンの首都ハルツーム東のイムティダード・ナセル地区では、住民たちが空がドローンで埋め尽くされるという恐ろしい新たな現実と格闘している。</p><p>「空でドローンの騒音が聞こえましたが、最初は気にも留めませんでした」と、この地域の住民アハメド・アブデル・ハミドさんはアルジャジーラに、最近の急速支援部隊（RSF）によるドローン攻撃について語った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>その後、対空砲火と2回の大爆発が地域を震撼させ、地域の家族の子供3人が死亡した。</p><p>スーダン全土での壊滅的なドローン攻撃の波により、ここ数日で160人以上が死亡し、2023年4月に始まった競合する軍隊間の紛争が致命的な展開を見せている。</p><p>スーダン国軍（SAF）と民兵組織RSFによる無人航空機（UAV）の使用の増加により、戦場の動機の変化と相手を疲弊させたいという相互の願望により、戦争は住宅街の奥深くまで押し込まれている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>In the Imtidad Nasser neighbourhood east of Sudan’s capital Khartoum, residents are grappling with a terrifying new reality of skies filled with drones.</p><p>“We heard the buzz of drones in the sky, but did not pay attention to it at first,” Ahmed Abdel Hamid, a resident of the area, told Al Jazeera about a recent drone attack by the Rapid Support Forces (RSF).</p><p>Then, anti-aircraft fire and two huge explosions shook the area, killing three children from a family in the community.</p><p>A devastating wave of drone attacks across Sudan has killed more than 160 people in recent days, marking a lethal evolution in the conflict between competing military forces which began in April 2023.</p><p>A rise in the use of unmanned aerial vehicles (UAVs) by the Sudanese Armed Forces (SAF) and the paramilitary RSF has pushed the war deep into residential neighbourhoods, driven by shifting battlefield motives and a mutual desire to exhaust the opponent.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/22/how-sudans-shift-to-drone-warfare-is-fuelling-a-civilian-crisis?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-10-22";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
