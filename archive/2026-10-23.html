@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年10月23日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/23 23:26</span>
+    </div>
+
+    
+    <p class="title-ja">フランスの抗議活動：エマニュエル・マクロン大統領が学生組合の代表と会談</p>
+    <p class="title-en"><a href="https://www.france24.com/en/french-protests-president-emmanuel-macron-meets-student-unions-representatives" target="_blank" rel="noopener">French protests: President Emmanuel Macron meets student unions representatives</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>政府が明日の動員の準備を進める中、フランスのエマニュエル・マクロン大統領は動員開始以来初めて学生代表と会談する予定だ。ルーク・シュラゴには他にもたくさんあります。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>For the first time since the beginning of the mobilisation, the French President Emmanuel Macron is set to meet student representatives as the government prepares for tomorrow's mobilisation. Luke Shrago has more.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/french-protests-president-emmanuel-macron-meets-student-unions-representatives" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/23 23:15</span>
+    </div>
+
+    
+    <p class="title-ja">パリ近郊で銃乱射事件、「テロ犯罪」として捜査へ大臣発言</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c6ev38dj1g8zo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Deadly shooting near Paris investigated as 'crime of terrorism', minister says</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>パリ郊外で発生した銃撃で１人が死亡、５人が負傷し、うち３人が重傷を負い、当局は「テロ」として捜査している。</p><p>金曜には車上での銃撃事件が複数発生し、最初はパリ南西のトラップで、次に近くのラ・ヴェリエールで発生した。ローラン・ヌニャス内務大臣によると、暴動は15分近く続いたという。負傷者の中には12歳の少女も含まれている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>襲撃犯とみられる人物は逮捕された。動機は依然として不明だが、国家対テロ検察局（PNAT）は、この事件は「テロ企業に関連した殺人」とみられると述べた。</p><p>ヌニエス氏はトラップスで記者団に対し、「これは明らかにテロ犯罪だ。（検察官が）そう言っている」と語った。</p><p>トラップス市長のアリ・ラベ氏は金曜朝、「ある人物が遭遇した数人に向かって車から発砲した」と述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>One person has been killed and five others wounded - three seriously - in a gun attack in a Parisian suburb which authorities are investigating as "terrorism".</p><p>Several drive-by shootings took place on Friday - first in Trappes to the south-west of Paris, and then in nearby La VerriÃ¨re. The rampage lasted almost 15 minutes, said Interior Minister Laurent NuÃ±ez. A12-year-old girl is among the wounded.</p><p>The suspected attacker has been arrested. The motive remains unclear, but the National Anti-Terrorist Prosecutor's Office (PNAT) said the incident appeared to be "murder in connection with a terrorist enterprise".</p><p>NuÃ±ez told reporters in Trappes: "It's clearly a terrorist crime, that's what [the prosecutor] has said."</p><p>The Mayor of Trappes, Ali Rabeh, said that "an individual fired shots from his vehicle at several people he encountered" on Friday morning.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c6ev38dj1g8zo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/23 22:50</span>
+    </div>
+
+    
+    <p class="title-ja">フィンランド、世界初の核廃棄物永久処分場の開設が近づく</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/23/finland-nearing-opening-of-worlds-first-permanent-nuclear-waste-repository?traffic_source=rss" target="_blank" rel="noopener">Finland nearing opening of world’s first permanent nuclear waste repository</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>フィンランドは、世界初の使用済み核燃料の永久地下処分場の運営許可を与えた。</p><p>廃棄物管理会社ポシバによると、政府は木曜日、フィンランド西部のオンカロに許可を与えた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>この動きにより施設の開設は認められないものの、間もなく操業を開始する予定だと同社は述べた。しかし、着工から22年が経った今でも正確な日付は決まっていない。</p><p>同社のイルッカ・ポイコライネン最高経営責任者（ＣＥＯ）は声明で「今日はポシバとフィンランドの双方にとって素晴らしい歴史的な日だ」と述べた。</p><p>「最終処分が始まる前に、ポシバは試運転段階を終え、STUK（フィンランド放射線原子力安全局）も検証し承認する必要がある必要な試験と検査を実施する。」</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Finland has granted an operating licence for the world’s first permanent underground repository for spent nuclear fuel.</p><p>The government handed Onkalo, in western Finland, the licence on Thursday, waste management company Posiva said.</p><p>Although the move does not allow the opening of the facility, it is expected to start operations soon, the firm said. However, 22 years after construction began, no exact date has been decided yet.</p><p>“This is a great and historic day for both Posiva and Finland,” the company’s Chief Executive Officer Ilkka Poikolainen said in a statement.</p><p>“Before final disposal begins, Posiva will finalise the commissioning stage, carrying out the necessary tests and inspections which STUK [the Finnish Radiation and Nuclear Safety Authority] also needs to verify and approve.”</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/23/finland-nearing-opening-of-worlds-first-permanent-nuclear-waste-repository?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/23 21:42</span>
+    </div>
+
+    
+    <p class="title-ja">ジャーナリストがモスクワ刑務所に収監され、日露関係が悪化</p>
+    <p class="title-en"><a href="https://www.dw.com/en/japan-russia-ties-erode-as-journalist-sits-in-moscow-jail/a-79742995?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Japan-Russia ties erode as journalist sits in Moscow jail</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>日本の外務省職員は今週、ロシア極東でスパイ容疑で逮捕されたジャーナリストと接触するためモスクワを訪れた。</p><p>ジャーナリストの今井夕貴氏が10月14日、サハリン島ユジノサハリンスク市でロシア連邦保安局保安局に逮捕された。逮捕のテレビ映像には、就寝中のホテルの部屋にFSB職員が押し入る様子が映っていた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>北海道新聞の特派員は、日ロ関係の地政学的問題点であるキリル諸島近くの地域の兵士に関する情報を入手しようとした疑いで告発された。</p><p>ロシア当局はすぐに同氏をモスクワのレフォルトボ刑務所に移送し、裁判所は同氏を少なくとも12月12日まで公判前拘留するよう命じた。国際ジャーナリスト連盟によると、同氏の即時釈放を求めた国際ジャーナリスト連盟によると、有罪判決を受けた場合、34歳の今井氏は最長20年の懲役刑に処される可能性がある。</p><p>モスクワの日本大使館職員らは今井氏との面会を拒否されている。東京では高市早苗首相が逮捕を非難し、今井氏がスパイだったという主張を却下した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Japanese Foreign Ministry officials were in Moscow this week in an attempt to contact a journalist arrested in Russia's far east on spying claims .</p><p>Journalist Yuki Imai was arrested on October 14 by Russia's FSB security service in the city of Yuzhno-Sakhalinsk on Sakhalin Island. Televised footage of the arrest showed FSB officers barging into his hotel room as he slept.</p><p>The correspondent for the Hokkaido Shimbun newspaper was accused of attempting to obtain information on soldiers in the region, which is near the Kiril islands, a geopolitical sore spot in Russia - Japan relations.</p><p>Russian authorities quickly transferred him to Lefortovo Prison in Moscow, where a court ordered him to be held in pre-trial detention until at least December 12. If convicted, 34-year-old Imai faces up to 20 years in jail, according to the International Federation of Journalists, which has called for his immediate release.</p><p>Officials of the Japanese embassy in Moscow have been refused access to Imai. In Tokyo, Prime Minister Sanae Takaichi has condemned the arrest and dismissed the claim that Imai was a spy.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/japan-russia-ties-erode-as-journalist-sits-in-moscow-jail/a-79742995?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/23 23:29</span>
+    </div>
+
+    
+    <p class="title-ja">ヨルダンの教会の葬儀で武装集団に射殺され6人死亡、当局発表</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/ck87zlpzny15o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Six shot dead by gunmen at church funeral in Jordan, officials say</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ヨルダン中部の葬儀で武装集団が発砲し、6人が死亡したと政府報道官が発表した。</p><p>金曜日にはカラク県の教会でさらに２８人が負傷した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>身元不明の武装集団は車で到着し、教会内で銃撃を開始し、現場から逃走したと伝えられている。</p><p>政府報道官モハマド・アルモマニ氏は、「凶悪な」攻撃を受けて治安部隊がその地域に派遣されたと述べた。</p><p>銃撃が始まったとき、数十人が葬儀のために教会内にいたと会葬者の一人、ハリド・ブルカンさんはヨルダンのアル・マムラカ国営テレビに語った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Six people were killed when gunmen opened fire on a funeral in central Jordan, a government spokesperson has said.</p><p>Another 28 people were injured in the church in the Karak governorate on Friday.</p><p>The unidentified gunmen are reported to have arrived in a car and began shooting inside the church before fleeing the scene.</p><p>Security forces have been deployed to the area after the "heinous" attack, government spokesman Mohammad al-Momani said.</p><p>Dozens of people had been inside the church for the funeral when the shooting began, Khaled Burqan, one of the mourners, told Jordan's al-Mamlaka state-run TV.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/ck87zlpzny15o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/23 22:32</span>
+    </div>
+
+    
+    <p class="title-ja">ヨルダンの教会で武装集団が発砲、数人死亡</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/23/at-least-seven-killed-after-gunmen-open-fire-at-church-in-jordan?traffic_source=rss" target="_blank" rel="noopener">Gunmen open fire at church in Jordan, killing several people</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ヨルダンのカラク県で起きた襲撃では、教会での葬儀中に武装集団が発砲し、少なくとも6人が死亡、28人が負傷した。</p><p>ヨルダン公安総局の報道官は、金曜のハムード教会襲撃後、少なくとも6人の死亡が確認されたと述べた。ヨルダン情報筋は以前、アルジャジーラに対して7人が殺害されたと伝えていた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>生存者らは、葬儀の行列が始まったときに爆発音を聞いたと述べ、その後、覆面をした襲撃者が教会に侵入して銃撃を始めたという。</p><p>国営テレビ局アル・マムラカは、治安部隊が教会に配備され、容疑者２人を追跡していたところ、容疑者２人が車から降りて発砲したと報じた。</p><p>葬儀参列者のハーレド・ブルカンさんはアル・マムラカに対し、数十人が行列に参加していたと語った。襲撃者の1人はピストルを所持し、もう1人はライフルを所持していたという。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>At least six people have been killed, and 28 others wounded, in an attack in Jordan’s Karak governorate that saw gunmen open fire during a funeral at a church.</p><p>A spokesperson for Jordan’s Public Security Directorate said at least six people are confirmed dead after Friday’s attack on the Hamoud church. Jordanian sources previously told Al Jazeera seven people had been killed.</p><p>Survivors said they heard an explosion when the funeral procession started, after which masked attackers broke into the church and began shooting.</p><p>State-owned television station Al-Mamlaka reported that security forces were deployed to the church and were pursuing two suspects, who got out of a vehicle and opened fire.</p><p>Funeral attendee Khaled Burqan told Al-Mamlaka that dozens of people were at the procession. One of the assailants carried a pistol, he said, and the other carried a rifle.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/23/at-least-seven-killed-after-gunmen-open-fire-at-church-in-jordan?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/23 21:57</span>
+    </div>
+
+    
+    <p class="title-ja">中東戦争：イスラエルがヨルダン川西岸作戦を開始</p>
+    <p class="title-en"><a href="https://www.france24.com/en/war-in-the-middle-east-israel-launches-west-bank-operations" target="_blank" rel="noopener">War in the Middle East: Israel launches West Bank operations</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>パレスチナ武装勢力は金曜日の攻撃でイスラエル人5人を負傷させ、その後兵士との銃撃戦で死亡したため、ベンヤミン・ネタニヤフ首相はイスラエルの選挙の数日前に占領下のヨルダン川西岸での封鎖を命令した。 FRANCE 24の国際問題編集者、Kethevane Gorjestaniによる詳細。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Palestinian militants wounded five Israelis in an attack on Friday before being killed in a shootout with soldiers, leading Prime Minister Benjamin Netanyahu to order a lockdown in the occupied West Bank days before Israeli elections. Details by Kethevane Gorjestani, FRANCE 24's International Affairs Editor.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/war-in-the-middle-east-israel-launches-west-bank-operations" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/23 20:22</span>
+    </div>
+
+    
+    <p class="title-ja">軍事増援が中東へ移動。そして、何百万人ものアメリカ人が期日前投票を行っています</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/23/g-s1-149514/up-first-newsletter-iran-war-midterm-voting-trump-bbc" target="_blank" rel="noopener">Military reinforcements move to Mideast. And, millions of Americans vote early</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>軍の増援が到着し、一部の米軍関係者が地域を離れることから、イランでの激しい戦闘が今後数週間で再開される可能性がある。この変化は、米国とイスラエルの戦争計画について説明を受けた関係者がNPRに、両国は米国の中間選挙後にイラン攻撃の可能性に備えた計画を準備していると語った中で起こった。イランは準備ができていると述べた。</p><p>フロリダ大学の選挙研究所によると、投票日まで 1 週間以上あるにもかかわらず、約 2,100 万人のアメリカ人が郵便または期日前投票ですでに投票を行っています。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>トランプ氏はBBCに対する100億ドルの名誉毀損訴訟で証言録取に出席しなければならないと連邦判事が判決した。判事は昨日、トランプ大統領は裁判所の規則に従う必要があり、さもなければ制裁に直面するだろうと述べた。この事件は、2024年10月下旬のパノラマ放送を中心に争われており、大統領の1月6日の演説を編集して、暴力的な議会包囲を扇動したかのように見せかけたという。トランプ大統領は、フロリダ州法に基づき、この放送は虚偽で誤解を招き中傷に当たると述べた。</p><p>これらの価格が変動する理由について詳しくは、こちらをご覧ください。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Heavier fighting in Iran could resume in the coming weeks as military reinforcements arrive and some U.S. personnel leave the region. This shift comes as a person briefed on the U.S. and Israel's war planning told NPR that the countries were preparing plans for a possible attack on Iran after the U.S. midterms. Iran said it is prepared .</p><p>Although Election Day is more than a week away , almost 21 million Americans have already voted, either by mail or early in-person voting, according to the University of Florida's Election Lab.</p><p>Trump must sit for a deposition in his $10 billion defamation case against the BBC, a federal magistrate judge ruled. Trump is required to comply with court rules or face sanctions, the judge said yesterday. The case centers on a Panorama broadcast from late October 2024, which allegedly edited the president's Jan. 6 speech to make it appear he incited a violent siege of Congress. Trump has described the broadcast as false, misleading and defamatory under Florida law.</p><p>Read more about why these prices have fluctuated here .</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/23/g-s1-149514/up-first-newsletter-iran-war-midterm-voting-trump-bbc" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/23 22:58</span>
+    </div>
+
+    
+    <p class="title-ja">なぜ公の場で女性が標的になるのでしょうか?</p>
+    <p class="title-en"><a href="https://www.france24.com/en/tv-shows/the-51/20261023-why-do-women-in-public-life-become-targets" target="_blank" rel="noopener">Why do women in public life become targets?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>オーストラリアの女性議員に対する残忍な標的型襲撃事件により両足を失ったことで、公の場における女性に対する暴力のレベルの上昇に対する懸念が再燃している。また、コーネル大学は、2024年に集団レイプ疑惑への対応をめぐって不信任投票に直面している。アネット・ヤングが、キャンパス内での性的暴行の生存者であるアニー・E・クラーク氏とジョージ・メイソン大学のサラ・ウィルフ博士に、なぜ大学が性的暴行事件で苦戦し続けるのかについて語る。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A brutal targeted attack on an Australian female MP, who lost both her legs as a result, has reignited concerns over the rising levels of violence against women in public life. Also Cornell University is facing a no-confidence vote over its handling of an alleged gang rape in 2024. Annette Young speaks to Annie E. Clark, a survivor of campus sexual assault and Dr Sara Wilf of George Mason University about why institutions continue to struggle with sexual assault cases.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/tv-shows/the-51/20261023-why-do-women-in-public-life-become-targets" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/23 21:59</span>
+    </div>
+
+    
+    <p class="title-ja">サセックス公爵夫人、父親に対する児童性的虐待画像の申し立てに「深く悩んでいる」</p>
+    <p class="title-en"><a href="https://www.theguardian.com/uk-news/2026/oct/23/meghan-duchess-of-sussex-distressed-child-sexual-abuse-image-claims-against-father" target="_blank" rel="noopener">Duchess of Sussex ‘deeply distressed’ over child sexual abuse image claims against father</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>メーガン妃、2018年にメトロポリタン警察から自身に対する「不穏な疑惑」を​​知らされたことを明かす</p><p>サセックス公爵夫人は、別居中の父親トーマス・マークル・シニアに対する児童への性的虐待画像に関わる告発に「深く心を痛めている」と述べ、2018年にロンドン警視庁から彼に対する「憂慮すべき申し立て」を知らされたことを明らかにした。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>メーガン妃は、異母弟のトーマス・マークル・ジュニアがフィリピンの旧宅で父親の遺影の隠し場所を発見したとの主張をサン紙が報じたことを受けて声明を発表した。</p><p>デイリー・メール紙とのインタビューで、マークル・シニアは児童への性的虐待画像の所持を否定し、告発を「ひどい嘘」と呼んだ。</p><p>英国当局は以前、メーガン妃に対し、2018年にスコットランドヤードに送られ、その後警察から共有された手紙の中で父親に関する疑惑が捜査中であると伝えていたことがわかっている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Meghan reveals she was made aware of ‘disturbing allegations’ against him in 2018 by Met police</p><p>The Duchess of Sussex has said she is “deeply distressed” over accusations involving child sexual abuse images against her estranged father, Thomas Markle Sr, and revealed she was made aware of “disturbing allegations” against him in 2018 by the Metropolitan police.</p><p>Meghan issued a statement after the Sun newspaper published claims that her half-brother Thomas Markle Jr alleged he had found a stash of images belonging to their father at his former home in the Philippines.</p><p>In an interview with the Daily Mail, Markle Sr denied possessing child sexual abuse images, calling the accusations “sick lies”.</p><p>It is understood that authorities in the UK previously told Meghan that allegations made about her father in a 2018 letter sent to Scotland Yard, and subsequently shared with her by the police, were being investigated.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/uk-news/2026/oct/23/meghan-duchess-of-sussex-distressed-child-sexual-abuse-image-claims-against-father" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/23 18:29</span>
+    </div>
+
+    
+    <p class="title-ja">スリランカ：象徴的なゾウの死で生息地への懸念が高まる</p>
+    <p class="title-en"><a href="https://www.dw.com/en/sri-lanka-death-of-iconic-elephant-raises-habitat-concerns/a-79735669?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Sri Lanka: Death of iconic elephant raises habitat concerns</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>最近、スリランカで象徴的な雄のゾウが死亡したことで、生息地が大幅に減少している巨大な動物と人間との継続的な接触に対する懸念が高まっている。</p><p>「カバンティッサ」として知られるゾウは、スリランカで現存するオスのゾウの中で最も背が高いと考えられていた。年齢は約 45 歳、身長は約 3.3 メートル (11 フィート) であると考えられ、スリランカ北西部のガルガムワ村近くを歩き回り、その堂々たる身長が広く賞賛されました。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>9月下旬、村人たちは体重5.5トン（5,500kg）の牙が足を引きずっていることに気づき、よく見てみると右足に銃創があったことが判明した。獣医師の介入にもかかわらず、ゾウは10月16日に死亡した。</p><p>スリランカは、ゾウと人間の間の暴力的な相互作用による年間ゾウの死亡数が世界で最も多く、人間の死亡数が世界で2番目に多いことを記録しています。通常、農作物を略奪するゾウが農地に侵入するときに発生します。</p><p>公式統計によると、2019年以降、毎年平均370頭のゾウと125人の人間が人間とゾウの衝突事故で死亡している。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The recent death of an iconic male elephant in Sri Lanka has raised concerns over ongoing contact between humans and the giant animals, whose habitats have been greatly reduced.</p><p>The elephant known as "Kavantissa" had been considered to be the tallest living male elephant in the Sri Lanka. Thought to be around 45 years old and measuring roughly 3.3 meters tall (11 feet), he roamed Sri Lanka's northwest near the village of Galgamuwa, and was widely admired for his majestic stature.</p><p>In late September, villagers noticed the 5.5 ton-tusker (5,500 kg) was limping, and a closer look reveled a gunshot wound on his right leg. Despite the intervention of veterinary surgeons, the elephant died on October 16.</p><p>Sri Lanka records the highest number of elephant deaths annually and the second highest number of human deaths globally from violent interactions between elephants and humans , which usually happen when crop raiding elephants encroach on farmlands.</p><p>According to official statistics, since 2019, an average of 370 elephants and 125 humans have died in human-elephant conflict incidents each year.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/sri-lanka-death-of-iconic-elephant-raises-habitat-concerns/a-79735669?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/23 18:00</span>
+    </div>
+
+    
+    <p class="title-ja">約6年の時を経て、元ミャンマー指導者アウン・サン・スー・チー氏の息子が彼女の声を聞く</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/23/nx-s1-6012784/aung-san-suu-kyi-son-phone-call-myanmar" target="_blank" rel="noopener">After nearly 6 years, ex-Myanmar leader Aung San Suu Kyi's son hears her voice</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>木曜日にミャンマー政府が公開したこの写真では、失脚したミャンマー指導者アウン・サン・スー・チー氏が、ミャンマーのネピドーで息子のキム・アリス氏と電話で話している。ミャンマー大統領報道官室、AP通信 キャプションを隠す</p><p>チェンマイ、タイ — 6年近くの拘禁を経て、アウン・サン・スー・チーさんが息子に向けた最初の言葉は、健康状態についての質問だった。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「そして私は、家族全員が愛を送っており、彼女の健康を尋ねていると言いました」と、木曜日に81歳の母親と電話で話したキム・アリスさんは語った。彼女が率いる民主的に選出されたミャンマー政府が2021年の軍事クーデターで打倒されて以来、初めての直接会話となった。</p><p>アリスさんは軍が監視していたと信じているこの20分間の通話では、1991年のノーベル平和賞受賞者の拘束状況を垣間見ることができた貴重な機会となった。彼女は2021年に最初の判決を受け、2022年までの連続裁判により、米国、西側諸国、人権団体から捏造として広く非難されている汚職と選挙不正の罪での合計刑期は33年となった。刑期は後に減刑され、彼女の刑期はまだ18年残った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>In this photo released by Myanmar's government on Thursday, Myanmar's ousted leader Aung San Suu Kyi talks on the phone with her son Kim Aris, in Naypyidaw, Myanmar. Myanmar President Spokesperson Office via AP hide caption</p><p>CHIANG MAI, Thailand — After nearly six years in detention, Aung San Suu Kyi's first words to her son were a question about his health.</p><p>"And then I said all the family was sending their love and asked after her health," said Kim Aris, who spoke by phone with his 81-year-old mother on Thursday, their first direct conversation since the 2021 military coup toppled the democratically elected Myanmar government she led.</p><p>The 20-minute call, which Aris believes the military monitored, offered a rare glimpse of how the 1991 Nobel Peace Prize laureate is being held. She was first sentenced in 2021, with consecutive trials through 2022 bringing her total sentence to 33 years on corruption and electoral fraud charges, widely condemned by the U.S., Western countries, and human rights groups as fabricated. The sentence was later reduced, leaving her with 18 years still to serve.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/23/nx-s1-6012784/aung-san-suu-kyi-son-phone-call-myanmar" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/23 22:25</span>
+    </div>
+
+    
+    <p class="title-ja">パレスチナ行動禁止に数百人が抵抗、ロンドンの米国大使館で抗議</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/features/2026/10/23/hundreds-to-defy-palestine-action-ban-in-protest-at-us-embassy-in-london?traffic_source=rss" target="_blank" rel="noopener">Hundreds to defy Palestine Action ban in protest at US embassy in London</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>英国政府によるパレスチナ行動グループの禁止に対する最新の集団的反抗行為として、10月31日にはロンドンの米国大使館前に400人以上が集まると予想されている。</p><p>デモ参加者らは「大量虐殺に反対。パレスチナ行動を支持する」と書かれたプラカードを掲げる予定で、運動団体「Defend Our Juries」は、スコットランド・エディンバラの米国総領事館前で並行して行動が行われると発表した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>英国政府が2025年7月にパレスチナ行動を「テロリスト」組織として禁止して以来、パレスチナ行動を公に支援したとして3,850人以上が逮捕されたと、Defend Our Juriesは述べた。</p><p>デモンストレーションのタイミングは計算されています。 6月、控訴裁判所は政府の側に立って、禁止は違法であるとした高等裁判所の判決を覆した。</p><p>英国最高裁判所は11月4日と5日、パレスチナ行動の共同創設者フダ・アンモリ氏の上告審を審理する。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>More than 400 people are expected to gather outside the United States embassy in London on October 31 in the latest act of mass defiance against the British government’s ban on the Palestine Action group.</p><p>Protesters plan to hold placards reading: “I oppose genocide. I support Palestine Action,” and campaign group Defend Our Juries said a parallel action will take place outside the US consulate in Edinburgh, Scotland.</p><p>More than 3,850 people have been arrested for publicly backing Palestine Action since the United Kingdom’s government proscribed it as a “terrorist” organisation in July 2025, Defend Our Juries said.</p><p>The timing of the demonstrations is calculated. In June, the Court of Appeal sided with the government and overturned a High Court ruling that had found the proscription unlawful.</p><p>On November 4 and 5, the UK Supreme Court will hear an appeal by Palestine Action cofounder Huda Ammori.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/features/2026/10/23/hundreds-to-defy-palestine-action-ban-in-protest-at-us-embassy-in-london?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/23 21:45</span>
+    </div>
+
+    
+    <p class="title-ja">ブラジルの緊迫した大統領選決選投票は心理スリラーのようだ</p>
+    <p class="title-en"><a href="https://www.france24.com/en/americas/20261023-brazil-s-tense-presidential-run-off-campaign-feels-like-a-psychological-thriller" target="_blank" rel="noopener">Brazil's tense presidential run-off campaign feels like a psychological thriller</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>日曜日の熾烈な大統領選決選投票を前に、ソーシャルメディア上で交わされる侮辱と戦闘的な討論会で圧力が激化しており、左派親労働組合のルイス・イナシオ・ルーラ・ダ・シルバ大統領と極右の挑戦者フラビオ・ボルソナロ氏（前大統領でトランプ氏の同盟者ジャイール・ボルソナロ氏の息子）の差はわずか数ポイントとなっている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Insults traded on social media and a combative debate have intensified the pressure ahead of a fiercely contested presidential run-off on Sunday, with only a few points separating leftist pro-union President Luiz Inacio Lula da Silva and far-right challenger Flavio Bolsonaro, the son of former president and Trump ally Jair Bolsonaro.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/americas/20261023-brazil-s-tense-presidential-run-off-campaign-feels-like-a-psychological-thriller" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/23 18:00</span>
+    </div>
+
+    
+    <p class="title-ja">ブラジルの決選投票：ルーラの遺産 vs. ボルソナロ王朝</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/23/nx-s1-6004277/brazil-vote-runoff-lula-bolsonaro" target="_blank" rel="noopener">Brazil's runoff: Lula's legacy vs. Bolsonaro's dynasty</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>リオデジャネイロ — ブラジルで日曜日に行われる大統領決選投票は、政治界の巨人のキャリアを延長するか、あるいは新世代の政治王朝の到来をもたらす可能性がある。</p><p>決選投票を前に有権者のエネルギーは急増し、各候補者の集会には主要都市で数万人が集まり、全米の広場や大学キャンパスが満員となった</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>多くの世論調査では、左派のルイス・イナーシオ・ルーラ・ダ・シルバ大統領と、投獄されたジャイール・ボルソナロ元大統領の息子で右派のフラビオ・ボルソナロ上院議員との間の争いは誤差の範囲内であることが示されている。</p><p>フラビオ・ボルソナロ氏は10月4日の第1回投票でルーラ氏を上回って終了し、現在世論調査でリードしているが、一部の調査ではここ数日でその差が縮まっていることを示している。</p><p>ボルソナロ氏が勝利すれば、過去数十年間、より穏健派の人物が支配していたブラジル右派に対する同氏一族の影響力が拡大することになる。トランプ大統領の緊密な同盟者であるフラビオ・ボルソナロ氏が当選すれば、最近の選挙で保守系候補者が躍進しているラテンアメリカの大部分で、より広範な右傾化を強化することになるだろう。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>RIO DE JANEIRO — Sunday's presidential runoff in Brazil could prolong the career of a political giant—or usher in a new generation of a political dynasty.</p><p>Voter energy has surged ahead of the runoff, with rallies for each candidate drawing tens of thousands of people in major cities and packing plazas and university campuses nationwide</p><p>Many polls show a race within the margin of error between left-wing President Luiz Inácio Lula da Silva and right-wing Sen. Flávio Bolsonaro, the son of jailed former President Jair Bolsonaro.</p><p>Flávio Bolsonaro finished ahead of Lula in the first round of voting on Oct. 4 and currently leads polls, though some surveys show the gap narrowing in recent days .</p><p>A Bolsonaro victory would extend his family's influence over the Brazilian right, which in previous decades was dominated by more moderate figures. A close ally of President Trump, Flávio Bolsonaro would, if elected, reinforce a broader rightward shift across much of Latin America, where conservative candidates have made gains in recent elections.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/23/nx-s1-6004277/brazil-vote-runoff-lula-bolsonaro" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/23 11:00</span>
+    </div>
+
+    
+    <p class="title-ja">ブラジルの選挙とアマゾンの戦い - ポッドキャスト</p>
+    <p class="title-en"><a href="https://www.theguardian.com/news/audio/2026/oct/23/brazil-election-battle-for-amazon-podcast" target="_blank" rel="noopener">Brazil’s election and the battle for the Amazon – podcast</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ラテンアメリカ特派員のトム・フィリップスは、日曜日のブラジル大統領決選投票で熱帯雨林とそこに住むコミュニティにとって何が危険にさらされているかを聞くためにロライマに向かいます。コメントや質問は tif.questions@theguardian.com に送信してください。</p><p>アマゾンとそこに住むコミュニティにとって、日曜のブラジル大統領選挙決選投票の賭け金はこれ以上ないほど大きい。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ラテンアメリカ特派員のトム・フィリップスは、第一回投票でフラビオ・ボルソナロを強く支持した地域の有権者、説教者、政治家から話を聞くため、同国の最北端のロライマ州へ向かう。</p><p>彼は、1100万エーカー（4.500万ヘクタール）の熱帯雨林の伐採を監督していた政権の政権下で父ジャイール氏が心から奨励した鉱山を、極右候補者が復活させることに全員が期待を抱いていることに気づいた。</p><p>トムはまた、たとえボルソナロが再び政権を握ったとしても反撃する決意をした先住民活動家たちとも会った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Our Latin America correspondent, Tom Phillips, heads to Roraima to hear what’s at stake for the rainforest and the communities that live there in the Brazilian presidential runoff on Sunday. Send your comments and questions to tif.questions@theguardian.com</p><p>For the Amazon and the communities who live there, the stakes in Sunday’s Brazilian presidential election runoff could scarcely be higher.</p><p>Our Latin America correspondent, Tom Phillips heads to Roraima, the country’s most northern state, to hear from voters, preachers and politicians in a region that heavily backed Flávio Bolsonaro in the first round.</p><p>He finds them all hopeful that the far-right candidate will bring back the mining that his father Jair so heartily encouraged when in power in an administration that oversaw the felling of 11m acres (4.5m hectares) of rainforest.</p><p>Tom also meets Indigenous activists determined to fight back even if the Bolsonaros take power again.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/news/audio/2026/oct/23/brazil-election-battle-for-amazon-podcast" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/23 22:57</span>
+    </div>
+
+    
+    <p class="title-ja">ナイジェリアのエボラ出血熱の感染源を巡る謎がウイルス蔓延への懸念を煽る</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/oct/23/ebola-swiss-patient-nigeria-dr-congo-concerns-virus-spread" target="_blank" rel="noopener">Mystery over source of Ebola infection in Nigeria fuels concern about spread of virus</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>スイス政府、患者はスイス外交官の妻でウガンダ旅行中にウイルスに感染したとみられると発表</p><p>アフリカ4か国に感染が拡大したことで感染がさらに拡大するのではないかとの懸念のなか、アフリカ全土の保健当局はナイジェリアで10年以上ぶりとなるエボラ出血熱患者がどのようにして感染したのかを解明しようと急いでいる。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>スイス外務省は金曜日、ナイジェリアの患者はアブジャに拠点を置くスイス外交官のウガンダ生まれの妻で、コンゴ民主共和国には渡航していないと発表した。コンゴ民主共和国では5月中旬に感染が初めて確認され、その後ウガンダ、ケニア、そして現在はナイジェリアに広がっている。同省は、女性は夫とともにウガンダを旅行中にエボラ出血熱に感染したとみられると付け加えた。</p><p>この新たな情報は、女性がコンゴ民主共和国東部に旅行していたと以前に発表したウガンダの報告と矛盾しており、すでに歴史上最も地理的に広範囲に広がっているアウトブレイクを封じ込める当局の能力に懸念が生じるだろう。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Switzerland says patient is wife of Swiss diplomat and believed to have contracted virus while travelling in Uganda</p><p>Health officials across Africa are racing to determine how Nigeria’s first Ebola patient ⁠in more than a decade ⁠became infected, amid fears ​the outbreak could spread further after reaching a fourth African country.</p><p>The Swiss foreign ministry said on Friday the patient in Nigeria, the Ugandan-born wife of a Swiss diplomat based in Abuja, had not travelled to the Democratic Republic of ⁠Congo, where the outbreak was first detected in mid-May before spreading to Uganda , Kenya and now Nigeria. The woman was believed to have contracted Ebola while travelling with her husband in Uganda, the ministry added.</p><p>The new information contradicts accounts from Uganda, which previously said the woman had travelled to eastern DR Congo, and will raise concerns about the ability of authorities to contain the outbreak, which is already the most geographically widespread in history.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/oct/23/ebola-swiss-patient-nigeria-dr-congo-concerns-virus-spread" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/23 22:45</span>
+    </div>
+
+    
+    <p class="title-ja">ケニアのマラソンチャンピオン、ペレス・ジェプチルチルがAIUから暫定出場停止に</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/sports/2026/10/23/kenyas-marathon-champion-peres-jepchirchir-provisionally-banned-by-aiu?traffic_source=rss" target="_blank" rel="noopener">Kenya’s marathon champion Peres Jepchirchir provisionally banned by AIU</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ケニアの世界マラソンチャンピオン、ペレス・ジェプチルチル選手が、シドニーマラソン優勝前に採取されたサンプルで禁止されている血液ブースターEPOの陽性反応が出たため、暫定的に出場停止処分を受けたと陸上競技部インテグリティユニット（AIU）が発表した。</p><p>AIUは、ケニアで採取された競技会外のサンプルから、赤血球の生産を促進するEPO（エリスロポエチン）について有害な分析結果が得られたと付け加えた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>代理人のジャンニ・デマドンナ氏は電子メールで声明を発表し、「起こったことについてはひどい気分だとしか言えない。パフォーマンス向上薬を使用したアスリートが失格になるのは当然だと思う」と述べた。</p><p>シドニーマラソンの主催者は、ジェプチルチル選手の暫定出場停止を知り「非常に残念」と述べた。</p><p>「ジェプチルチルには適正な手続きを受ける権利があり、その手続きが完了するまでこの件についてこれ以上コメントすることはない」と主催者はソーシャルメディア上の声明で述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Kenya’s world marathon champion Peres Jepchirchir has been provisionally suspended after testing positive for the banned blood booster EPO in a sample taken before her Sydney Marathon victory , the Athletics Integrity Unit (AIU) said.</p><p>The AIU added that the out-of-competition sample collected in Kenya returned an adverse analytical finding for EPO (erythropoietin), which boosts the production of red blood cells.</p><p>“I can only say that I feel terrible about what happened and I think it’s only right that an athlete who uses performance enhancing drugs should be disqualified,” her agent Gianni Demadonna said in an emailed statement.</p><p>Sydney Marathon organisers said they were “extremely disappointed” to learn about Jepchirchir’s provisional suspension.</p><p>“Jepchirchir is entitled to due process and we will make no further comment on the case until that process has concluded,” organisers said in a statement on social media.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/sports/2026/10/23/kenyas-marathon-champion-peres-jepchirchir-provisionally-banned-by-aiu?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-10-23";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
