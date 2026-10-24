@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年10月24日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/24 22:22</span>
+    </div>
+
+    
+    <p class="title-ja">フランス全土で新たな抗議活動</p>
+    <p class="title-en"><a href="https://www.france24.com/en/fresh-protests-across-france" target="_blank" rel="noopener">Fresh protests across France</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>「黄色いベスト」運動、労働組合、学生の連合は土曜日、学習条件や購買力をめぐる要求を掲げてフランス全土をデモ行進する。当局は先週土曜日の暴動と同様の略奪や破壊行為を懸念しており、約7万人の警察が出動すると予想されている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A coalition of the “Yellow Vests” movement, trade unions and students will march across France on Saturday with demands over studying conditions and purchasing power. Some 70,000 police are expected to be deployed as authorities fear looting and vandalism similar to last Saturday's unrest.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/fresh-protests-across-france" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/24 21:55</span>
+    </div>
+
+    
+    <p class="title-ja">フランスの抗議活動がライブ：厳重な警備の下で行進が行われ135人が逮捕</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/liveblog/2026/10/24/france-protests-live-135-arrested-as-marches-held-under-tight-security?traffic_source=rss" target="_blank" rel="noopener">France protests live: 135 arrested as marches held under tight security</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>当局は、再び週末に発生する略奪や車の放火、公共建物への攻撃を阻止する決意を示している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Authorities say they are determined to prevent another weekend of looting, burned cars and attacks on public buildings.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/liveblog/2026/10/24/france-protests-live-135-arrested-as-marches-held-under-tight-security?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/24 21:12</span>
+    </div>
+
+    
+    <p class="title-ja">ウクライナ、ネットワーク制限後スターリンク接続は「安定した」と発表</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cwkg5md14j8go?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Ukraine says Starlink connection 'now stable' after network limits</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ウクライナ国防相は、同国軍が衛星インターネットネットワークで数日間接続制限に苦しんだ後、現在はスターリンクへの「安定した接続」ができていると述べた。</p><p>キエフは、ウクライナ国内での無人機の操縦や作戦にスターリンクとその軍用グレードのスターシールドに依存しているが、先週、ドナルド・トランプ米大統領が所有者のイーロン・マスクに対し、それに制限を設けるよう指示したと非難した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>これは、時速161km（時速100マイル）以上で飛行するとドローンが接続を失うことを意味するという。トランプ氏はマスク氏が「元に戻した」と述べる前に、そうしたことを否定した。</p><p>エフヘニー・クマラ国防大臣は、ネットワーク上で時速400kmを超える速度が可能になったと述べ、完全な能力が回復したことを示した。</p><p>同氏は土曜日の声明で「この結果は何よりも我が国の前線、兵士、無人機の運用、兵站、通信にとって重要だ」と述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Ukraine now has a "stable connection" to Starlink, its defence minister has said, after its military suffered days of restricted connectivity on the satellite internet network.</p><p>Kyiv relies on the Starlink and its military-grade counterpart Starshield for piloting drones and operations within Ukraine, but last week accused US President Donald Trump of telling owner Elon Musk to place limits on it.</p><p>This meant drones would lose connection when travelling at 161km/h (100mph) or more, it said. Trump denied doing so before saying Musk had "put it back".</p><p>Defence Minister Yevhenii Khmara said that speeds of more than 400km/h were now possible on the network, indicating that full capability had been restored.</p><p>"This result is above all important for our front, for our soldiers, for the operation of drones, for logistics and for communications," he said in a statement on Saturday.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cwkg5md14j8go?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/24 20:42</span>
+    </div>
+
+    
+    <p class="title-ja">ヨーロッパの学生抗議活動がセルビアの選挙を狙う</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/24/nx-s1-6012799/european-student-protests-take-aim-at-serbias-elections" target="_blank" rel="noopener">European student protests take aim at Serbia's elections</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>学生たちはヨーロッパ全土で抗議活動を行っている。セルビアでは、日曜日の選挙で議会に立候補する候補者を選出した。そして彼らは、ポピュリスト指導者アレクサンダル・ブチッチによる14年間にわたる政権を終わらせることを目指している。</p><p>NPR は、取材やインタビューに対して金銭を提供したり受け取ったりしません。そのような申し出や要求を行う者は、NPR の従業員ではなく、NPR を代表するものでもありません。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Students have been protesting across Europe. In Serbia, they've selected candidates to run for parliament in Sunday's elections. And they're aiming to end 14 years of government by the populist leader Aleksandar Vucic.</p><p>NPR does not offer or accept money for coverage or interviews. Anyone who makes such an offer or request is not an NPR employee and does not represent NPR.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/24/nx-s1-6012799/european-student-protests-take-aim-at-serbias-elections" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/24 22:06</span>
+    </div>
+
+    
+    <p class="title-ja">トランプ大統領が新たな攻撃を検討中、イランは米軍艦の接近を許可しないと表明</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/24/iran-says-wont-allow-us-warships-to-get-close-as-trump-ponders-new-attacks?traffic_source=rss" target="_blank" rel="noopener">Iran says won’t allow US warships to get close as Trump ponders new attacks</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>テヘラン、イラン – ドナルド・トランプ大統領が、米国政府がイランに対する新たな攻撃や継続的な圧力をまだ検討していると述べたことを受け、イラン国軍は米国の軍艦に発砲する用意があると述べた。</p><p>トランプ大統領は金曜日、フロリダでの集会で支持者に対し、開戦当初のイランに対する大規模な爆撃作戦に言及し、米軍が「再びエピック・フューリーを行う可能性がある」と語った。同氏は以前、イランに対する大規模な攻撃を通じて紛争を早期に終結させるか、それとも海上封鎖と制裁によるイランへの圧力を継続するかについて疑問を呈していた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>しかし、イラン軍のアリ・アブドラヒ参謀長は、イランが地域内のあらゆる船舶を標的にする能力があるため、米海軍はイランの領海やその周辺に再侵入することはできないと主張した。</p><p>「米国大統領は自国の兵士と軍が再びペルシャ湾に入るのを夢見ることしかできない。彼らはこの願いを永久に墓場まで持っていくだろう」と国営メディアが土曜朝に報じた声明で同氏は述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Tehran, Iran – Iran’s armed forces say they are prepared to fire on United States warships as President Donald Trump said Washington was still deliberating new attacks or continued pressure on Iran.</p><p>Trump told supporters at a rally in Florida on Friday that the US military “may do another Epic Fury”, in reference to the extensive bombing campaign against Iran at the start of the war. He had earlier questioned whether to end the conflict quickly through huge attacks on Iran or let pressure on Tehran from a naval blockade and sanctions persist.</p><p>But Ali Abdollahi, chief of general staff of the Iranian armed forces, asserted that the US Navy is incapable of re-entering Iran’s territorial waters or its periphery due to Iran’s ability to target any vessel in the region.</p><p>“The US president can only dream of their soldiers and military again entering the Persian Gulf. They will take this wish to the grave for good,” he said in a statement carried by state media on Saturday morning.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/24/iran-says-wont-allow-us-warships-to-get-close-as-trump-ponders-new-attacks?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/24 22:02</span>
+    </div>
+
+    
+    <p class="title-ja">ヨルダンのアブドラ国王、教会襲撃事件を受け断固とした対応を命令</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/24/jordans-king-abdullah-orders-firm-response-after-deadly-church-attack?traffic_source=rss" target="_blank" rel="noopener">Jordan’s King Abdullah orders firm response after deadly church attack</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ヨルダンのアブドラ国王は、8人が死亡、40人が負傷したカラク県での教会襲撃事件に対し、治安部隊に断固として対応し、背後にいる者らを追跡するよう命令したと王裁判所が発表した。</p><p>アンマンの米国大使館によると、当局が犯人の捜索を続ける中、アンマンの米国大使館によると、アンマンではこの襲撃事件を受けて、同国は既にショッピングモールや外国大使館、その他全国各地の場所で警備を強化している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>金曜日、首都アンマンの南西約120キロにあるカラク県のギリシャ正教教会での葬儀中に、白昼堂々、襲撃者らが数分間発砲し、ヨルダン当局は「過激派テロ行為」と表現した。</p><p>サウジのペトラ通信によると、ヨルダンは３日間の国喪を宣言したが、直ちに犯行声明は出なかった。</p><p>この地域の暴力的武装勢力との戦いにおける米国のパートナーであるアブドラ国王は、襲撃の数時間後にカラクを訪問し、加害者には「鉄の拳」で罰を与えると述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Jordan’s King Abdullah has ordered security forces to respond firmly and pursue those behind a church attack in the Karak governorate that killed eight people and wounded 40, the royal court has said.</p><p>The country has already increased security across malls, foreign embassies and other locations across the country in response to the attack, according to the US embassy in Amman, as authorities continue to search for the perpetrators.</p><p>On Friday, assailants fired for several minutes in broad daylight during a funeral at a Greek Orthodox church in Karak governorate, about 120km (75 miles) southwest of the capital, Amman, in what Jordanian authorities described as an “act of extremist terrorism”.</p><p>There was no immediate claim of responsibility, as Jordan declared three days of national mourning, according to the kingdom’s Petra News Agency.</p><p>King Abdullah, a US partner in the fight against violent armed groups in the region, visited Karak hours after the attack and said the perpetrators would be punished “with an iron fist”.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/24/jordans-king-abdullah-orders-firm-response-after-deadly-church-attack?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/24 20:59</span>
+    </div>
+
+    
+    <p class="title-ja">ヨルダンで葬儀中に武装集団が教会に発砲、7人死亡、40人負傷</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/24/nx-s1-6015414/shooting-church-jordan" target="_blank" rel="noopener">Gunmen open fire at a church during a funeral in Jordan, killing 7 and wounding 40</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>金曜日、ヨルダンのカラク県にあるハムード村で数時間前に葬儀が行われていた際に武装集団が発砲したギリシャ正教の教会を、石の壁の隙間から覗く男性。 AP 写真/AP キャプションを隠す</p><p>エルサレム－金曜日、ヨルダンの教会で葬儀中に武装集団が発砲し、7人が死亡、40人が負傷したと当局が発表した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>銃撃事件は首都アンマンから約９０キロ南にあるカラクのギリシャ正教教会で起きた。</p><p>ヨルダン国営テレビで放送された映像には、拳銃を持ったとみられる2人の銃撃犯が教会に近づき、発砲する様子が映っていた。その後、半自動小銃を持っているように見える3人目の男が近づいてきて発砲し、3人全員が教会に向かって走った。</p><p>目撃者が撮影したビデオ映像には、教会の床に割れたガラスと血だまりが映っていた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A man looks through a gap in a stone wall toward a Greek Orthodox church where gunmen opened fire during a funeral hours earlier in Hamoud village, in Jordan's Karak governorate on Friday. AP Photo/AP hide caption</p><p>JERUSALEM — Gunmen opened fire during a funeral at a church in Jordan on Friday, killing seven people and wounding 40 others, authorities said.</p><p>The shooting took place at a Greek Orthodox church in Karak, about 90 kilometers (55 miles) south of the capital, Amman.</p><p>Footage broadcast on Jordanian state television showed two gunmen who appear to be holding pistols approaching the church and firing shots. A third man who appears to be holding a semiautomatic rifle then approaches and opens fire, and all three then run toward the church.</p><p>Video footage taken by witnesses shows broken glass and pools of blood on the floor of the church.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/24/nx-s1-6015414/shooting-church-jordan" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/22 23:16</span>
+    </div>
+
+    
+    <p class="title-ja">イランは中間選挙後に再び米国による大規模な攻撃に備える用意があるのか​​？</p>
+    <p class="title-en"><a href="https://www.dw.com/en/is-iran-ready-for-another-major-us-attack-after-midterm-elections/a-79734082?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Is Iran ready for another major US attack after midterm elections?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>テヘラン当局は新たなストライキの準備を進めている</p><p>米国とイスラエルが対イラン戦争激化のための新たな選択肢を検討しているとのメディア報道を受けて。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>11月3日の米国中間選挙と10月27日のイスラエル選挙は、両国が2月末に開始した紛争にどのように取り組むかに政治的要因を注入した。</p><p>世論調査によると、イラン戦争によってもたらされたエネルギー価格の高騰がドナルド・トランプ大統領の共和党に打撃を与えている。 10月8日、大統領はイランとの「生産的な議論」を理由に、米国は中間選挙前にイランを攻撃しないとソーシャルメディアに投稿した。米国が最後にイランへの攻撃を開始したのは9月初旬だった。</p><p>しかし、選挙が終わったら、トランプ大統領は政治的な束縛が薄れていると感じるかもしれない。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Officials in Tehran are preparing for renewed strikes</p><p>following media reports that the United States and Israel have been examining new options for escalating their war against Iran.</p><p>The US midterm elections on November 3 and Israel's October 27 election have injected a political factor into how both countries are approaching the conflict, which they launched in late February.</p><p>Polls show that high energy prices brought on by the Iran war are hurting Donald Trump's Republican Party. On October 8, the president posted on social media that the United States would not attack Iran before the midterms, citing "productive discussions" with Tehran. The United States last launched strikes on Iran in early September.</p><p>After the elections are over, however, Trump may feel less politically constrained.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/is-iran-ready-for-another-major-us-attack-after-midterm-elections/a-79734082?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/24 21:54</span>
+    </div>
+
+    
+    <p class="title-ja">金正恩氏、新たに開通した橋を渡って中国へ</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/oct/24/kim-jong-un-crosses-newly-opened-bridge-into-china" target="_blank" rel="noopener">Kim Jong-un crosses newly opened bridge into China</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>北朝鮮指導者、新鴨緑江橋を渡って共産党幹部と会談</p><p>金正恩氏は中国を訪問し、両国を結ぶ橋の開通を行い、隣国との協力を拡大したいと述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>北朝鮮関連問題を担当する韓国統一省と中国国営新華社通信によると、北朝鮮指導者は土曜日、新鴨緑江橋を渡った後、中国国境の都市丹東に到着した。</p><p>彼は中国共産党常務委員の王滬寧氏と面会した。両氏は自動車工場を視察し、両国関係の強化を約束した。</p><p>新華社通信によると、金氏は、自国が「歴史的な友好関係を前進させ、実際的な協力を拡大するために中国と協力する用意があり、それによって両国国民に具体的な利益をもたらす」と述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>North Korean leader travels over New Yalu River Bridge to meet senior Communist party member</p><p>Kim Jong-un has visited China, inaugurating a bridge that connects the two countries and saying he hopes to expand cooperation with his neighbour.</p><p>The North Korean leader arrived in the Chinese border city of Dandong on Saturday after crossing the New Yalu River Bridge, according to South Korea’s unification ministry, which handles affairs related to North Korea, and China’s official Xinhua news agency.</p><p>He met Wang Huning, a member of the standing committee of China’s Communist party. The pair toured a car factory, and promised to strengthen the bilateral relationship.</p><p>Kim said his country “stands ready to work with China to carry forward their historical friendship and expand practical cooperation, thereby delivering tangible benefits to the peoples of both countries”, according to Xinhua.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/oct/24/kim-jong-un-crosses-newly-opened-bridge-into-china" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/24 10:55</span>
+    </div>
+
+    
+    <p class="title-ja">オーストラリア国会議員、車襲撃容疑で容体改善</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c670pr1ryxyno?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Australian MP's condition improves after alleged car attack</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>5日前にビクトリア州北東部で車にはねられたオーストラリア国会議員ヘレン・ヘインズ氏の容体は、危篤状態から重篤状態に改善したが、安定している。</p><p>65歳の無所属議員は月曜日、メルボルン北東のワンガラッタにある選挙事務所の外で当局が意図的な襲撃を受けたと発表し、両足を切断された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>メルボルンのアルフレッド病院は土曜朝の最新情報で、ヘインズさんの状態は重篤だが安定しており、空輸されて以来初めて改善したと発表した。</p><p>彼女を襲撃したとされる43歳のブレンダン・ニュージェントは事件直後に逮捕され、それ以来3つの容疑で出廷している。</p><p>政治家の夫フィル・ヘインズ氏は水曜日、「恐ろしい事件」により妻は重傷を負ったが、「心と精神」は「良好」だと述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The condition of Helen Haines, the Australian MP hit by a car five days ago in north-east Victoria, has improved from critical to serious but stable.</p><p>The independent MP, 65, had both her legs amputated after what authorities say was a deliberate attack outside her electorate office in Wangaratta, north-east of Melbourne, on Monday.</p><p>In the latest update on Saturday morning, the Alfred Hospital in Melbourne said Haines was in a serious but stable condition, the first improvement since she was airlifted there.</p><p>Her alleged attacker, 43-year-old Brendan Nugent, was arrested shortly after the incident and has since appeared in court on three charges.</p><p>The politician's husband, Phil Haines, said on Wednesday that the "horrendous incident" had caused his wife significant injuries but "her heart and her mind" were "in good shape".</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c670pr1ryxyno?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/23 23:54</span>
+    </div>
+
+    
+    <p class="title-ja">アフガニスタンの女性​​は高等教育への最後の手段を失う可能性がある</p>
+    <p class="title-en"><a href="https://www.dw.com/en/afghan-women-could-lose-one-of-their-last-paths-to-a-higher-education/a-79745173?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Afghan women could lose one of their last paths to a higher education</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>「ライラ」は、真夜中に目を覚まして水を一杯飲み、ほとんど偶然に携帯電話をチェックし、メールを見てお腹が痛くなりました。米国は、国内で女性が学ぶことのできる最後の大学の一つであるアフガニスタン・アメリカン大学（AUAF）への資金提供を停止するだろう。</p><p>ライラさんは、ベッドに座って見つめながら、過去5年間、そして教育を受けるために耐えてきたすべてのことを思い巡らせていたと語った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>タリバンが女子教育を非合法化して以来、アフガニスタンで学ぶ方法を見つけるのは容易ではなかった。</p><p>アメリカン大学のキャンパスはすでにタリバンに占拠されていたが、彼女は大学のオンラインプログラムを通じて秘密裏に勉強することができた。しかし現在、大学は財政を失いつつあり、彼女とクラスメートは大学が完全に閉鎖されるのではないかと心配していると彼女はDWに語った。安全上の理由から彼女の名前は変更されました。</p><p>このビデオを表示するには、JavaScript を有効にし、HTML5 ビデオをサポートする Web ブラウザへのアップグレードを検討してください。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>"Laila" awoke in the middle of the night for a glass of water, checked her phone almost by accident, and saw an email that made her stomach drop. The US would stop funding the American University of Afghanistan (AUAF), one of the last places women can still study in the country.</p><p>Laila said she sat on her bed, staring, her thoughts racing through the past five years and everything she had endured just to get an education.</p><p>It had not been easy to find a way to study in Afghanistan after the Taliban outlawed women's education .</p><p>The American University campus was already taken over by the Taliban, but she could study secretly through the university's online program. But now that the university is losing its financing, she told DW she and her classmates fear it will shut down entirely. Her name has been changed for safety reasons.</p><p>To view this video please enable JavaScript, and consider upgrading to a web browser that supports HTML5 video</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/afghan-women-could-lose-one-of-their-last-paths-to-a-higher-education/a-79745173?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/23 18:00</span>
+    </div>
+
+    
+    <p class="title-ja">約6年の時を経て、元ミャンマー指導者アウン・サン・スー・チー氏の息子が彼女の声を聞く</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/23/nx-s1-6012784/aung-san-suu-kyi-son-phone-call-myanmar" target="_blank" rel="noopener">After nearly 6 years, ex-Myanmar leader Aung San Suu Kyi's son hears her voice</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>木曜日にミャンマー政府が公開したこの写真では、失脚したミャンマー指導者アウン・サン・スー・チー氏が、ミャンマーのネピドーで息子のキム・アリス氏と電話で話している。ミャンマー大統領報道官室、AP通信 キャプションを隠す</p><p>チェンマイ、タイ — 6年近くの拘禁を経て、アウン・サン・スー・チーさんが息子に向けた最初の言葉は、健康状態についての質問だった。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「そして私は、家族全員が愛を送っており、彼女の健康を尋ねていると言いました」と、木曜日に81歳の母親と電話で話したキム・アリスさんは語った。彼女が率いる民主的に選出されたミャンマー政府が2021年の軍事クーデターで打倒されて以来、初めての直接会話となった。</p><p>アリスさんは軍が監視していたと信じているこの20分間の通話では、1991年のノーベル平和賞受賞者の拘束状況を垣間見ることができた貴重な機会となった。彼女は2021年に最初の判決を受け、2022年までの連続裁判により、米国、西側諸国、人権団体から捏造として広く非難されている汚職と選挙不正の罪での合計刑期は33年となった。刑期は後に減刑され、彼女の刑期はまだ18年残った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>In this photo released by Myanmar's government on Thursday, Myanmar's ousted leader Aung San Suu Kyi talks on the phone with her son Kim Aris, in Naypyidaw, Myanmar. Myanmar President Spokesperson Office via AP hide caption</p><p>CHIANG MAI, Thailand — After nearly six years in detention, Aung San Suu Kyi's first words to her son were a question about his health.</p><p>"And then I said all the family was sending their love and asked after her health," said Kim Aris, who spoke by phone with his 81-year-old mother on Thursday, their first direct conversation since the 2021 military coup toppled the democratically elected Myanmar government she led.</p><p>The 20-minute call, which Aris believes the military monitored, offered a rare glimpse of how the 1991 Nobel Peace Prize laureate is being held. She was first sentenced in 2021, with consecutive trials through 2022 bringing her total sentence to 33 years on corruption and electoral fraud charges, widely condemned by the U.S., Western countries, and human rights groups as fabricated. The sentence was later reduced, leaving her with 18 years still to serve.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/23/nx-s1-6012784/aung-san-suu-kyi-son-phone-call-myanmar" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/24 20:44</span>
+    </div>
+
+    
+    <p class="title-ja">郵便番号による民主主義: 2 つのアメリカ、1 つの選挙</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/10/24/democracy-by-zip-code-two-americas-one-election?traffic_source=rss" target="_blank" rel="noopener">Democracy by ZIP Code: Two Americas, one election</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>郵便番号による民主主義: 2 つのアメリカ、1 つの選挙</p><p>アメリカ人は同じ選挙に投票しますが、いくつかの街路や郵便番号の距離によって、人生のチャンスが大きく変わる可能性があります。アルジャジーラのモハマド・カセム氏は、住宅や医療から雇用機会に至るまで、共和党と民主党が議会の主導権を争う中で不平等が何を明らかにしているかを考察する。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Democracy by ZIP Code: Two Americas, one election</p><p>Americans vote in the same elections, but the distance of a few streets or ZIP codes can drastically change a person’s opportunities in life. From housing and healthcare to job opportunities, Al Jazeera’s Mohammad Qasem looks at what those inequalities reveal as Republicans and Democrats fight for control of Congress.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/10/24/democracy-by-zip-code-two-americas-one-election?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/24 20:43</span>
+    </div>
+
+    
+    <p class="title-ja">米国はキューバ政府の打倒を目指す</p>
+    <p class="title-en"><a href="https://www.france24.com/en/us-seeks-to-topple-cuba-s-government" target="_blank" rel="noopener">US seeks to topple Cuba's government</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>そして今、かなり驚くべき展開として、マルコ・ルビオ米国務長官がキューバ国民にCIAに協力するよう直接促している。ハバナは、トランプ政権の「絶望」を嘲笑することで反応した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>And now, in a rather surprising development, US Secretary of State Marco Rubio is directly urging Cubans to cooperate with the CIA. Havana has responded by mocking what it calls the Trump administration’s “desperation”.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/us-seeks-to-topple-cuba-s-government" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/24 14:31</span>
+    </div>
+
+    
+    <p class="title-ja">ミネアポリス撤退は「降伏」だった、トランプ大統領の元国境警備隊長官がBBCに語る</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/ck20rery78lro?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Minneapolis withdrawal was 'surrender', Trump's ex-border patrol chief tells BBC</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>今年初めにミネアポリスでの非常に物議を醸した国外追放作戦の公の顔となった元米国国境警備隊長官は、ミネアポリス市からの職員の撤退をトランプ政権による「降伏」と表現し、作戦を擁護した。</p><p>グレッグ・ボビーノ氏もBBCに対し、手術中に射殺された女性の遺族が起こした訴訟には「応じていない」と語った。同氏はミネアポリスに派遣された警察官を称賛し、「人々はいつでも訴訟を起こしている」と述べ、訴訟を却下したようだった。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>56歳のボヴィーノ氏は、1月に米国民のレニー・グッド氏とアレックス・プレティ氏が射殺された直後、その職を解かれた。</p><p>2件の銃撃事件はビデオに撮られ、超党派の反発と広範な抗議活動を引き起こした。その後、ドナルド・トランプ米大統領は「少し緊張を緩めるつもりだ」と述べ、数百人の移民職員を市内から撤退させた。</p><p>今月初め、グッドさんの家族は不法死亡と抗議活動参加者の公民権妨害の陰謀を主張し、グッドさんの殺害をめぐりトランプ政権を相手取って２件の民事訴訟を起こした。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The former US border patrol chief who became the public face of the highly controversial deportation drive in Minneapolis earlier this year has defended the operation, describing the withdrawal of agents from the city as a "surrender" by the Trump administration.</p><p>Greg Bovino also told the BBC that he was "not responding" to a lawsuit filed by the family of a woman shot dead during the operation. He appeared to dismiss the legal action, praising the officers deployed to Minneapolis and saying "people do lawsuits all the time".</p><p>Bovino, 56, was removed from his role shortly after the fatal shootings of US citizens Renee Good and Alex Pretti in January.</p><p>The two shootings, which were captured on video, triggered a bipartisan backlash and widespread protests. US President Donald Trump then said he was "going to de-escalate a little bit" and withdrew hundreds of immigration agents from the city.</p><p>Earlier this month, Good's family filed two civil lawsuits against the Trump administration over her killing, alleging wrongful death and a conspiracy to interfere with the civil rights of protesters.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/ck20rery78lro?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/24 09:30</span>
+    </div>
+
+    
+    <p class="title-ja">ルビオ氏はキューバ国民に「今が政治変革に向けて行動する時だ」と語る</p>
+    <p class="title-en"><a href="https://www.theguardian.com/us-news/2026/oct/23/marco-rubio-cuba-trump" target="_blank" rel="noopener">Rubio tells Cubans ‘now is the time’ to act to see political change</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>トランプ大統領がイランからの帰国時に米軍艦艇が介入する可能性があると発言したことを受け、米国務長官がコメント</p><p>マルコ・ルビオ氏は、ドナルド・トランプ大統領が金曜日のフロリダ州南部の候補者集会で、イラン戦争からの帰還途中に米軍艦がキューバに介入する可能性があると発言した直後に、自国の政治変革を求めるキューバ国民に行動を起こすよう促した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>米国務長官は「前向きな変化を生み出そうとする人々」に宛てたソーシャルメディアへの投稿で、キューバ国民にトランプ大統領の計画を活用するよう促した。 「約束の果たせなかった失望、汚職、そしてほんの少数の特権的な生活。この機会を利用して、CIAとの個別の[原文のまま]パートナーシップを通じて望む変化を生み出してください」とルビオ氏は語った。</p><p>キューバで社会主義革命が起こる前に両親がキューバから米国に渡った米国のトップ外交官は、プライベートや秘密を意味する「discrete」ではなく、分離を意味する「discrete」という言葉を誤って使ったようだ。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>US secretary of state makes comments after Trump tells US rally warships could intervene on return from Iran</p><p>Marco Rubio urged Cubans seeking political change in their country to act, saying “now is the time” moments after Donald Trump told a Friday rally for candidates in south Florida that US warships could intervene in Cuba on their way back from the Iran war.</p><p>The US secretary of state, in his social media post addressed “to those who seek to create positive change”, urged Cubans to capitalize on Trump’s plans. “The disappointment of failed promises, corruption, and the privileged lives of only a few; seize this opportunity to create the change you desire through a discrete [sic] partnership with the CIA,” Rubio said.</p><p>The top US diplomat, whose parents left Cuba for the United States before the socialist revolution there, seemed to mistakenly use the word “discrete”, meaning separate, rather than “discreet”, meaning private or secret.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/us-news/2026/oct/23/marco-rubio-cuba-trump" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/24 18:46</span>
+    </div>
+
+    
+    <p class="title-ja">65歳の女性、ケニアでエボラ出血熱で死亡した2人目の患者となる</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c6x2355448eyo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Woman, 65, becomes second patient to die of Ebola in Kenya</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ケニアは史上初のエボラ出血熱流行に対処する中、エボラ出血熱による２人目の死者を記録した。</p><p>保健省は、最初の被害者であるコンゴ民主共和国から旅行していた男性の近親者である65歳の女性が隔離後に死亡したと発表した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>他の7人のエボラ出血熱患者が2つの隔離施設で治療を受けていると付け加えた。</p><p>同省は、すべての症例は「1つのクラスター内にあり、市中感染の証拠はない」と述べた。</p><p>5月にコンゴ民主共和国でエボラ出血熱が確認されて以来、アフリカでは4,000人以上が死亡しており、この感染症の流行としては2番目に致死率の高いものとなっている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Kenya has recorded its second death from Ebola as it handles its first ever outbreak of the disease.</p><p>A woman, aged 65, who was a close family member of the first victim, a man who had travelled from the Democratic Republic of Congo, died after being placed in quarantine, the health ministry said.</p><p>Seven other Ebola patients were receiving treatment at two isolation facilities, it added.</p><p>All the cases were within "one cluster, with no evidence of community spread", the ministry said.</p><p>More than 4,000 people have died in Africa since Ebola was confirmed in DR Congo in May, making it the second most deadly outbreak of the disease.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c6x2355448eyo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/23 22:57</span>
+    </div>
+
+    
+    <p class="title-ja">ナイジェリアのエボラ出血熱の感染源を巡る謎がウイルス蔓延への懸念を煽る</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/oct/23/ebola-swiss-patient-nigeria-dr-congo-concerns-virus-spread" target="_blank" rel="noopener">Mystery over source of Ebola infection in Nigeria fuels concern about spread of virus</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>スイス政府、患者はスイス外交官の妻でウガンダ旅行中にウイルスに感染したとみられると発表</p><p>アフリカ4か国に感染が拡大したことで感染がさらに拡大するのではないかとの懸念のなか、アフリカ全土の保健当局はナイジェリアで10年以上ぶりとなるエボラ出血熱患者がどのようにして感染したのかを解明しようと急いでいる。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>スイス外務省は金曜日、ナイジェリアの患者はアブジャに拠点を置くスイス外交官のウガンダ生まれの妻で、コンゴ民主共和国には渡航していないと発表した。コンゴ民主共和国では5月中旬に感染が初めて確認され、その後ウガンダ、ケニア、そして現在はナイジェリアに広がっている。同省は、女性は夫とともにウガンダを旅行中にエボラ出血熱に感染したとみられると付け加えた。</p><p>この新たな情報は、女性がコンゴ民主共和国東部に旅行していたと以前に発表したウガンダの報告と矛盾しており、すでに歴史上最も地理的に広範囲に広がっているアウトブレイクを封じ込める当局の能力に懸念が生じるだろう。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Switzerland says patient is wife of Swiss diplomat and believed to have contracted virus while travelling in Uganda</p><p>Health officials across Africa are racing to determine how Nigeria’s first Ebola patient ⁠in more than a decade ⁠became infected, amid fears ​the outbreak could spread further after reaching a fourth African country.</p><p>The Swiss foreign ministry said on Friday the patient in Nigeria, the Ugandan-born wife of a Swiss diplomat based in Abuja, had not travelled to the Democratic Republic of ⁠Congo, where the outbreak was first detected in mid-May before spreading to Uganda , Kenya and now Nigeria. The woman was believed to have contracted Ebola while travelling with her husband in Uganda, the ministry added.</p><p>The new information contradicts accounts from Uganda, which previously said the woman had travelled to eastern DR Congo, and will raise concerns about the ability of authorities to contain the outbreak, which is already the most geographically widespread in history.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/oct/23/ebola-swiss-patient-nigeria-dr-congo-concerns-virus-spread" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-10-24";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
