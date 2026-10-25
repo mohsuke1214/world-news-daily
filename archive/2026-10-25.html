@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年10月25日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/25 21:38</span>
+    </div>
+
+    
+    <p class="title-ja">英国のバーナム首相、EUの移動の自由への復帰について議論したいと発言</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/25/uk-pm-burnham-says-he-wants-to-discuss-a-return-to-eu-freedom-of-movement?traffic_source=rss" target="_blank" rel="noopener">UK PM Burnham says he wants to discuss a return to EU freedom of movement</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>アンディ・バーナム首相は、英国のEU離脱につながった2016年のEU離脱国民投票の重要な争点である、英国が欧州連合の労働者の移動の自由規則に復帰することについて議論したいと述べた。</p><p>ブリュッセルとの関係を再考する必要性について、バーナム氏はサンデー・タイムズ紙に対し、EU離脱前の英国へのEU労働者の流入が重大な課題をもたらしたと語った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「しかし同時に、それはおそらく（現在ほど）難しくないタイプの移民だった」と彼は日曜日に発表された報告書の中で述べた。</p><p>「人々が来ては戻ってくる回転ドア型の移民は違います。それ以来、移民のバランスが変わりましたね。私たちはそれらのことについて正直に議論する必要があると思います。」と彼は言いました。</p><p>移民問題は、英国人が僅差でEU離脱に投票して終わった2016年のEU離脱国民投票キャンペーンの重要な要素だった。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Prime Minister Andy Burnham says he wants to discuss Britain returning to the European Union’s freedom of movement rules for workers, a key issue in the 2016 Brexit referendum which led to the United Kingdom leaving the bloc.</p><p>Addressing the need to rethink ties with Brussels, ⁠Burnham told The Sunday Times newspaper that the influx of EU workers into Britain before Brexit had posed significant challenges.</p><p>“But, at the same time, it was a type of immigration that perhaps wasn’t as difficult [as now],” he said in a report released on Sunday.</p><p>“Revolving door migration where people would come and then go back is different. The balance of migration has changed, hasn’t it, ‌since then? I think we’ve just got to have an honest discussion about those things,” he said.</p><p>The issue of immigration was a key factor in the 2016 Brexit referendum campaign that ended with Britons narrowly voting to leave the EU.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/25/uk-pm-burnham-says-he-wants-to-discuss-a-return-to-eu-freedom-of-movement?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/25 20:39</span>
+    </div>
+
+    
+    <p class="title-ja">極右指導者ルペン氏、目に見える警備が抗議活動を円滑に保つと語る</p>
+    <p class="title-en"><a href="https://www.france24.com/en/far-right-leader-le-pen-says-visible-policing-keeps-protests-smooth" target="_blank" rel="noopener">Far-right leader Le Pen says visible policing keeps protests smooth</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>一方、フランスの極右国民集会はパリ南部のオルレアンで党大会２日目を開催している。マリーヌ・ルペン氏は今日午後遅くの演説で正式に大統領選活動を開始する予定だが、ジョルダン・バルデラ氏は党首に再選される。土曜日、市内で極右に対する大規模な反対デモが行われた。記者のアントニア・ケリガンが最新の動向を追っています。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Meanwhile, France’s far-right National Rally is holding the second day of its party congress in Orléans, south of Paris. Marine Le Pen is expected to officially launch her presidential campaign in a speech later this afternoon, while Jordan Bardella is being re-elected as party leader. On Saturday, a large counter-demonstration against the far right was held in the city. Our reporter Antonia Kerrigan has been following the latest developments.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/far-right-leader-le-pen-says-visible-policing-keeps-protests-smooth" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/25 20:00</span>
+    </div>
+
+    
+    <p class="title-ja">グレナダでの英国人男性の死から10か月後、英国政府の行動を求める</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/oct/25/demand-uk-government-action-after-british-man-death-grenada" target="_blank" rel="noopener">Demand for UK government action 10 months after British man’s death in Grenada</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>アンドリュー・フレデリックの死は殺人であるとの司法解剖報告書にも関わらず、警察は事件を解決した</p><p>カリブ海のグレナダ島で略奪された敷地内で遺体で発見された英国人の父親の死に関する一刻を争う捜査が、両国間の外交上の遅れにより行き詰まっている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>アンドリュー・フレデリックさんの遺族を支援する慈善団体関係者らは、病理学者によって殺人と判断された彼の死からほぼ10カ月後に開始される本格的な捜査に道筋をつけるため、政府の即時介入を要求している。</p><p>グレナダ警察が「殺人が起きたという根拠はない」と判断し事件を終結させたことを受け、海外殺人慈善団体は外交特別委員会に介入するよう求めた。</p><p>これは、47歳のフレデリックが「鈍的外傷」を負い、足の爪を除去するなどの拷問を受け、死を殺人と裁定したと述べ、フレデリックが亡くなった週に行われた検死報告書にもかかわらずであった。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Police closed case of Andrew Frederick despite autopsy report ruling his death a homicide</p><p>A time-critical investigation into the death of a British father whose body was found in a ransacked property on the Caribbean island of Grenada has stalled because of diplomatic delays between the two countries.</p><p>Charity workers supporting the family of Andrew Frederick are demanding immediate government intervention to clear the path for a full investigation to begin almost 10 months after his death, which has been ruled a homicide by a pathologist.</p><p>The Murdered Abroad charity has called on the foreign affairs select committee to step in after Grenadian police found there was “no basis … that any homicide has occurred” and closed the case.</p><p>This was despite a report from an autopsy, done in the week he died, saying Frederick, 47, had suffered “blunt force trauma”, was tortured, including by removal of his toenail, and ruling the death a homicide.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/oct/25/demand-uk-government-action-after-british-man-death-grenada" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/25 18:17</span>
+    </div>
+
+    
+    <p class="title-ja">プラハ、ヒトラーに対するロマのレジスタンス戦士を讃える</p>
+    <p class="title-en"><a href="https://www.dw.com/en/prague-honours-roma-resistance-fighters-against-hitler/a-79725015?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Prague honours Roma resistance fighters against Hitler</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>チェコとスロバキアに住む50万人以上のロマ人にとって、2026年10月15日は重要な節目となる。</p><p>その日、プラハのロマ国立復興博物館で、ほとんど忘れられていたチェコの歴史の一章に関する展覧会が開幕した。この展示では、1938 年から 1945 年までのナチス ドイツ占領とチェコスロバキア解体におけるチェコとスロバキアのロマのレジスタンス戦士の役割を探ります。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>これまで、チェコとスロバキアのロマ人は、第二次世界大戦の歴史の中で、ほぼ専ら、ロマ人とシンティに対するホロコーストの犠牲者として登場しました。いわゆるボヘミアおよびモラヴィア保護領では、ナチスドイツが第二次世界大戦中にチェコのロマ人の約90％を殺害した。</p><p>しかし、あまり知られていないのは、多数のチェコとスロバキアのロマ人が抵抗グループのパルチザンとして、またチェコスロバキア地下軍（国家防衛、オンタリオ州）の兵士としてドイツ占領者と戦ったことである。</p><p>したがって、ロマ国民運動博物館での展示は、第二次世界大戦中のロマに対する見方の転換点を示しています。少なくともそれが、弁護士であり元検察官であり、チェコの最も有名なロマ活動家の一人である博物館館長エミール・シュカ氏の希望だ。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>For more than half a million Roma in Czechia and Slovakia , October 15, 2026, marks an important milestone.</p><p>That day, an exhibition on a largely forgotten chapter of Czech history opened at the Museum of the Romani National Revival in Prague. The exhibit explores the role of Czech and Slovak Romani resistance fighters during the Nazi German occupation and the dismantling of Czechoslovakia from 1938 to 1945.</p><p>Until now, Czech and Slovak Roma appeared in the history of World War II almost exclusively as victims of the Holocaust against Roma and Sinti. In the so-called Protectorate of Bohemia and Moravia, Nazi Germany murdered approximately 90% of the Czech Roma during World War II.</p><p>However, what is less well known is that a large number of Czech and Slovak Roma fought against the German occupiers as partisans in resistance groups and as soldiers in the Czechoslovak Underground Army, or Defense of the Nation, ON.</p><p>The exhibition at the Museum of the Roma National Movement therefore marks a turning point in how the Roma are viewed during World War II . At least that is the hope of museum director Emil Scuka, a lawyer, former prosecutor and one of the best-known Czech Roma activists.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/prague-honours-roma-resistance-fighters-against-hitler/a-79725015?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/25 21:17</span>
+    </div>
+
+    
+    <p class="title-ja">イスラエルによる最近のヘブロン攻撃がヨルダン川西岸にとってそれほど重要な理由</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/economy/2026/10/25/why-israels-latest-assault-on-hebron-is-so-significant-for-the-west-bank?traffic_source=rss" target="_blank" rel="noopener">Why Israel’s latest assault on Hebron is so significant for the West Bank</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ヘブロンのパレスチナ人は、占領下のヨルダン川西岸都市に対する最近の攻撃で、イスラエルによる数日間の襲撃と強制避難にさらされている。</p><p>パレスチナ捕虜協会によると、イスラエルは金曜日以来、パレスチナ人に封鎖を課し、ヘブロン全土で少なくとも47人のパレスチナ人を拘束した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>パレスチナ人の住宅の一部が駐屯地や兵舎に転用され、約2,500人が市から追い出された。</p><p>この作戦は金曜日に起きた銃撃事件で兵士２人が死亡、パレスチナ人の容疑者２人も死亡したことを受けて行われた。</p><p>イスラエルによるヘブロンへの最近の攻撃について知っておくべきことは次のとおりです。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Palestinians in Hebron have been subjected to days of Israeli raids and forced displacement in the latest assault on the occupied West Bank city.</p><p>Israel has imposed a lockdown on Palestinians and detained at least 47 Palestinians across Hebron since Friday, according to the Palestinian Prisoner’s Society.</p><p>About 2,500 people have been forced out of the city as some Palestinian homes have been converted into military posts and barracks .</p><p>The operations followed a shooting attack on Friday that killed two soldiers while the two Palestinian suspects were also killed.</p><p>Here is what to know about Israel’s latest assault on Hebron:</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/economy/2026/10/25/why-israels-latest-assault-on-hebron-is-so-significant-for-the-west-bank?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/25 20:38</span>
+    </div>
+
+    
+    <p class="title-ja">イスラエル：選挙を前にデモ参加者が政府に反対して集会</p>
+    <p class="title-en"><a href="https://www.france24.com/en/israel-demonstrators-rally-against-government-ahead-of-election" target="_blank" rel="noopener">Israel: Demonstrators rally against government ahead of election</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イスラエルでは反ネタニヤフ運動が活発化している。ベンヤミン・ネタニヤフ首相に対する国民投票と広く見られている総選挙をわずか３日後に控えた金曜日、数千人がテルアビブに集まりイスラエル政府に抗議した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>In Israel, the anti-Netanyahu movement is mobilising. Thousands gathered in Tel Aviv on Friday to protest against the Israeli government, just three days ahead of a general election widely seen as a referendum on Prime Minister Benjamin Netanyahu.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/israel-demonstrators-rally-against-government-ahead-of-election" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/25 18:27</span>
+    </div>
+
+    
+    <p class="title-ja">ガディ・アイゼンコット、ネタニヤフ首相に対抗してモロッコのルーツを訴えるキャンペーンを展開</p>
+    <p class="title-en"><a href="https://www.dw.com/en/gadi-eisenkot-campaigns-on-moroccan-roots-in-challenge-to-netanyahu/a-79747193?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Gadi Eisenkot campaigns on Moroccan roots in challenge to Netanyahu</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>さまざまなスローガンを掲げた選挙ポスターは、右翼リクード党と極右政党オツマ・ユーディットを宣伝している。しかし、他のポスターよりもよく見られるポスターが 1 つあります。それは、リベラルなヤシャール党のポスターです。</p><p>そのスローガン「ロシュ・メムシャラ・ディアルナ」は、ヘブライ語の「首相」とモロッコのアラビア語で「私たち自身の」という言葉を組み合わせたものである。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>そして、スデロートやイスラエルの社会政治的周縁部にある他の都市でのアイゼンコットの選挙運動が彼のモロッコのルーツに焦点を当てているのには十分な理由がある。</p><p>スデロットは、テルアビブの南から約 75 キロメートル（45 マイル）、ガザ国境からわずか 1 キロメートル離れたネゲブ砂漠に位置し、大規模なモロッコ系ユダヤ人コミュニティがある都市です。ここ数十年で、この都市はイスラエルにおけるモロッコ系ユダヤ人文化の象徴となり、音楽、映画、国政においてその表現が見られました。</p><p>このビデオを表示するには、JavaScript を有効にし、HTML5 ビデオをサポートする Web ブラウザへのアップグレードを検討してください。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Campaign posters with various slogans promote the right-wing Likud and the far-right Otzma Yehudit parties. However, one poster is seen more than any others: that of's liberal Yashar party.</p><p>Its slogan, "Rosh Memshala Dialna," combines the terms "prime minister" in Hebrew and the words "of our own" in Moroccan Arabic.</p><p>And there is a good reason why Eisenkot's campaign in Sderot and other cities on Israel's sociopolitical periphery focuses on his Moroccan roots.</p><p>Sderot — located in the Negev desert, about 75 kilometers (45 miles) to Tel Aviv's south and just a kilometer away from the Gaza border — is a city with a large Moroccan Jewish community. In recent decades, the city has become symbolic of Moroccan-Jewish culture in Israel, finding its expression in music, cinema and state politics.</p><p>To view this video please enable JavaScript, and consider upgrading to a web browser that supports HTML5 video</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/gadi-eisenkot-campaigns-on-moroccan-roots-in-challenge-to-netanyahu/a-79747193?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/25 14:15</span>
+    </div>
+
+    
+    <p class="title-ja">イスラエル、弾圧激化でヨルダン川西岸の交差点を投票日に閉鎖へ</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c6y93ylpl5p2o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Israel to close West Bank crossings on election day as crackdown escalates</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>同国軍は、火曜日のイスラエル選挙期間中はヨルダン川西岸のすべての陸路が閉鎖され、パレスチナ人労働者がすべての入植地に入ることが禁止されると発表した。</p><p>この制限は、占領下のヨルダン川西岸地区でパレスチナ人の武装集団がイスラエル兵２人を殺害したことを受けて弾圧が行われる中で行われた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>イスラエル国防軍は火曜日、「工業地帯を含むユダヤ、サマリアおよびヨルダン渓谷全域におけるパレスチナ労働者の出入国の禁止と、すべての陸路の閉鎖」を発表した。</p><p>また、工業地帯やその他の限られた地域を除き、ほとんどの労働者が日曜日から入植地への出入りを禁止されると述べた。</p><p>ハマス主導の2023年10月7日のイスラエル攻撃前、10万人以上のパレスチナ人労働者のイスラエルへの入国が許可されていた。それ以来、許可が回復されたのはほんの一部だけです。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>All West Bank land crossings will be closed during Tuesday's election in Israel, the country's military says, and Palestinian workers will be barred from entering all settlements.</p><p>The restrictions come amid a crackdown in the occupied West Bank after Palestinian gunmen killed two Israeli soldiers in the territory.</p><p>The Israel Defense Forces announced a "ban on the entry and exit of Palestinian workers throughout Judea and Samaria and the Jordan Valley, including industrial zones, as well as the closure of all land crossings" on Tuesday.</p><p>It said most workers would also be barred from settlements from Sunday, with the exception of industrial zones and a limited number of other areas.</p><p>Before the Hamas-led October 7, 2023 attack on Israel, more than 100,000 Palestinian workers were permitted to enter Israel. Since then only a small fraction have had their permits restored.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c6y93ylpl5p2o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/25 19:27</span>
+    </div>
+
+    
+    <p class="title-ja">パキスタン、アガとリズワンの復帰でシャン・マスードをスリランカテストチームから外す</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/sports/2026/10/25/pakistan-axe-shan-masood-from-sri-lanka-test-squad-as-agha-rizwan-return?traffic_source=rss" target="_blank" rel="noopener">Pakistan drops Shan Masood from Sri Lanka Test squad as Agha, Rizwan return</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>元キャプテンのサルマン・アガは、スリランカとの次のシリーズに向けてパキスタンのテストクリケットチームに復帰したが、チームの悲惨なイングランド遠征を終えたモハマド・リズワンの居場所はまだなかった。</p><p>アガとリズワンは、8月にイングランドで行われたテストツアーから追放された7選手のうちの一人で、そのシリーズでは訪問チームは0-3で敗れた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>それ以来、パキスタンの最初のチームでは、同国のサイバー犯罪当局による継続的な捜査の対象となっているウィケットキーパー兼打者のリズワンを含む、5人の選手が依然として不利な状況にある。</p><p>今週初め、パキスタンクリケット委員会（PCB）はリズワンの国内試合出場を許可した。</p><p>アガは今月のT20シリーズのスリランカ戦から外されたが、32歳の彼はホームで開催中のワンデイ・インターナショナル（ODI）シリーズで好成績を収め、先週日曜日のスリランカ戦でセンチュリーゴールを決めた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Former skipper Salman Agha has returned to Pakistan’s Test cricket squad for the upcoming series against Sri Lanka, but there was still no place for Mohammad Rizwan following the team’s disastrous tour of England.</p><p>Agha and Rizwan were among seven players expelled from the Test tour of England in August, a series the visitors lost 3-0 .</p><p>In Pakistan’s first squad since, five players remain out of favour, including wicketkeeper-batsman Rizwan, who is the subject of an ongoing investigation by the country’s cybercrime agency.</p><p>Earlier this week, the Pakistan Cricket Board (PCB) allowed Rizwan to feature in a domestic match.</p><p>Agha was left out of this month’s T20 series against Sri Lanka, but the 32-year-old impressed in the ongoing One-Day International (ODI) series at home, scoring a century against Sri Lanka last Sunday.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/sports/2026/10/25/pakistan-axe-shan-masood-from-sri-lanka-test-squad-as-agha-rizwan-return?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/24 22:34</span>
+    </div>
+
+    
+    <p class="title-ja">金正恩氏、新たに開通した橋を渡って中国へ</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/oct/24/kim-jong-un-crosses-newly-opened-bridge-into-china" target="_blank" rel="noopener">Kim Jong-un crosses newly opened bridge into China</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>北朝鮮指導者、新鴨緑江橋を渡って共産党幹部と会談</p><p>金正恩氏は中国を訪問し、両国を結ぶ橋の開通を行い、隣国との協力を拡大したいと述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>北朝鮮関連問題を担当する韓国統一省と中国国営新華社通信によると、北朝鮮指導者は土曜日、新鴨緑江橋を渡った後、中国国境の都市丹東に到着した。</p><p>彼は中国共産党常務委員の王滬寧氏と面会した。両氏は自動車工場を視察し、両国関係の強化を約束した。</p><p>新華社通信によると、金氏は、自国が「歴史的な友好関係を前進させ、実際的な協力を拡大するために中国と協力する用意があり、それによって両国国民に具体的な利益をもたらす」と述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>North Korean leader travels over New Yalu River Bridge to meet senior Communist party member</p><p>Kim Jong-un has visited China, inaugurating a bridge that connects the two countries and saying he hopes to expand cooperation with his neighbour.</p><p>The North Korean leader arrived in the Chinese border city of Dandong on Saturday after crossing the New Yalu River Bridge, according to South Korea’s unification ministry, which handles affairs related to North Korea, and China’s official Xinhua news agency.</p><p>He met Wang Huning, a member of the standing committee of China’s Communist party. The pair toured a car factory, and promised to strengthen the bilateral relationship.</p><p>Kim said his country “stands ready to work with China to carry forward their historical friendship and expand practical cooperation, thereby delivering tangible benefits to the peoples of both countries”, according to Xinhua.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/oct/24/kim-jong-un-crosses-newly-opened-bridge-into-china" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/24 10:55</span>
+    </div>
+
+    
+    <p class="title-ja">オーストラリア国会議員、車襲撃容疑で容体改善</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c670pr1ryxyno?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Australian MP's condition improves after alleged car attack</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>5日前にビクトリア州北東部で車にはねられたオーストラリア国会議員ヘレン・ヘインズ氏の容体は、危篤状態から重篤状態に改善したが、安定している。</p><p>65歳の無所属議員は月曜日、メルボルン北東のワンガラッタにある選挙事務所の外で当局が意図的な襲撃を受けたと発表し、両足を切断された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>メルボルンのアルフレッド病院は土曜朝の最新情報で、ヘインズさんの状態は重篤だが安定しており、空輸されて以来初めて改善したと発表した。</p><p>彼女を襲撃したとされる43歳のブレンダン・ニュージェントは事件直後に逮捕され、それ以来3つの容疑で出廷している。</p><p>政治家の夫フィル・ヘインズ氏は水曜日、「恐ろしい事件」により妻は重傷を負ったが、「心と精神」は「良好」だと述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The condition of Helen Haines, the Australian MP hit by a car five days ago in north-east Victoria, has improved from critical to serious but stable.</p><p>The independent MP, 65, had both her legs amputated after what authorities say was a deliberate attack outside her electorate office in Wangaratta, north-east of Melbourne, on Monday.</p><p>In the latest update on Saturday morning, the Alfred Hospital in Melbourne said Haines was in a serious but stable condition, the first improvement since she was airlifted there.</p><p>Her alleged attacker, 43-year-old Brendan Nugent, was arrested shortly after the incident and has since appeared in court on three charges.</p><p>The politician's husband, Phil Haines, said on Wednesday that the "horrendous incident" had caused his wife significant injuries but "her heart and her mind" were "in good shape".</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c670pr1ryxyno?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/23 23:54</span>
+    </div>
+
+    
+    <p class="title-ja">アフガニスタンの女性​​は高等教育への最後の手段を失う可能性がある</p>
+    <p class="title-en"><a href="https://www.dw.com/en/afghan-women-could-lose-one-of-their-last-paths-to-a-higher-education/a-79745173?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Afghan women could lose one of their last paths to a higher education</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>「ライラ」は、真夜中に目を覚まして水を一杯飲み、ほとんど偶然に携帯電話をチェックし、メールを見てお腹が痛くなりました。米国は、国内で女性が学ぶことのできる最後の大学の一つであるアフガニスタン・アメリカン大学（AUAF）への資金提供を停止するだろう。</p><p>ライラさんは、ベッドに座って見つめながら、過去5年間、そして教育を受けるために耐えてきたすべてのことを思い巡らせていたと語った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>タリバンが女子教育を非合法化して以来、アフガニスタンで学ぶ方法を見つけるのは容易ではなかった。</p><p>アメリカン大学のキャンパスはすでにタリバンに占拠されていたが、彼女は大学のオンラインプログラムを通じて秘密裏に勉強することができた。しかし現在、大学は財政を失いつつあり、彼女とクラスメートは大学が完全に閉鎖されるのではないかと心配していると彼女はDWに語った。安全上の理由から彼女の名前は変更されました。</p><p>このビデオを表示するには、JavaScript を有効にし、HTML5 ビデオをサポートする Web ブラウザへのアップグレードを検討してください。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>"Laila" awoke in the middle of the night for a glass of water, checked her phone almost by accident, and saw an email that made her stomach drop. The US would stop funding the American University of Afghanistan (AUAF), one of the last places women can still study in the country.</p><p>Laila said she sat on her bed, staring, her thoughts racing through the past five years and everything she had endured just to get an education.</p><p>It had not been easy to find a way to study in Afghanistan after the Taliban outlawed women's education .</p><p>The American University campus was already taken over by the Taliban, but she could study secretly through the university's online program. But now that the university is losing its financing, she told DW she and her classmates fear it will shut down entirely. Her name has been changed for safety reasons.</p><p>To view this video please enable JavaScript, and consider upgrading to a web browser that supports HTML5 video</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/afghan-women-could-lose-one-of-their-last-paths-to-a-higher-education/a-79745173?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/25 21:48</span>
+    </div>
+
+    
+    <p class="title-ja">写真で見る 1 週間: フランス全土の抗議デモ、インドネシアの山火事、ブラジルの選挙</p>
+    <p class="title-en"><a href="https://www.france24.com/en/europe/20261025-the-week-in-pictures-protests-across-france-wildfires-in-indonesia-and-brazilian-elections" target="_blank" rel="noopener">The week in pictures: Protests across France, wildfires in Indonesia and Brazilian elections</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>週末にフランス全土で起きた学生抗議活動や、左翼の現職ルイス・イナシオ・ルーラ・ダ・シルバ氏と右翼の挑戦者フラビオ・ボルソナロ氏が争うブラジルの大統領選挙、インドネシアの山火事まで、フランス24は先週の最も印象的な映像のいくつかを振り返る。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>From student protests across France over the weekend and presidential elections in Brazil pitting leftist incumbent Luiz Inacio Lula da Silva against right-wing challenger Flavio Bolsonaro to wildfires in Indonesia, FRANCE 24 looks back at some of the most striking images from the past week.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/europe/20261025-the-week-in-pictures-protests-across-france-wildfires-in-indonesia-and-brazilian-elections" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/25 20:54</span>
+    </div>
+
+    
+    <p class="title-ja">ルラ氏がボルソナロ氏の息子と対決する中、ブラジルの有権者は投票所へ向かう</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cxp8g21j4648o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Voters in Brazil head to polls as Lula goes up against Bolsonaro's son</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>接戦の決選投票で国民が新大統領を選ぶ中、ブラジルで世論調査が始まった。</p><p>選択は、非連続で4期目の政権を目指している80歳の現職左翼ルイス・イナシオ・ルーラ・ダ・シルバ氏と、右翼のフラビオ・ボルソナロ上院議員（45歳）のどちらかである。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ボルソナロ氏は、2022年の前回選挙で敗北した後、クーデターを計画した罪で20年以上の懲役刑を言い渡された元右翼大統領ジャイール・ボルソナロ氏の息子である。</p><p>10月4日の第1回投票でトップに立ったボルソナロ氏は、今回の選挙で敗北することになるが、ドナルド・トランプ米大統領はこれを「非常に大きな」勝利と呼んだ。</p><p>第1回投票で劣勢に立たされた候補者が、第2回投票で劣勢を覆して勝利した例はこれまでにない。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Polls have opened in Brazil as people choose their new president in a closely fought run-off election.</p><p>The choice is between the 80-year-old incumbent, left-winger Luiz InÃ¡cio Lula da Silva, who is seeking a fourth non-consecutive term in office, and right-wing senator FlÃ¡vio Bolsonaro, 45.</p><p>Bolsonaro is the son of former right-wing president Jair Bolsonaro, who was sentenced to more than 20 years in jail for plotting a coup after losing the last election in 2022.</p><p>This is Bolsonaro's election to lose after he came top in the first round of voting on 4 October, which US President Donald Trump called a "very big" victory.</p><p>Never before has a candidate who trailed after the first round managed to overturn the deficit and win in the second round.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cxp8g21j4648o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/25 20:39</span>
+    </div>
+
+    
+    <p class="title-ja">CENTCOMはイラン攻撃を計画していると伝えられているが、トランプ大統領はそれを承認するだろうか？</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/25/centcom-reportedly-has-plans-for-iran-strikes-will-trump-approve-them?traffic_source=rss" target="_blank" rel="noopener">CENTCOM reportedly has plans for Iran strikes: Will Trump approve them?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ワシントンに本拠を置くウェブサイト「ザ・ヒル」によると、米軍はイランに対する新たな攻撃の選択肢を策定しており、8カ月に迫った戦争で再び大規模な戦闘が行われる可能性が高まっている。</p><p>中東の米軍を監督する中央軍（CENTCOM）は、ホワイトハウスの許可があれば追加攻撃を行う計画を立てていると同紙は報じた。また、軍事計画立案者らがピート・ヘグセス国防長官のためにいくつかの選択肢を用意しているとも述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>報告書は、11月3日の米国中間選挙後に起こり得る攻撃に焦点を当てた。しかし、ドナルド・トランプ大統領は土曜日、米国は「明日」にも攻撃する可能性があると示唆したが、同時にイラン政府との「大きくて美しい」合意の可能性も保留した。</p><p>一方、イランのマスード・ペゼシキアン大統領は、米国が交渉を脱線させていると非難したが、合意に向けた努力は継続されるべきだと述べた。双方がさらなる攻撃を警告しているため、紛争は全面戦争に逆戻りする可能性があるだろうか？私たちが知っていることは次のとおりです。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The US military has drawn up options for renewed attacks on Iran, according to the Washington-based website The Hill, raising the prospect of another round of major fighting in a war approaching its eighth month.</p><p>Central Command (CENTCOM), which oversees US forces in the Middle East, has plans ready for follow-up strikes if authorised by the White House, the outlet reported. It also said military planners had prepared several options for Defense Secretary Pete Hegseth.</p><p>The report focused on possible attacks after the November 3 US midterm elections. But President Donald Trump suggested on Saturday that the United States could strike as soon as “tomorrow”, while also holding out the possibility of a “big, beautiful” agreement with Tehran.</p><p>Iranian President Masoud Pezeshkian, meanwhile, accused Washington of derailing negotiations but said efforts to reach an agreement should continue. With both sides warning of further attacks, could the conflict tip back into full-scale war? Here is what we know.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/25/centcom-reportedly-has-plans-for-iran-strikes-will-trump-approve-them?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/25 06:10</span>
+    </div>
+
+    
+    <p class="title-ja">ブラジル選挙決選投票前夜、100万人以上のルーラ支持者が集結</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/oct/24/lula-da-silva-supporters-rally-eve-brazil-election-runoff-bolsonaro" target="_blank" rel="noopener">More than one million Lula supporters rally on eve of Brazilian election runoff</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>左翼現職とフラビオ・ボルソナロ氏の戦いで日曜日には約1億5,900万人が投票に向かう</p><p>ブラジルの左翼大統領、ルイス・イナシオ・ルーラ・ダ・シルバ氏の100万人以上の支持者が、極右のライバル、フラビオ・ボルソナロ氏に対する歴史的な選挙戦への大統領の反撃を後押しすることを期待して大規模な抗議活動をリオで最も有名なビーチに押し寄せた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>日曜の選挙決選投票では約１億５９００万人のブラジル人が投票する予定で、１０月４日の第１回投票でボルソナロ氏が４７％対４５％で勝利したため、両氏は同票となった。</p><p>土曜日、強烈な日差しの下、ルーラの劇的な前例のないカムバックを手助けしようと、赤い服を着た群衆が4.5マイルのコパカバーナビーチに詰めかけた。 1980年代にブラジルに民主主義が復帰して以来、第1ラウンド敗者が立ち直ることができたことは一度もなかった。</p><p>61歳のトラック運転手、ジョシアス・シルバさんは、2002年に初当選した80歳の大統領が非連続4期目に勝利するだろうと自信を表明した。彼はカーニバルのような行列に「ルーラが再選された。明日は新しい日になる」と書かれた手作りのプラカードを持って行った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Nearly 159 million people to head to polls on Sunday in battle between leftwing incumbent and Flávio Bolsonaro</p><p>More than one million supporters of Brazil’s leftwing president, Luiz Inácio Lula da Silva, have streamed on to Rio’s most famous beach for a giant protest they hope will propel him towards a historic election fightback against his far-right rival, Flávio Bolsonaro .</p><p>Nearly 159m Brazilians will vote in the election’s runoff on Sunday, with the pair tied in the polls after Bolsonaro won the first round on 4 October by 47% to 45%.</p><p>On Saturday, under a fierce sun, red-clad crowds packed the 2.5-mile Copacabana beach in an attempt to help Lula clinch a dramatic and unprecedented comeback . Never since the return of democracy to Brazil in the 1980s has the first-round loser managed to bounce back.</p><p>Josias Silva, a 61-year-old truck driver, voiced confidence that his 80-year-old president, who was first elected in 2002, would win a fourth non-consecutive term. He carried a homemade sign to the carnival-like procession reading: “Lula re-elected. Tomorrow will be a new day.”</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/oct/24/lula-da-silva-supporters-rally-eve-brazil-election-runoff-bolsonaro" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/25 22:41</span>
+    </div>
+
+    
+    <p class="title-ja">ウガンダはエボラ出血熱の感染者はいないと発表、しかしケニアとナイジェリアでの感染は新たな精査を促している</p>
+    <p class="title-en"><a href="https://www.dw.com/en/uganda-says-it-has-no-active-ebola-cases-but-infections-in-kenya-and-nigeria-are-prompting-fresh-scrutiny/a-79741580?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Uganda says it has no active Ebola cases, but infections in Kenya and Nigeria are prompting fresh scrutiny</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>スイスからの新たな情報がナイジェリア人患者の渡航歴に関するウガンダの説明と矛盾しているため、アフリカ保健当局者らによると、ケニアとナイジェリアで最初に確認されたエボラ出血熱患者はウガンダのエンテベ国際空港ですれ違った可能性があるという。</p><p>ウガンダは、活動的なエボラ出血熱感染者が報告されていない国だが、数千キロ離れた場所での症例調査の焦点となっている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ウガンダは、致死性ウイルスの活動性感染者は確認されていないと主張している。しかし、ケニアとナイジェリアの保健当局は、東アフリカの国との渡航歴や接触者が関与したエボラ出血熱感染症を調査している。</p><p>アフリカ疾病予防管理センター（アフリカCDC）の緊急事態対策・対応責任者のウェサム・マンクーラ氏によると、両患者は10月3日にエンテベ国際空港を通過した。</p><p>保健当局は、２人がすれ違った可能性があるとしているが、２人が遭遇したのか、空港で感染が起こったのかは明らかになっていない。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The first confirmed Ebola patients in Kenya and Nigeria may have crossed paths at Uganda's Entebbe International Airport, according to African health officials, as new information from Switzerland contradicts Uganda's account of the Nigerian patient's travel history.</p><p>Uganda , a country reporting no active Ebola infections, has become a focus of investigations into cases thousands of kilometers apart.</p><p>Uganda insists that it has no confirmed active cases of the deadly virus . Yet health authorities in Kenya and Nigeria are investigating Ebola infections involving people whose travel histories or contacts are connected to the East African nation.</p><p>Both patients passed through Entebbe International Airport on October 3, according to Wessam Mankoula, head of emergency preparedness and response at the Africa Centers for Disease Control and Prevention (Africa CDC) .</p><p>Health officials say the two may have crossed paths, although it has not been established whether they encountered each other or whether any transmission occurred at the airport.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/uganda-says-it-has-no-active-ebola-cases-but-infections-in-kenya-and-nigeria-are-prompting-fresh-scrutiny/a-79741580?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/25 21:19</span>
+    </div>
+
+    
+    <p class="title-ja">アルジェリア議会上院、ニジェールへの軍隊派遣を承認</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/25/algerian-parliaments-upper-house-approves-troop-deployment-to-niger?traffic_source=rss" target="_blank" rel="noopener">Algerian parliament’s upper house approves troop deployment to Niger</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>アルジェリア議会上院は、隣国ニジェールへの軍隊派遣を全会一致で承認した。</p><p>アルジェリアの憲法は、両院の３分の２の多数で承認された場合に大統領に軍隊を海外に派兵する権限を与えている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>アルジェリアの大衆紙エル・ハバル紙の報道によると、国家評議会は日曜日に軍隊配備に関する投票を行うための緊急会議を開催したが、人民国会、つまり下院は夕方遅くに別の会議を開催する予定であるとのこと。この派遣が承認されれば、アラブ人には「十月戦争」、イスラエル人には「ヨム・キプール戦争」として知られる、イスラエルとアラブ諸国間の1973年の戦争以来、アルジェリア国境外での初の任務となる。</p><p>アルジェリアが派遣する軍事部隊はニジェールの石油施設を確保する任務を負うと予想されている。</p><p>この投票は、先週ニジェールのサリフ・モディ国防大臣がアルジェリアを訪問し、アルジェリアのアブデルマジド・テブン大統領および人民国軍のサイード・チャングリハ参謀総長と会談した後に行われた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The upper house of Algeria’s parliament has unanimously approved the deployment of troops to neighbouring Niger.</p><p>The Algerian constitution empowers the president to send military units abroad, provided that both chambers of parliament approve it by a two-thirds majority.</p><p>The Council of the Nation held an emergency session on Sunday to vote on troop deployment, while the People’s National Assembly, or the lower house, is expected to hold a separate session later in the evening, Algeria’s popular newspaper El Khabar reported. If the deployment is approved, it would be the first mission outside Algeria’s borders since the 1973 War between Israel and several Arab countries, known to Arabs as the October War and Israelis as the Yom Kippur War.</p><p>The military units to be deployed by Algeria are expected to be tasked with securing oil facilities in Niger.</p><p>The vote came after a visit by Niger’s Defence Minister General Salifou Modi to Algeria last week, where he held talks with Algerian President Abdelmadjid Tebboune and Chief of Staff of the People’s National Army General Said Chanegriha.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/25/algerian-parliaments-upper-house-approves-troop-deployment-to-niger?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-10-25";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
