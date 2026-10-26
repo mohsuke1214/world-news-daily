@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年10月27日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/27 00:44</span>
+    </div>
+
+    
+    <p class="title-ja">ブラジル決選投票ライブ最新情報：ボルソナロ氏が譲歩を拒否する中、世界の指導者らが歴史的な選挙勝利でルラ氏を祝福</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/live/2026/oct/25/brazil-election-runoff-live-updates-flavio-bolsonaro-lula" target="_blank" rel="noopener">Brazil runoff live updates: world leaders congratulate Lula on historic election win as Bolsonaro refuses to concede</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>私がブログを書いているブラジリアでは午前6時15分、ロンドンでは午前9時15分を過ぎたところです。ここでは、ブラジル史上最も重要かつ痛ましい選挙の 1 つからの主な最新情報を簡単に要約します。</p><p>80歳のブラジル大統領、ルイス・イナシオ・ルーラ・ダ・シルバは選挙で劇的なカムバックを果たし、極右の対立候補フラビオ・ボルソナロを破り、歴史的な4期目の政権を獲得した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ブラジル高等選挙裁判所によると、ルラ氏はボルソナロ氏の得票率48.21%に対し51.79%を獲得し、約440万票多く獲得した。</p><p>ジャイール・ボルソナロ前大統領の長男、フラビオ・ボルソナロ氏は選挙結果を受け入れることを拒否し、選挙結果の無効を要求した。</p><p>45歳の上院議員は、有権者輸送の不正疑惑を理由に投票を2時間延長したルーラ氏が任命した最高裁判事による日曜日遅くの決定に疑問を呈した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>It has just gone past 06:15am in Brasília and 09:15am in London, where I am blogging from. Here is a quick recap of the main updates from one of the most significant and bruising elections in Brazilian history:</p><p>Luiz Inácio Lula da Silva , the 80-year-old Brazilian president, has staged a dramatic election comeback , defeating his far-right opponent, Flávio Bolsonaro , to claim a historic fourth term in power.</p><p>Lula secured 51.79% of the votes compared with Bolsonaro’s 48.21% , according to Brazil’s Superior Electoral Court – about 4.4m more votes</p><p>Flávio Bolsonaro, the eldest son of former President Jair Bolsonaro , refused to accept the election result, and has called for it to be annulled .</p><p>The 45-year-old senator called into question a late-Sunday decision by a Lula-appointed supreme court justice that extended voting by two hours over alleged voter transport irregularities.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/live/2026/oct/25/brazil-election-runoff-live-updates-flavio-bolsonaro-lula" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/26 23:58</span>
+    </div>
+
+    
+    <p class="title-ja">ウクライナがマリ紛争に関与する可能性がある理由</p>
+    <p class="title-en"><a href="https://www.dw.com/en/why-ukraine-may-be-involved-in-mali-s-conflict/a-79743423?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Why Ukraine may be involved in Mali's conflict</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ウクライナはロシアと戦っており、紛争はアフリカのサヘル地域にまで拡大する可能性がある。</p><p>米メディアＣＮＮが９月に発表した調査結果によると、約１５人のウクライナ人ドローン専門家がマリ北部のトゥアレグ族反政府勢力を支援していると報じられている。彼らの共通の敵は、バマコの軍事政権とロシアの同盟国である。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>しかし、その情報はどの程度信頼できるのでしょうか？そして、キエフがアフリカに関与するために支払う代償は何でしょうか?</p><p>キエフ国立大学モヒラアカデミーアフリカ研究プログラムコーディネーターのマルタ・オリニク・ドモチコ氏は、戦略的な動機があると見ている。 「ウクライナの主な関心は、世界中でのロシアの影響力を弱めることだ」と彼女はDWに語った。同氏は、ロシアの軍事的影響力が縮小すれば、そこから生じる経済的機会も減少するだろうと付け加えた。</p><p>南アフリカのクワズール・ナタール大学名誉教授でロシアの歴史家イリーナ・フィラトヴァ氏も、トゥアレグ運動に対するウクライナの支援はもっともらしいと考えている。しかし、彼女はそのような関与を裏付ける独立した証拠はないと言う。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Ukraine is fighting Russia — and the conflict may extend into Africa's Sahel region .</p><p>According to an investigation published by US media outlet CNN in September, around 15 Ukrainian drone specialists are reportedly supporting Tuareg rebels in northern Mali. Their common enemy: the military government in Bamako and its Russian allies.</p><p>But how reliable is the information? And what price could Kyiv pay for engaging in Africa?</p><p>Marta Oliynyk-D'omochko, coordinator of the African Studies Program at the National University of Kyiv-Mohyla Academy, sees a strategic motive. "Ukraine's main interest is to weaken Russia's influence around the world," she told DW. If Russia's military influence were rolled back, she added, the economic opportunities arising from it would also diminish.</p><p>Russian historian Irina Filatova, professor emeritus at the University of KwaZulu-Natal in South Africa, also considers Ukrainian support for the Tuareg movement plausible. However, she says she has no independent evidence to confirm such involvement.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/why-ukraine-may-be-involved-in-mali-s-conflict/a-79743423?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/26 23:48</span>
+    </div>
+
+    
+    <p class="title-ja">2026 年米国中間選挙: ゲリマンダリングの歴史</p>
+    <p class="title-en"><a href="https://www.france24.com/en/us-midterms-2026-a-history-of-gerrymandering" target="_blank" rel="noopener">US Midterms 2026: A history of gerrymandering</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>サンショウウオは米国選挙とどんな関係があるのでしょうか？ゲリマンダリングは何世紀にも遡り、今日でもアメリカの選挙に影響を及ぼし続けています。現代の投票時代では共和党員によってよく使われてきたが、過去10年間では民主党員もこの戦術に頼っている。しかし、ゲリマンダリングとは何ですか?なぜそう呼ばれるのでしょうか? FRANCE 24のタニシュク・サハ氏が解説する。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>What does a salamander have to do with US elections? Dating back centuries, gerrymandering continues to play a role in American elections today. Used more often by Republicans in the modern era of voting, Democrats have also resorted to the tactic in the past decade. But what is gerrymandering, and why is it called that? FRANCE 24's Tanishk Saha explains.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/us-midterms-2026-a-history-of-gerrymandering" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/26 23:34</span>
+    </div>
+
+    
+    <p class="title-ja">ベテラン統治者ブチッチ氏が学生主導の抗議運動で選挙に敗れた後、セルビアで祝賀会</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cw5yn3xlprpmo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Celebrations in Serbia after veteran ruler Vučić loses election to student-led protest movement</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>セルビアの長年の指導者アレクサンダー・ヴエシエ氏は、解散総選挙で学生主導の抗議活動に敗北したことを認めた。</p><p>ベオグラード、ノヴィサド、その他の都市の中心部に群衆が集まり、祝賀会が沸き起こった。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>この学生運動は、汚職と過失が原因とされた鉄道駅事故に対応して2年も経たずに結成されたが、選挙ではセルビア社会のさまざまな立場からの候補者を擁して戦った。</p><p>右翼ポピュリスト指導者ブエシェ氏は「今回の選挙で我々が負けたのは明らかだ」と認めながら語った。セルビア選挙管理委員会は、投票所の９７％が開票され、学生が２２５万票、旧与党が１６７万票を獲得したと発表した。</p><p>月曜朝遅くの速報値によると、学生らは得票率52.7％を獲得し、ヴエシエ氏率いるセルビア進歩党（SNS）は39.2％だった。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Serbia's long-standing leader Aleksandar VuÄiÄ has admitted defeat to a student-led protest movement in snap parliamentary elections.</p><p>Celebrations erupted as crowds descended on the centre of Belgrade, Novi Sad and other cities.</p><p>The student movement was formed less than two years ago in response to a railway station disaster blamed on corruption and negligence, but fought the election with candidates from a cross-section of Serbian society.</p><p>"It is clear we have lost these elections," right-wing populist leader VuÄiÄ said as he conceded. With 97% of polling stations counted, Serbia's election commission said the students had won 2.25 million votes and the former ruling party 1.67 million.</p><p>The students had secured 52.7% of the vote, while VuÄiÄ's Serbian Progressive Party (SNS) was on 39.2%, according to its preliminary figures late on Monday morning.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cw5yn3xlprpmo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/27 00:44</span>
+    </div>
+
+    
+    <p class="title-ja">イスラエル、占領下のヨルダン川西岸で人道に対する罪を犯す：国連</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/26/israel-committing-crimes-against-humanity-in-occupied-west-bank-un?traffic_source=rss" target="_blank" rel="noopener">Israel committing crimes against humanity in occupied West Bank: UN</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イスラエルは占領下のヨルダン川西岸で「絶滅」を含む人道に対する罪を犯したと国連の委託調査団が報告した。</p><p>パレスチナ占領地域に関する国連独立国際調査委員会は月曜日、イスラエル政府とその軍隊はパレスチナ領土における他の戦争犯罪や拷問、強姦、その他の形態の性暴力を含む人道に対する罪にも責任があると述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>この報告書の発表は、イスラエル軍が先週の銃撃を受けてヘブロンで追放や破壊を含む取り締まりを実施した中で行われた。</p><p>国連そのものを代弁するわけではない同委員会は、2023年10月7日のハマスの致命的なイスラエル攻撃を受けて、イスラエルがガザ戦争で「大量虐殺」を犯したと2025年9月の報告書で初めて認定したが、イスラエルはこの認定をきっぱりと拒否している。</p><p>イスラエル総選挙の前日に発表された新しい報告書で、同委員会は、1967年以来イスラエルが占領しているヨルダン川西岸において、持続的な入植者の暴力によって強化されたイスラエルの軍事作戦が民間人に対する「広範かつ組織的な攻撃」を構成していると認定した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Israel has committed crimes against humanity including “extermination” in the occupied West Bank, United Nations-mandated investigators have reported.</p><p>The UN Independent International Commission of Inquiry on the Occupied Palestinian Territory said on Monday that the Israeli government and its forces are also responsible for other war crimes and crimes against humanity in the Palestinian territory, including torture, rape and other forms of sexual violence.</p><p>The release of the report came as Israeli forces carried out a clampdown , including expulsions and demolitions, on Hebron following a gun attack last week.</p><p>The commission, which does not speak for the UN itself, first determined in a September 2025 report that Israel had committed “genocide” in its war on Gaza following Hamas’s deadly October 7, 2023 attack on Israel – a finding Israel flatly rejects.</p><p>In its new report, issued the day before Israel’s general election , the commission found that in the West Bank – which Israel has occupied since 1967 – Israeli military operations , reinforced by sustained settler violence, constitute a “widespread and systematic attack” against civilians.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/26/israel-committing-crimes-against-humanity-in-occupied-west-bank-un?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/27 00:12</span>
+    </div>
+
+    
+    <p class="title-ja">ヨルダン、教会襲撃テロで3人逮捕</p>
+    <p class="title-en"><a href="https://www.france24.com/en/middle-east/20261026-jordan-arrests-three-following-deadly-terror-attack-on-church" target="_blank" rel="noopener">Jordan arrests three following deadly terror attack on church</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ヨルダン当局は月曜日、西部ハムード村で葬儀行列中に教会が襲撃され９人が死亡した事件を受け、テロリスト３人を逮捕した。ヨルダン公安局長によると、3人の襲撃者はイスラム過激派であり、当局との未明の銃撃戦で負傷しており、死刑を支持するこの国の法廷に引き出される予定である。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Jordanian authorities on Monday arrested three terrorists following a deadly attack on a church during a funeral procession that killed nine people in the western village of Hammoud. The three assailants – who are Islamic extremists, according the Jordanian director of public security – were injured in a dawn shootout with authorities and are due to be brought before the courts in the nation that supports capital punishment.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/middle-east/20261026-jordan-arrests-three-following-deadly-terror-attack-on-church" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/26 01:00</span>
+    </div>
+
+    
+    <p class="title-ja">イスラエル人は変わった。彼らはリーダーシップを変えるのでしょうか？</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/25/g-s1-149563/israel-election-war-netanyahu" target="_blank" rel="noopener">Israelis have changed. Will they change their leadership?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>テルアビブ、イスラエル — イスラエル国民は、火曜日に予定されている選挙が自国の歴史の中で最も重要なものであると確信している。</p><p>ホロコースト以来、ユダヤ人にとって最も多くの命を奪った2023年10月7日のハマスの攻撃を阻止できなかったことを理由に、ベンヤミン・ネタニヤフ首相とその極右・超国家主義・宗教政党の連合を投票で排除するのだろうか？</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>それとも、彼らは彼を再選して報復キャンペーンを継続し、中東の再編を目的とした戦争を仕掛けるのだろうか？彼の主な挑戦者であるガディ・アイゼンコット元軍参謀長は、中道右派野党を率い、外交強化と過激主義の抑制を約束している。</p><p>これは長年にわたる戦いと流血を経て、イスラエルにとって初めての投票となる。イスラエル人は自国の将来を非常に懸念しているため、イスラエルでは不在者投票が認められていないため、数万人の駐在員が飛行機で投票に戻ることが予想されている。</p><p>投票のためミズーリ州カンザスシティから飛行機で来たイスラエル弁護士のショーラ・ロマノ・ホリング氏は、「10月7日にはほとんど壊滅するところだった」と語った。 「イスラエルの安全を確保するために、私がネタニヤフ首相に投票するのはこのためだ。」</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>TEL AVIV, Israel — Israelis are convinced that elections scheduled for Tuesday are the most pivotal in their nation's history.</p><p>Will they vote out Prime Minister Benjamin Netanyahu — and his coalition of far-right, ultranationalist and religious political parties — because he failed to prevent the Hamas attacks on Oct. 7, 2023, the deadliest day for Jews since the Holocaust?</p><p>Or will they reelect him to continue his campaign of retaliation, waging wars that aim to reshape the Middle East? His main challenger, former military chief of staff Gadi Eisenkot, leads a center-right opposition promising more diplomacy and less extremism.</p><p>It is Israel's first vote after these years of battle and bloodshed. Israelis are so concerned about their country's future that tens of thousands of expats are expected to fly back to cast ballots, since Israel does not allow absentee voting.</p><p>"We almost could have been destroyed on Oct. 7," said Israeli lawyer Shoula Romano-Horing, who flew in from Kansas City, Mo., to vote. "This is why I'm voting for Netanyahu, to make Israel so secure and so safe."</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/25/g-s1-149563/israel-election-war-netanyahu" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/25 18:27</span>
+    </div>
+
+    
+    <p class="title-ja">ガディ・アイゼンコット、ネタニヤフ首相に対抗してモロッコのルーツを訴えるキャンペーンを展開</p>
+    <p class="title-en"><a href="https://www.dw.com/en/gadi-eisenkot-campaigns-on-moroccan-roots-in-challenge-to-netanyahu/a-79747193?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Gadi Eisenkot campaigns on Moroccan roots in challenge to Netanyahu</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>さまざまなスローガンを掲げた選挙ポスターは、右翼リクード党と極右政党オツマ・ユーディットを宣伝している。しかし、他のポスターよりもよく見られるポスターが 1 つあります。それはリベラルなヤシャル党のポスターです。</p><p>そのスローガン「ロシュ・メムシャラ・ディアルナ」は、ヘブライ語の「首相」とモロッコのアラビア語で「私たち自身の」という言葉を組み合わせたものである。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>そして、スデロートやイスラエルの社会政治的周縁部にある他の都市でのアイゼンコットの選挙運動が彼のモロッコのルーツに焦点を当てているのには十分な理由がある。</p><p>スデロットは、テルアビブの南から約 75 キロメートル（45 マイル）、ガザ国境からわずか 1 キロメートル離れたネゲブ砂漠に位置し、大規模なモロッコ系ユダヤ人コミュニティがある都市です。ここ数十年で、この都市はイスラエルにおけるモロッコ系ユダヤ人文化の象徴となり、音楽、映画、国政においてその表現が見られました。</p><p>このビデオを表示するには、JavaScript を有効にし、HTML5 ビデオをサポートする Web ブラウザへのアップグレードを検討してください。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Campaign posters with various slogans promote the right-wing Likud and the far-right Otzma Yehudit parties. However, one poster is seen more than any others: that of the liberal Yashar party.</p><p>Its slogan, "Rosh Memshala Dialna," combines the terms "prime minister" in Hebrew and the words "of our own" in Moroccan Arabic.</p><p>And there is a good reason why Eisenkot's campaign in Sderot and other cities on Israel's sociopolitical periphery focuses on his Moroccan roots.</p><p>Sderot — located in the Negev desert, about 75 kilometers (45 miles) to Tel Aviv's south and just a kilometer away from the Gaza border — is a city with a large Moroccan Jewish community. In recent decades, the city has become symbolic of Moroccan-Jewish culture in Israel, finding its expression in music, cinema and state politics.</p><p>To view this video please enable JavaScript, and consider upgrading to a web browser that supports HTML5 video</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/gadi-eisenkot-campaigns-on-moroccan-roots-in-challenge-to-netanyahu/a-79747193?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/26 23:31</span>
+    </div>
+
+    
+    <p class="title-ja">カシミール紛争地域で立ち退きの脅威を受け、ロヒンギャが家を解体</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/10/26/rohingya-deported-disputed-kashmir-region?traffic_source=rss" target="_blank" rel="noopener">Rohingya dismantle homes amid eviction threat in disputed Kashmir region</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>インド統治下のジャンムー・カシミール地方で立ち退きの脅威を受け、ロヒンギャが家を解体</p><p>「私たちはどこへ行くのですか？」ロヒンギャ難民は、裁判所命令に従い、インド統治下のカシミールで自宅の解体を余儀なくされていると語った。 10年以上そこで暮らした後、多くの人が今、ミャンマーに送還され迫害に直面することを恐れている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Rohingya dismantle homes amid eviction threat in India-administered Jammu and Kashmir</p><p>‘Where will we go?’ Rohingya refugees say they are being forced to dismantle their homes in Indian-administered Kashmir, following a court order. After living there for more than a decade, many now fear being returned to Myanmar, where they face persecution.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/10/26/rohingya-deported-disputed-kashmir-region?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/26 23:13</span>
+    </div>
+
+    
+    <p class="title-ja">米海兵隊員、日本で女性強盗殺人罪で起訴</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c3vgxjex1z9wo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">US Marine indicted for murder and robbery of woman in Japan</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>日本のメディアが報じたところによると、今月初めに日本で抗議活動を引き起こした事件で、米海兵隊員が女性殺害と強盗の容疑で起訴された。</p><p>米海兵隊普天間飛行場に駐屯していたデビン・ジェイコブ・バラード容疑者（20）が、沖縄県の首都・那覇市のホテルで八木アンナさん（39）を殺害した疑いで逮捕された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>検察は、10月3日に電話コードで八木さんの首を絞め、その後バックパックと財布を盗んだ容疑で彼を起訴したとメディアが起訴状を引用して報じた。</p><p>バラード容疑者は容疑を否認していると報じられたが、朝日新聞と共同通信は捜査関係者の話として、バラード容疑者が関与を示唆する発言をしていると述べた。</p><p>防犯カメラの映像には、容疑者とみられる男が女性と一緒にホテルに入り、所持品を持って一人で出ていく様子が映っていたという。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A US Marine has been indicted on suspicion of murdering and robbing a woman in Japan earlier this month in a case that has triggered protests, Japanese media reports.</p><p>Devin Jacob Ballard, 20, who was stationed at US Marine Corps Air Station Futenma, was arrested on suspicion of killing Anna Yagi, 39, at a hotel in Naha, the capital of Okinawa.</p><p>Prosecutors have now indicted him for allegedly strangling Yagi with a telephone cord and then stealing her backpack and wallet on 3 October, media reports, citing the indictment document.</p><p>It wasreported Ballard had denied the allegations, but Asahi Shimbun and Kyodo News cited investigators saying he has made some statements suggesting involvement.</p><p>Security footage allegedly shows a man believed to be the suspect entering the hotel with the woman and leaving alone with her belongings.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c3vgxjex1z9wo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/26 22:32</span>
+    </div>
+
+    
+    <p class="title-ja">安全保障問題が深刻化する中、ドイツのメルツ氏がアジアへ向かう</p>
+    <p class="title-en"><a href="https://www.dw.com/en/germany-s-merz-heads-to-asia-as-security-issues-loom-large/a-79764065?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Germany's Merz heads to Asia as security issues loom large</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ドイツのフリードリヒ・メルツ首相は月曜日、5日間のアジア歴訪を開始し、予定されていた日本と韓国訪問の前にシンガポールを訪問した。メルツ氏には、ドイツの産業界、テクノロジー企業、防衛企業、エネルギー供給会社の代表者ら30人の上級ビジネスマンが随行している。</p><p>同時に、ドイツのフランク＝ヴァルター・シュタインマイヤー大統領が中国を訪問している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>これらの訪問は公式には関連していないが、世界のサプライチェーンを脅かす地政学的不安定の時期に、どちらもベルリンの経済と安全保障の関係を強化することを目的としているようだ。</p><p>メルツ氏はシンガポールで主要な外交政策演説を行い、ローレンス・ウォン首相と会談する予定だ。その後水曜日には日本を訪れ、高市早苗首相と会談し、日独ビジネスサミットに参加する予定だ。</p><p>メルツ氏の訪問は「東京では大歓迎されるだろう」と東京の早稲田大学で政治・国際関係学の助教授ベン・アシオーネ氏は語った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>German Chancellor Friedrich Merz kicked off a five-day tour of Asia on Monday, traveling to Singapore before his scheduled visits to Japan and South Korea . Merz is accompanied by an entourage of 30 senior businesspeople, including representatives of Germany's industry, tech and defense companies, and energy suppliers.</p><p>At the same time, Germany's President Frank-Walter Steinmeier is visiting China .</p><p>While the trips are not officially related, they both seem aimed at boosting Berlin's economic and security relationships at a time of geopolitical instability, which threatens global supply chains.</p><p>In Singapore, Merz is set to deliver a major foreign policy speech and meet Prime Minister Lawrence Wong. He will then travel to Japan on Wednesday to meet with Prime Minister Sanae Takaichi and take part in the German-Japanese Business Summit.</p><p>Merz's visit "will be very much welcomed in Tokyo," said Ben Ascione, an assistant professor of politics and international relations at Tokyo's Waseda University.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/germany-s-merz-heads-to-asia-as-security-issues-loom-large/a-79764065?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/26 22:25</span>
+    </div>
+
+    
+    <p class="title-ja">オーストラリアの裁判官、ベジマイト禁止に対する囚人の人権申し立てを却下</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/26/g-s1-149923/australian-judge-rejects-prisoners-human-rights-challenge-to-vegemite-ban" target="_blank" rel="noopener">Australian judge rejects prisoner's human rights challenge to Vegemite ban</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ファイル - 2025年11月17日月曜日、オーストラリアのシドニーでベジマイトでトーストを作る様子。リック・ライクロフト/AP キャプションを隠す</p><p>オーストラリア・メルボルン — 月曜日、囚人がベジマイトの摂取を禁止するオーストラリア州の異議申し立てに対し、二極化した酵母ベースのスプレッドを差し控えることは「オーストラリア人として文化を楽しむ」という人権を侵害すると法廷で主張し、敗訴した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>殺人罪で終身刑で服役中のアンドレ・マッケニー被告（55歳）は昨年、ビール醸造の際に生じる塩辛くて粘着性のある黒褐色の副産物をめぐる闘いをビクトリア州最高裁判所に提起した。</p><p>法廷文書によると、ベジマイトが拒否されたことで、人権責任憲章に基づく「オーストラリア人の背景を持つ他の人々とのコミュニティでオーストラリア人としての文化を楽しむ」権利が否定されたと主張していたことが示された。</p><p>クレア・ハリス判事は、憲章に基づくマッケニー・ベジマイトの「文化的権利の制限」を刑務所当局が拒否したことを受け入れた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>FILE - A piece of toast is prepared with Vegemite in Sydney, Australia, Monday, Nov. 17, 2025. Rick Rycroft/AP hide caption</p><p>MELBOURNE, Australia — A prisoner on Monday lost his challenge to an Australian state's ban on inmates eating Vegemite after he argued in court that withholding the polarizing yeast-based spread breached his human right to "enjoy his culture as an Australian."</p><p>Andre McKechnie, 55, who is serving a life sentence for murder, took his battle for the salty, sticky, black-brown byproduct of brewing beer to the Supreme Court of the state of Victoria last year.</p><p>He had argued being refused Vegemite denied him his right under the Charter of Human Rights and Responsibilities Act to "enjoy his culture as an Australian in the community with other persons of Australian background," court documents showed.</p><p>Justice Claire Harris accepted prison authorities' refusal to allow McKechnie Vegemite "limited his cultural rights" under the charter.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/26/g-s1-149923/australian-judge-rejects-prisoners-human-rights-challenge-to-vegemite-ban" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/27 00:51</span>
+    </div>
+
+    
+    <p class="title-ja">「民主主義は常に」：ルラ氏、選挙勝利後もブラジルで独裁政権には戻らないと誓う</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/oct/26/brazil-lula-vow-democracy-always-election-win" target="_blank" rel="noopener">‘Democracy always’: Lula vows no return to dictatorship in Brazil after election win</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>世界中の指導者と政府がルーラの劇的なカムバックを祝福し、ラテンアメリカの他の地域への重要なシグナルとみなしている</p><p>ブラジルのルイス・イナシオ・ルーラ・ダ・シルバ大統領は、極右の敵対者フラビオ・ボルソナロを破って歴史的な4期目の政権を獲得した後、ブラジルに独裁とファシズムは決して戻らないと誓った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「これは神の御業であり、皆さんのおかげです」とルラ氏は、月曜日の早朝、選挙での劇的なカムバックを祝うためにサンパウロ中心部に集まった数万人の支持者に語った。</p><p>その数時間前、ルラ氏はブラジル現代史の中で最も驚くべき政治的反撃を成功させ、10月初旬の第1ラウンド敗北から立ち直り、決選投票でボルソナロ氏を400万票以上の差で破った。</p><p>ルーラ氏は「今日は歴史的な日だ」と宣言し、大喜びする大勢の支持者に向かって「民主主義は常に、独裁主義は二度とない。民主主義は常に、ファシズムは二度とない」と語った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Leaders and governments worldwide congratulate Lula on dramatic comeback seen as an important signal to rest of Latin America</p><p>Luiz Inácio Lula da Silva , the Brazilian president, has vowed that dictatorship and fascism will never return to Brazil after winning a historic fourth term in power by defeating his far-right opponent, Flávio Bolsonaro .</p><p>“This is God’s work – and it’s thanks to all of you,” Lula told tens of thousands of supporters who had gathered in central São Paulo in the early hours of Monday to celebrate his dramatic election comeback.</p><p>A few hours earlier Lula pulled off the most stunning political fightback in modern Brazilian history, bouncing back from a first-round defeat in early October to trounce Bolsonaro by more than 4m votes in the runoff.</p><p>“Today is a historic day,” Lula declared, before telling a sea of elated supporters: “Democracy always, dictatorship never again. Democracy always, fascism never again.”</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/oct/26/brazil-lula-vow-democracy-always-election-win" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/27 00:46</span>
+    </div>
+
+    
+    <p class="title-ja">カトリック司教、トランプ大統領との会談を「悪用された」と謝罪</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cw8rz1d286v3o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Catholic bishops apologise for 'exploited' Trump meeting</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米国のカトリック司教2人は、ドナルド・トランプ大統領と一緒に祈っている画像が公開され、政治的発言をしているのかと多くの人が疑問を抱いたことを受け、ホワイトハウスでドナルド・トランプ大統領に会ったことを後悔していると述べた。</p><p>10月22日の会談の写真とビデオには、大統領執務室の毅然としたデスクでトランプ大統領の周りに立つ司教のグループが映っている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>写真に写った一人のミルウォーキー大司教ジェフリー・グロブ氏は、この会談は非公開であり「政治的な写真撮影の機会」ではないと信じていたと述べた。</p><p>トランプ大統領とローマ法王レオ14世の関係には論争があり、一部の米国司教らは政権の移民政策を批判している。しかし、トランプ氏は通常、カトリック教徒の有権者の支持を享受してきた。</p><p>アイオワ州デモインのウィリアム・ジョエンセン司教はオンラインに掲載した声明の中で、この会合は移民や国際聖職者のビザ、「弱い立場にある貧しい人々の搾取」などの問題を話し合うためにホワイトハウス信仰局の関係者によって手配されたと述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Two Catholic bishops in the US have said they regret meeting President Donald Trump at the White House, after images of them praying with him were released and prompted many to ask if they were making a political statement.</p><p>Photos and video of the 22 October meeting show a group of bishops standing around Trump at the Resolute Desk in the Oval Office.</p><p>Milwaukee Archbishop Jeffrey Grob, one of those pictured, said he had believed the meeting was private and not "a political photo opportunity".</p><p>Trump and Pope Leo XIV have a contentious relationship, and some US bishops have criticised the administration's immigration policies. But Trump has typically enjoyed the support of Catholic voters.</p><p>In a statement posted online, Bishop William Joensen of Des Moines, Iowa, said the meeting was arranged by officials with the White House Faith Office to discuss issues including immigration, visas for international clergy and the "exploitation of vulnerable poor persons".</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cw8rz1d286v3o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/27 00:11</span>
+    </div>
+
+    
+    <p class="title-ja">ブラジルのルラ氏、決選投票で大統領に再選：彼のキャリアを振り返る</p>
+    <p class="title-en"><a href="https://www.france24.com/en/brazil-s-lula-reelected-president-in-runoff-vote-a-look-back-at-his-career" target="_blank" rel="noopener">Brazil's Lula reelected president in runoff vote: A look back at his career</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ブラジルのルイス・イナシオ・ルーラ・ダ・シルバ大統領が日曜（10月25日）、世論調査を裏切る衝撃的な結果で前例のない4期目の当選を果たしたと同国の選挙裁判所が発表した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Brazilian President Luiz Inacio Lula da Silva won an unprecedented fourth term on Sunday (October 25), the country's electoral court said, in a shock result that defied polls.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/brazil-s-lula-reelected-president-in-runoff-vote-a-look-back-at-his-career" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/26 22:02</span>
+    </div>
+
+    
+    <p class="title-ja">ブラジルの第1回選挙で敗れた後、ルラ氏はどのようにしてボルソナロ氏を破ったのか?</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/26/how-did-lula-beat-bolsonaro-after-losing-brazils-first-round-election?traffic_source=rss" target="_blank" rel="noopener">How did Lula beat Bolsonaro after losing Brazil’s first-round election?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ブラジルのルイス・イナシオ・ルーラ・ダ・シルバ大統領は、10月初めに行われた第1回投票で極右のライバルであるフラビオ・ボルソナロ上院議員に200万票以上の差をつけられたにもかかわらず、選挙で驚異的な勝利を収めた。</p><p>80歳の左翼は日曜日に前例のない4期目の当選を確実にし、1985年のブラジルの民主主義復帰以来、初戦で2位となり大統領決選投票で勝利した初の候補者となった。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ルラさんはサンパウロの勝利パレードで「愛していると言わなければならなかった。明日も戦いは続く」と応援するファンに語った。 「誰も次期大統領を好きになる必要はないが、彼はすべての人のために統治しなければならない。」</p><p>ルーラ氏の勝利は、しばしばドナルド・トランプ米大統領の支援を受けてラテンアメリカ全土で地盤を広げてきた右翼政治運動にとって、重大な後退となる。</p><p>では、ルーラはわずか 3 週間でどのように状況を好転させたのでしょうか?また、彼はどのような課題に直面しているのでしょうか?</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Brazilian President Luiz Inacio Lula da Silva has achieved a stunning election victory, defeating far-right rival Senator Flavio Bolsonaro, despite trailing him by more than two million votes in the first round held earlier in October.</p><p>The 80-year-old leftist secured an unprecedented fourth term on Sunday, becoming the first candidate since Brazil’s return to democracy in 1985 to win a presidential run-off after finishing second in the opening round.</p><p>“I just had to tell you that I love you. Tomorrow, the fight continues,” Lula told cheering fans at a victory parade in Sao Paulo. “No one is required to like the president-elect, but he must govern for everyone.”</p><p>Lula’s victory is a significant setback for the right-wing political movement that has gained ground across Latin America, often with the backing of United States President Donald Trump.</p><p>So how did Lula turn things around in just three weeks, and what challenges does he face?</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/26/how-did-lula-beat-bolsonaro-after-losing-brazils-first-round-election?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/27 01:01</span>
+    </div>
+
+    
+    <p class="title-ja">サダム・ハフタル氏はリビアの王位獲得を狙っている</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/opinions/2026/10/26/saddam-haftar-is-eyeing-the-throne-in-libya?traffic_source=rss" target="_blank" rel="noopener">Saddam Haftar is eyeing the throne in Libya</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>リビア東部は、トルキエがトリポリを拠点とするライバル国と締結した海洋覚書を非難することに7年近くを費やした。先週、この法案を受け入れるには議会が1回の議席を必要とした。</p><p>10月20日、ベンガジの下院（HoR）は協定を批准した。欧州連合はギリシャ、イスラエル、エジプトと同様にこの投票を非難した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>しかし、この批准はトルコの勝利というよりも、リビア東部を支配する軍司令官ハリファ・ハフタルの息子サダム・ハフタルが振り付けた一連の劇の最終幕としてのものだった。最終目標はリビア大統領就任だ。</p><p>米国は現在、トリポリとベンガジの間の権力分担協定の仲介を試みている。ドナルド・トランプ米大統領のアラブ・アフリカ問題担当上級顧問マサド・ブーロス氏が支持したこの合意により、サダム氏がリビア大統領に就任する可能性がある。</p><p>しかし、それが実現するには、リビア西部に対する影響力がそのような和解において決定的な発言力を与えているトルコ政府の支援が必要だ。したがって、海洋協定の批准はトルキエの祝福を確保することを目的としている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Eastern Libya spent nearly seven years denouncing the maritime memorandum Turkiye struck with its rivals based in Tripoli. Last week, it needed a single sitting of the legislature to embrace it.</p><p>On October 20, the House of Representatives (HoR) in Benghazi ratified the deal . The European Union condemned the vote, as did Greece, Israel and Egypt.</p><p>Yet the ratification was less a Turkish triumph than the final act of a sequence choreographed by Saddam Haftar, the son of Khalifa Haftar, the military commander who controls eastern Libya. The ultimate goal is the Libyan presidency.</p><p>The United States is currently trying to broker a power-sharing arrangement between Tripoli and Benghazi. Championed by Massad Boulos, US President Donald Trump’s senior adviser for Arab and African affairs, the deal could install Saddam as Libya’s president.</p><p>For that to happen, however, he needs the backing of Ankara, whose sway over western Libya gives it a decisive voice in any such settlement. The ratification of the maritime deal, therefore, is meant to secure Turkiye’s blessing.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/opinions/2026/10/26/saddam-haftar-is-eyeing-the-throne-in-libya?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/26 23:27</span>
+    </div>
+
+    
+    <p class="title-ja">コンゴ民主共和国でエボラ出血熱警戒中、看護師が襲撃で死亡</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/crx2dyd24188o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Nurse killed in attack while responding to Ebola alert in DR Congo</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>コンゴ民主共和国北東部でエボラ出血熱の警報に対応中だった襲撃で、看護師１人が死亡、別の医療従事者が重傷を負った。</p><p>国連支援のラジオ・オカピによると、２人は水源を汚染し、エボラ出血熱を広めたとして地元の若者らから標的にされたという。世界保健機関（WHO）はこの攻撃を非難した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ウイルスの蔓延を防ぐため、隣国のウガンダはコンゴ民主共和国への不要不急の渡航を禁止し、コンゴ民主共和国から帰国する国民は21日間隔離されるとしている。</p><p>5月にこの流行が始まって以来、コンゴ民主共和国では4,800人以上が死亡し、1万人近くが感染している。</p><p>コンゴ民主共和国での襲撃事件を受け、WHOのテドロス事務局長は、医療従事者は「安全と尊厳をもって職務を遂行できなければならない」と述べ、医療従事者は常に保護されるべきだと付け加えた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A nurse has been killed and another health worker seriously injured in an attack as they were responding to an Ebola alert in north-eastern Democratic Republic of Congo.</p><p>The two were targeted by local youths who accused them of contaminating water sources and spreading the Ebola virus, according to the UN-backed Radio Okapi. The World Health Organization (WHO) condemned the attack.</p><p>In an attempt to prevent the virus spreading, neighbouring Uganda has banned all non-essential travel to and from DR Congo and says its citizens returning from there will be quarantined for 21 days.</p><p>More than 4,800 people have died and nearly 10,000 been infected in DR Congo since this outbreak began in May.</p><p>Reacting to the attack in DR Congo, WHO Director-General Tedros Adhanom Ghebreyesus said health workers "must be able to carry out their duties in safety and dignity", adding that healthcare personnel should always be protected.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/crx2dyd24188o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-10-27";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
