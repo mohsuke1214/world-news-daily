@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年10月29日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/29 00:55</span>
+    </div>
+
+    
+    <p class="title-ja">ジョン・マルコビッチとサム・ロックウェルがCIAの新しい政治スリラーでチリへ向かう</p>
+    <p class="title-en"><a href="https://www.france24.com/en/tv-shows/arts24/20261028-john-malkovich-and-sam-rockwell-head-to-chile-in-new-political-cia-thriller" target="_blank" rel="noopener">John Malkovich and Sam Rockwell head to Chile in new political CIA thriller</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>今週、フランスの映画館に 4 つのまったく異なる映画が公開され、arts24 の評論家エマ・ジョーンズはすべてを鑑賞しました。マーティン・マクドナー監督の「ワイルド・ホース・ナイン」では、一流キャストと再会します。ヴェネツィアでヴォルピ杯主演男優賞を受賞したジョン・マルコヴィッチは、サム・ロックウェルと共演し、1973年のチリで瀕死のCIAエージェントを演じる。エマは、この作品を「イン・ブルージュ」以来お気に入りのマクドナー映画であり、必見だと語っています。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Four very different films arrive in French cinemas this week, and arts24 critic Emma Jones has seen them all. Martin McDonagh's "Wild Horse Nine" reunites him with an A-list cast. John Malkovich, who won the Volpi Cup for Best Actor at Venice, plays a dying CIA agent in 1973 Chile, alongside Sam Rockwell. Emma calls it her favourite McDonagh film since "In Bruges" and a must see.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/tv-shows/arts24/20261028-john-malkovich-and-sam-rockwell-head-to-chile-in-new-political-cia-thriller" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/29 00:36</span>
+    </div>
+
+    
+    <p class="title-ja">レアル・マドリードのキリアン・ムバッペと中国の間の論争とは何ですか？</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/sports/2026/10/28/kylian-mbappe-china-meme-mao-zedong-la-liga-real-madrid?traffic_source=rss" target="_blank" rel="noopener">What is the controversy between Real Madrid’s Kylian Mbappe and China?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>レアル・マドリードのキリアン・ムバッペは、中国の故毛沢東に関する発言で中国で物議を醸しており、そのせいで同氏はいくつかの商業契約を失うだけでなく、国営テレビによるラ・リーガ放送の打ち切りにもつながった。</p><p>この反発は、1949年から1976年に亡くなるまで中国を統治した現代中国建国の指導者毛沢東に関する風刺が依然として社会的タブーとなっている、儲かる中国市場におけるアスリートやブランドのリスクを浮き彫りにした。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>かつてサッカー界のセンセーションとして称賛されたムバッペは、この論争が中国の14億人の国民の怒りを引き起こすまで、中国で広く崇拝されていた。</p><p>謝罪をしたにもかかわらず、フランスのスーパースターは水曜日、中国のソーシャルメディアで怒りを鎮めるのに苦労した。</p><p>アルジャジーラはムバッペと中国の間の諍いを次のように解説している。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Real Madrid’s Kylian Mbappe is at the centre of a controversy in China for his comments on late Chinese leader Mao Zedong, which have not only cost him several commercial deals but have also led to state television scrapping La Liga broadcasts.</p><p>The backlash highlighted the risks for athletes and brands ⁠in the lucrative Chinese market, where satire about Mao, modern China’s founding leader who ruled the country from 1949 until his death in 1976, remains a social taboo.</p><p>Once hailed as a footballing sensation, Mbappe was widely adored in China until the controversy caused outrage among the country’s 1.4 billion people.</p><p>Despite issuing an apology, the French superstar struggled to dissipate anger on Chinese social media on Wednesday.</p><p>Al Jazeera breaks down the row between Mbappe and China:</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/sports/2026/10/28/kylian-mbappe-china-meme-mao-zedong-la-liga-real-madrid?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/28 19:24</span>
+    </div>
+
+    
+    <p class="title-ja">EUの「メイド・イン・ヨーロッパ」推進に世界の自動車サプライヤーが動揺</p>
+    <p class="title-en"><a href="https://www.dw.com/en/eu-s-made-in-europe-push-unnerves-global-auto-suppliers/a-79732579?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">EU's 'Made in Europe' push unnerves global auto suppliers</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>欧州の自動車産業を中国の不公平な貿易慣行から救うことが目的だ。 3 月に提案された欧州連合の産業促進法 (IAA) は、欧州の自動車工場をアップグレードし、欧州で生産された車両にのみ補助金を支給することを目指しています。</p><p>しかし、EUの「メイド・イン・ヨーロッパ」計画は、トルコ、モロッコ、日本、韓国など、欧州のサプライチェーンに深く組み込まれている他の自動車生産同盟国に深い懸念を引き起こしている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ドイツとフランスは、IAAが自国の自動車生産に及ぼす影響の可能性をめぐって数カ月間行き詰まりを経て、今月初め、英国やノルウェーなど非EU加盟国のサプライヤーに「欧州原産」の資格を与えるという重要な妥協案に達した。</p><p>このビデオを表示するには、JavaScript を有効にし、HTML5 ビデオをサポートする Web ブラウザへのアップグレードを検討してください。</p><p>しかし、1990年代半ば以来EU市場へのシームレスなアクセスを享受してきたトルコなど、自動車分野の他の主要企業は除外されることになる。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>It is meant to save Europe's auto industry from China's unfair trade practices. The European Union's Industrial Accelerator Act (IAA) , proposed in March, seeks to upgrade European car factories and only subsidize vehicles produced in Europe.</p><p>Yet, the EU's "Made in Europe" plan is causing deep concern among other allied carmaking nations — such as Turkey , Morocco , Japan and South Korea — all of them deeply embedded in European supply chains.</p><p>After months of deadlock over the IAA's potential impact on their own vehicle production, Germany and France earlier this month reached a key compromise that would allow suppliers from non-EU members like the United Kingdom and Norway to qualify for "European origin" status.</p><p>To view this video please enable JavaScript, and consider upgrading to a web browser that supports HTML5 video</p><p>Other key players in the automotive sector, however, will be excluded — including Turkey, which has enjoyed seamless access to the EU market since the mid-1990s.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/eu-s-made-in-europe-push-unnerves-global-auto-suppliers/a-79732579?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/28 17:47</span>
+    </div>
+
+    
+    <p class="title-ja">中間選挙を前にトランプ大統領とプーチン大統領の関係が批判にさらされる</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/28/nx-s1-6009262/trumps-relationship-with-putin-comes-under-fire-ahead-of-the-midterms" target="_blank" rel="noopener">Trump's relationship with Putin comes under fire ahead of the midterms</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>トランプ大統領とロシアのウラジーミル・プーチン大統領との関係は、大統領が中間選挙を前にロシア政府と合意を結ぶ中、再び精査されている。</p><p>NPR は、取材やインタビューに対して金銭を提供したり受け取ったりしません。そのような申し出や要求を行う者は、NPR の従業員ではなく、NPR を代表するものでもありません。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>President Trump's relationship with Russia's Vladimir Putin is under scrutiny again as the president makes deals with Moscow ahead of the midterms.</p><p>NPR does not offer or accept money for coverage or interviews. Anyone who makes such an offer or request is not an NPR employee and does not represent NPR.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/28/nx-s1-6009262/trumps-relationship-with-putin-comes-under-fire-ahead-of-the-midterms" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/29 01:04</span>
+    </div>
+
+    
+    <p class="title-ja">アラブ政党は「目覚めた」：不確実なイスラエルの選挙がキングメーカーにサプライズをもたらす可能性がある</p>
+    <p class="title-en"><a href="https://www.france24.com/en/middle-east/20261028-arab-parties-have-woken-up-israel-uncertain-election-may-deliver-surprise-kingmakers" target="_blank" rel="noopener">Arab parties ‘have woken up’: Israel's uncertain election may deliver surprise kingmakers</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>水曜日のイスラエル選挙には不確実性が漂い、ベンヤミン・ネタニヤフ首相率いる右翼宗教ブロックも、同首相のライバルである中道派ガディ・アイゼンコット氏の政党も国会で過半数を獲得する見込みはないようだ。しかし、驚くべきことがあった。アラブ政党の異常な強さを見せれば、彼らが予想外のキングメーカーになる可能性があるのだ。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Uncertainty hung over Israel’s election Wednesday as neither Prime Minister Benjamin Netanyahu’s right-wing, religious bloc nor that of his centrist rival, Gadi Eisenkot, appeared to be heading for a majority in the Knesset. But there was a surprise: an unusually strong showing by Arab parties could make them unexpected kingmakers.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/middle-east/20261028-arab-parties-have-woken-up-israel-uncertain-election-may-deliver-surprise-kingmakers" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/29 01:03</span>
+    </div>
+
+    
+    <p class="title-ja">イスラエルの新政府はアラブの近隣諸国にとって何を意味するのでしょうか?同様のことがさらに多くなることが予想されますが、いくつかの小さなプラスが予測されます。</p>
+    <p class="title-en"><a href="https://www.dw.com/en/what-would-a-new-israeli-government-mean-for-arab-neighbors-more-of-the-same-is-expected-with-some-small-positives-predicted/a-79788174?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">What would a new Israeli government mean for Arab neighbors? More of the same is expected, with some small positives predicted.</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>明確な勝者が見つからなかった選挙の後、イスラエルの政治家が連立政権の樹立を目指し始めているが、周辺アラブ諸国の政治家の反応は沈黙しているか、まったくない。</p><p>これは、いずれにせよ当面の間、イスラエルの新政府が現職のベンヤミン・ネタニヤフ首相の下で「通常通りの事業」を続けるのか、それともネタニヤフの反対派が率いる新政府がより穏健な国内路線を取ると予想されるのかが依然として不透明だからかもしれない。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>最終的な結果が何であれ、シリア、レバノン、ヨルダン、エジプトなどの近隣諸国、そしてさらに遠くの湾岸諸国とのイスラエルの対外関係に大きな変化が生じる可能性は低いというのがコンセンサスだ。また、この地域の多くのアラブ人が強く感じているパレスチナ人に対する政策が大きく異なる可能性も低い。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>As Israeli politicians begin to try to build a coalition government, after an election that saw no clear winner, response from politicians in surrounding Arab countries has been muted or non-existent.</p><p>This may be because, for the time being anyway, it remains unclear as to whether the new Israeli government will continue with "business as usual" under incumbent Prime Minister Benjamin Netanyahu or whether a new government headed by Netanyahu's opponents will take what is expected to be a more moderate domestic course.</p><p>Whatever the eventual outcome, the consensus is that there is unlikely to be a huge change in Israel's foreign relations with neighboring countries like Syria, Lebanon, Jordan and Egypt, and, further afield, the Gulf states. Nor is it likely to produce very different policies toward Palestinians, which many Arab populations in the region feel strongly about.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/what-would-a-new-israeli-government-mean-for-arab-neighbors-more-of-the-same-is-expected-with-some-small-positives-predicted/a-79788174?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/28 23:51</span>
+    </div>
+
+    
+    <p class="title-ja">GCC諸国はイランとの地域安全保障協定を求めているのか？</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/28/are-gcc-countries-looking-for-a-regional-security-pact-with-iran?traffic_source=rss" target="_blank" rel="noopener">Are GCC countries looking for a regional security pact with Iran?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米国によるテヘラン攻撃の再燃や、イエメンとサウジアラビアでイランが支援する反政府勢力フーシ派間の敵対激化が懸念される中、湾岸諸国は中東全域の緊張緩和を目指してイランとの外交を強化している。</p><p>8月にメッカ共同防衛協定に署名したパキスタン、サウジアラビア、トルキエの3カ国とカタールの外交官は月曜日、全面戦争の再開を阻止するためにイラン高官と会談した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>イランと連携したフーシ派戦闘員がサウジの空港、港湾、石油施設を攻撃した数日後、テヘランでの会合にはサウジ国防大臣のハリド・ビン・サルマン・アル・サウド王子も出席し、一か八かの賭けを強調した。</p><p>一方、月曜日に英国のケンブリッジ大学を外交訪問したオマーンのバドル・アルブサイディ外相は、湾岸諸国とイランの間で「不可侵協定」を含む地域安全保障の枠組みを構築し、その枠組みの下では米国がもはや安全保障の主要提供者ではなくなることを求めた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Gulf countries have stepped up diplomacy with Iran in a bid to de-escalate tensions across the Middle East, amid fears of renewed US strikes on Tehran and intensifying hostilities between Iran-backed Houthi rebels in Yemen and Saudi Arabia.</p><p>The three nations that signed the Mecca Joint Defence Agreement in August – Pakistan, Saudi Arabia and Turkiye – and diplomats from Qatar met with high-ranking Iranian officials on Monday in an effort to prevent the resumption of all-out war.</p><p>Underscoring the high stakes, the meeting in Tehran was attended by Saudi Minister of Defence Prince Khalid bin Salman Al Saud, just days after Iran-aligned Houthi fighters struck Saudi airports , ports and oil facilities.</p><p>Meanwhile, during a diplomatic visit to the United Kingdom’s University of Cambridge on Monday, Omani Foreign Minister Badr Albusaidi called for a regional security framework, including a “non-aggression pact”, between the Gulf countries and Iran under which the United States would no longer be the primary provider of security.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/28/are-gcc-countries-looking-for-a-regional-security-pact-with-iran?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/28 23:30</span>
+    </div>
+
+    
+    <p class="title-ja">イスラエルはどうすれば選挙の行き詰まりを打開できるだろうか？ 4つのシナリオをご紹介します</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cm62y46d97wwo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">How could Israel break election deadlock? Here are four scenarios</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イスラエルは政治的に行き詰まっているようだ。</p><p>火曜日の選挙後、開票率85％が終了した時点で、現職のベンヤミン・ネタニヤフ首相の連立政権も、彼の主要な挑戦者であるガディ・アイゼンコット氏の連合も過半数を獲得する見込みはない。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>政権を樹立するには、有力政党のいずれかが選挙公約を破らなければならない可能性が高く、最も可能性の高い結果は再選挙になる可能性が高いことを意味する。</p><p>ネタニヤフ首相はアイゼンコット氏に挙国一致政府への参加を説得できるだろうか。</p><p>そうするにはアイゼンコット氏は主要なプラットフォームを放棄する必要があるだろう。同氏は自らをネタニヤフ首相に代わる唯一の選択肢と位置づけ、同氏を権力の座から追放することを目標に選挙戦を展開してきた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Israel looks to be in political deadlock.</p><p>With 85% of votes counted after Tuesday's election, neither the incumbent Prime Minister Benjamin Netanyahu's coalition, nor the bloc of his key challenger Gadi Eisenkot look set to have a majority.</p><p>In order to form a government, it looks likely one of the leading parties would have to break their campaign promises - meaning the most probable outcome may well be new elections.</p><p>Could Netanyahu persuade Eisenkot to join him in a national unity government?</p><p>Eisenkot would have to abandon his key platform to do so. He's framed himself as the only alternative to Netanyahu, and built his campaign on ousting him from power.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cm62y46d97wwo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/28 23:40</span>
+    </div>
+
+    
+    <p class="title-ja">ボクサーのセラーノ、1月9日にプエルトリコでお別れの際にグローブを手放す</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/sports/2026/10/28/boxer-serrano-to-hang-up-gloves-in-puerto-rico-farewell-on-january-9?traffic_source=rss" target="_blank" rel="noopener">Boxer Serrano to hang up gloves in Puerto Rico farewell on January 9</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>プエルトリコの7階級世界チャンピオン、アマンダ・セラーノは、プロモーターが「最後の歩み」と名付けた試合で、オーストラリアのスカイ・ファルゾンを相手に母国で統一フェザー級世界タイトルを防衛した後に引退する。</p><p>モスト・ヴァリュアブル・プロモーションは、50勝4敗1分、32ノックアウトの戦績を誇るセラーノが、1月9日にサンフアンのコリセオ・デ・プエルトリコでWBOとWBAの統一世界フェザー級タイトルを防衛すると発表した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>プエルトリコ唯一の誰もが認めるボクシングチャンピオンは、アメリカ人のクリスティ・マーティンと並ぶ女子ノックアウト記録の歴代記録にも挑戦している。</p><p>「ボクシングは私の人生そのものであり、それが私と私の家族を連れて行くことになる旅路は想像もできませんでした」とセラーノは声明で述べた。</p><p>「女子ボクシングが小さな劇場のショーで知名度を求めて戦っていた初期の頃から、ニューヨークのマディソン・スクエア・ガーデンでヘッドライナーを務め、大規模なショーで世界中の何百万人ものファンにリーチし、次世代の女性格闘家への扉を開く手助けをするまで、私は常に信じていましたし、私たちが達成してきたすべてを誇りに思っています。」</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Puerto Rico’s seven-division world ‌champion Amanda Serrano will retire after defending her unified featherweight world titles ⁠against Australia’s Skye ⁠Falzon on home soil, in a fight her promoter dubbed “The Last Walk”.</p><p>Most Valuable Promotions said Serrano, who holds a 50–4–1 record with 32 ⁠knockouts, will defend her unified WBO and WBA featherweight world titles on January 9 at Coliseo de Puerto Rico in San Juan.</p><p>Puerto Rico’s only undisputed boxing ⁠champion is also gunning for the all-time women’s knockout record, which the 38-year-old jointly shares with American Christy Martin.</p><p>“Boxing has been my life and I never could have imagined the journey it would take me and my family on,” Serrano said in a ‌statement.</p><p>“From the early days when women’s boxing was fighting for recognition in small theatre shows, to headlining Madison Square Garden in New York, reaching millions of fans around the world on the biggest shows, and helping open doors for the next generation of female fighters … I always believed and I’m proud of everything we’ve accomplished.”</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/sports/2026/10/28/boxer-serrano-to-hang-up-gloves-in-puerto-rico-farewell-on-january-9?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/28 23:38</span>
+    </div>
+
+    
+    <p class="title-ja">シャドマン・イスラムの99得点でバングラデシュが第1テストで対西インド諸島を213-3とリード</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/sports/2026/10/28/shadman-islams-99-leads-bangladesh-to-213-3-in-first-west-indies-in-test?traffic_source=rss" target="_blank" rel="noopener">Shadman Islam’s 99 leads Bangladesh to 213-3 vs West Indies in first Test</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>西インド諸島との最初のクリケットテストの初日、開幕投手のシャドマン・イスラムが無敗の99を叩き出し、バングラデシュを213勝3敗に導いた。</p><p>左利きの彼は、バングラデシュのミルプールで行われた2連戦の開始時に、74オーバーでプレーを終えたとき、3回目のテスト世紀を目前に控えていた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>シャドマンは219球の滞在で10本のフォアを打ち、リットン・ダスは10本のノーアウトを記録した。</p><p>バングラデシュのバッティングコーチ、モハマド・サラハッディン氏は水曜日、「我々にとってさえ緊張した。一日の終わりには、チーム全体が緊張していた。誰もが彼に100本到達を望んでいたからだ」と語った。</p><p>「彼はテストマッチで約30試合（32試合）プレーしているが、寿命は200年しかない。その数はもっと多くあるべきだったと思う。」</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Opener Shadman Islam hit an unbeaten 99 to steer Bangladesh to 213-3 on the opening day of the first cricket Test against the West Indies.</p><p>The left-hander was on the verge of his third Test century when bad light ended play after 74 overs at the start of the two-match series in Mirpur, Bangladesh.</p><p>Shadman hit 10 fours in his 219-ball stay, with Litton Das on 10 not out.</p><p>“It was nerve-racking even for us — at the end of the day, the whole team was nervous because everyone wanted him to get to his hundred,” Bangladesh batting coach Mohammad Salahuddin said on Wednesday.</p><p>“He has played around 30 (32) Test matches but has only two centuries, and I think that number should have been higher.”</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/sports/2026/10/28/shadman-islams-99-leads-bangladesh-to-213-3-in-first-west-indies-in-test?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/28 18:37</span>
+    </div>
+
+    
+    <p class="title-ja">アフリカの「前例のない」エボラ出血熱の流行が英国に及ぶ可能性があると保健当局者トップが語る</p>
+    <p class="title-en"><a href="https://www.theguardian.com/global-development/2026/oct/28/africa-ebola-outbreak-could-reach-uk-says-top-health-official" target="_blank" rel="noopener">Africa’s ‘unprecedented’ Ebola outbreak could reach UK, says top health official</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>アフリカCDCのジーン・カセヤ氏は、備えと可能な治療法を強化するためにより多くの資金が確保されない限り、新型コロナウイルスと同様に病気が蔓延すると警告している</p><p>アフリカの保健当局トップの一人によると、エボラ出血熱の流行が「前例のない」広がりを見せているということは、英国やその他の国にも感染が及ぶ可能性があるということだ。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>現在の感染者数は1万人、死者数は約5,000人に達しており、アフリカ疾病管理予防センター（CDC）の所長であるジーン・カセヤ博士は、今回の感染拡大を、最初に中国で発生し、その後世界各国に広がり、何百万人もの命を奪い、医療制度と経済を破壊した新型コロナウイルスのパンデミックと比較した。</p><p>「適切な措置を講じなければ安全ではないことをすべての国に知ってもらいたい」と同氏は述べた。</p><p>「アフリカ地域だけでなく、すべての大陸の各国が今、備えのレベルを高め、治療の可能性を高めなければなりません。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Jean Kaseya, of the Africa CDC, warns of the illness spreading like Covid unless more funding is secured to increase preparedness and possible treatment</p><p>The “unprecedented” spread of the Ebola outbreak means it could reach the UK and other countries, according to one of Africa’s top health officials.</p><p>As the current outbreak reached 10,000 cases, with almost 5,000 deaths , Dr Jean Kaseya, director general of the Africa Centres for Disease Control and Prevention (CDC), compared the outbreak to the Covid pandemic, which first took hold in China before spreading to countries across the world, claiming millions of lives, and ravaging health systems and economies.</p><p>“We want all countries to know that they are not safe if they don’t take appropriate measures,” he said.</p><p>“Each country, not only in the African region, but all continents, must now increase the preparedness level and the possibility for treatment.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/global-development/2026/oct/28/africa-ebola-outbreak-could-reach-uk-says-top-health-official" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/27 13:42</span>
+    </div>
+
+    
+    <p class="title-ja">米国とのAI覇権争いが犠牲となり、中国市場は何兆ドルもの損失を被る</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/oct/27/chinese-markets-lose-trillions-ai-race-beijing" target="_blank" rel="noopener">Chinese markets lose trillions as race for AI supremacy with US takes its toll</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>利益の不足と西側諸国の脅威により、北京のAIブームの持続可能性に対する懸念が高まっている</p><p>中国政府が人工知能分野の覇権をかけて米国と争う中、人工知能の将来に対する不安が高まる中、ここ数カ月で中国の株式市場から数兆ドルが消え去った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>上海証券取引所のテクノロジー企業やイノベーション企業を追跡するSTAR 50指数は6月以来40％下落した。主要企業の他の指数も同期間に約２０％下落した。</p><p>ブルームバーグによると、この急落により、5月以来中国株式市場から2兆4000億ドルが消え去ったという。</p><p>ゴールドマン・サックスによると、中国と香港の株式市場価値の40％以上をAI株が占めており、価値の下落は国内市場全体に衝撃を与えることになる。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Lack of profits and the threat posed by western countries are raising concern about the sustainability of Beijing’s AI boom</p><p>Trillions of dollars have been wiped from China’s stock markets in recent months amid increasing anxiety about the future of artificial intelligence, as Beijing races against the United States for dominance in the sector.</p><p>The STAR 50 Index, which tracks technology and innovation companies on the Shanghai stock exchange, has plunged 40% since June. Other indexes of major companies dropped by about 20% over the same time period.</p><p>The precipitous drop has wiped out $2.4tn from the Chinese stock market since May, according to Bloomberg.</p><p>AI stocks account for over 40% of the stock market value in China and Hong Kong, according to Goldman Sachs, meaning that any dent in value will send shockwaves across the whole domestic market.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/oct/27/chinese-markets-lose-trillions-ai-race-beijing" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/29 00:53</span>
+    </div>
+
+    
+    <p class="title-ja">2026 年中間選挙 - ピープルパワー: 黒人投票を引き出す</p>
+    <p class="title-en"><a href="https://www.france24.com/en/video/20261028-2026-midterms-people-power-bringing-out-the-black-vote" target="_blank" rel="noopener">2026 Midterms - People Power: Bringing Out the Black Vote</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米国の中間選挙が2026年11月3日に予定されている中、スコッティ・スマートは黒人有権者を投票所に集めるためにジョージア州アトランタを駆け巡っている。広範囲にわたる有権者の棄権に直面しているこの活動家は、市民の参加を変革の力に変えようと決意している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>With the U.S. midterm elections set for November 3, 2026, Scotty Smart is crisscrossing Atlanta, Georgia, to get Black voters to the polls. Facing widespread voter abstention, the activist is determined to turn civic engagement into a force for change.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261028-2026-midterms-people-power-bringing-out-the-black-vote" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/29 00:10</span>
+    </div>
+
+    
+    <p class="title-ja">フラビオ・ボルソナロ氏、ブラジルから米国へ逃亡後マイアミに上陸</p>
+    <p class="title-en"><a href="https://www.dw.com/en/flavio-bolsonaro-lands-in-miami-after-fleeing-brazil-for-us/a-79788659?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Flavio Bolsonaro lands in Miami after fleeing Brazil for US</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ブラジルの右翼大統領候補フラビオ・ボルソナロとその家族は水曜朝、米国フロリダ州マイアミに到着した。</p><p>同氏のブラジル離脱計画は、日曜日の大統領選挙での敗北を認めず、その結果に異議を唱えると約束した直後の火曜日遅くに世間に知れ渡った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ボルソナロ氏は不正行為を否認しているマネーロンダリング捜査に関連したブラジル最高裁判所のパスポート返納命令に従うことを拒否し、米国国務省は後にボルソナロ氏と家族のビザを発給すると発表した。</p><p>水曜日の朝、ボルソナロ氏と妻、2人の娘がガルフストリームG400型機から降りてマイアミ・オパ・ロッカ空港に向かう姿が見られた。</p><p>彼らのアメリカ大陸横断の旅は地域の注目を集めました。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Brazilian right-wing presidential candidate Flavio Bolsonaro and his family landed in Miami, Florida in the US on Wednesday morning.</p><p>His plan to leave Brazil became public knowledge late on Tuesday , soon after he had refused to concede defeat in Sunday's presidential elections and pledged to challenge the results.</p><p>Bolsonaro refused to comply with a Brazilian Supreme Court order to surrender his passports, tied to a money-laundering investigation in which he denies wrongdoing, and the US State Department later said it would grant him and his family visas.</p><p>Bolsonaro, his wife and two daughters were seen disembarking a Gulfstream G400 plane and heading into the Miami-Opa Locka airport on Wednesday morning.</p><p>Their journey across the Americas had captured regional attention.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/flavio-bolsonaro-lands-in-miami-after-fleeing-brazil-for-us/a-79788659?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/29 00:02</span>
+    </div>
+
+    
+    <p class="title-ja">ボルソナロ氏、公の場から姿を消し、フロリダに姿を現す</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/10/28/aje-onl-nf_bolsonaro-in-florida-after-vanishing-from-public-281026?traffic_source=rss" target="_blank" rel="noopener">Bolsonaro turns up in Florida after vanishing from public view</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ボルソナロ氏、公の場から姿を消し、フロリダに姿を現す</p><p>ブラジル大統領選で敗れたフラビオ・ボルソナロ氏は、トランプ政権から米国ビザを発給された家族とともに国外逃亡後、フロリダに上陸した。ブラジル最高裁判所は、マネーロンダリング捜査のさなか、彼の所在が不明になる前に同氏にパスポートを返納するよう命じていた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Bolsonaro turns up in Florida after vanishing from public view</p><p>Flavio Bolsonaro, Brazil’s defeated presidential candidate, landed in Florida after fleeing the country with his family, who were granted US visas by the Trump administration. Brazil’s Supreme Court had ordered him to surrender his passports amid a money-laundering probe, before his whereabouts became unknown.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/10/28/aje-onl-nf_bolsonaro-in-florida-after-vanishing-from-public-281026?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/28 19:00</span>
+    </div>
+
+    
+    <p class="title-ja">死亡が懸念されていた米国人女性がメキシコで生存していると報告された。しかし警察は今、それは真実ではないと主張している</p>
+    <p class="title-en"><a href="https://www.theguardian.com/us-news/2026/oct/28/shayna-feinman-missing-arizona-woman-mexico" target="_blank" rel="noopener">A US woman feared dead was reported alive in Mexico. But cops now say that isn’t true</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>メキシコ警察はティファナでシェイナ・ファインマンを発見したと発表しており、アリゾナンの家族が行方不明の可能性が高まっている</p><p>アリゾナ州当局は、メキシコ当局が最近、2024年に失踪して殺害されたと恐れられていた女性が生きているのを発見したと公に主張したが、それは大きな間違いだったと主張しており、彼女の妹はこの出来事を「混乱」で「悲痛な」出来事と呼んでいる。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>問題の事件は、2024年3月にアリゾナ州ヤバパイ郡の田舎で行方不明になったと報告されたシェイナ・ファインマンさん（当時38歳）に焦点を当てている。</p><p>当局は、アリゾナ州の報道機関KSAZが報じたように、彼女が最後に目撃されたとき、彼女は知人の家に歩いていたと考えているが、彼女は到着することも、犬の元に戻ることもなかった。同局によると、その後の捜索により、ファインマンさんの車が恋人のキャベット・リチャーズさんと滞在していた場所の近くに乗り捨てられているのが発見されたという。</p><p>伝えられるところによると、彼女の財布と身分証明書は車内にあり、最終的に彼女の携帯電話は近くの土地で回収された。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Mexican police had said they found Shayna Feinman in Tijuana, raising the hopes of missing Arizonan’s family</p><p>Arizona authorities say their Mexican counterparts were resoundingly mistaken when they publicly claimed recently that they found alive a woman who was feared slain after disappearing in 2024 – a turn of events that her sister has called “turmoil” and “heartbreaking”.</p><p>The case in question centers on Shayna Feinman, who was reported missing in rural Yavapai county, Arizona , in March 2024 at age 38.</p><p>Authorities believe she was walking to an acquaintance’s home when she was last seen – but she never arrived or returned to her dog, as the Arizona news outlet KSAZ reported . An ensuing search turned up Feinman’s car abandoned near where she had been staying with her boyfriend, Cavett Richards, according to the station.</p><p>Her wallet and identification reportedly were inside the vehicle, and her cellphone was ultimately recovered on nearby land.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/us-news/2026/oct/28/shayna-feinman-missing-arizona-woman-mexico" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/28 23:16</span>
+    </div>
+
+    
+    <p class="title-ja">エジプト、著名編集者のリナ・アタラーに罰金、独立報道機関マダ・マスルを閉鎖</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/oct/28/egypt-lina-attalah-mada-masr-press-freedom-clampdown" target="_blank" rel="noopener">Egypt fines prominent editor Lina Attalah and shuts independent news outlet Mada Masr</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>カイロ裁判所が無許可ウェブサイト管理の罪でアタラ氏に有罪判決を下したことを受けて、報道の自由に対する取り締まりが激化するという警告が発せられた</p><p>エジプトの著名なジャーナリストで報道機関「マダ・マスル」の編集長であるリナ・アタラ氏が、エジプト当局による拘留から釈放され、国内の独立系メディアに対する弾圧が激化する中、裁判所からウェブサイトの閉鎖を命じられた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>アタラさんは、カイロの裁判所が無許可ウェブサイト管理の罪で有罪判決を下した後、短期間拘留され、エジプトにおける報道の自由に対する新たな国際的な懸念を引き起こした。</p><p>マダ・マスル氏によると、アタラ氏は報道機関が300万エジプトポンド（5万3500ドル、4万100ポンド）の罰金を支払った後に釈放され、世界の人権団体から支持の表明があったという。</p><p>「リナ・アタラさんは、我々が罰金を支払った後、釈放された」と彼女の弁護士ハッサン・アル・アズハリ氏は語った。 「その過程で、彼女が2024年に欠席裁判で懲役1年と罰金2万エジプトポンドを言い渡されていたことが判明した」と同氏はAFPに語った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Warnings of escalating clampdown on press freedom come after Cairo court convicts Attalah of managing an unlicensed website</p><p>Lina Attalah, a prominent Egyptian journalist and the editor-in-chief of the news outlet Mada Masr, has been released from detention by Egypt’s authorities and had her website ordered to be shut down by a court amid an intensifying crackdown on independent media in the country.</p><p>Attalah was taken briefly into custody after a Cairo court convicted her of managing an unlicensed website, prompting fresh international concerns over press freedom in Egypt.</p><p>According to Mada Masr, Attalah was released after the news outlet had paid a fine of 3m Egyptian pounds ($53,500; £40,100), prompting statements of support from global human rights groups.</p><p>“Lina Attalah was released after we paid the said fine,” said her lawyer Hassan al-Azhari. “In the process, we discovered that she had been sentenced in absentia in 2024 to a year in prison, as well as a fine of 20,000 Egyptian pounds,” he told AFP.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/oct/28/egypt-lina-attalah-mada-masr-press-freedom-clampdown" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/28 19:18</span>
+    </div>
+
+    
+    <p class="title-ja">タンザニア、10年以上ぶりの天然ガス発見を祝う</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c5m2dry2xwwvo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Tanzania celebrates first natural gas discovery in more than 10 years</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>タンザニアは、同国南部のムナジ湾地域で天然ガスの重要な発見を発表した。このような発見はここ10年で初めてである。</p><p>ジュマ・ホメラ・エネルギー大臣は、国営タンザニア石油開発公社（TPDC）とフランスの石油会社マウレル＆プロムが共同所有するカサ-1X ST2油井での記念式典に出席した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>同氏は、推定2,230億立方フィート（63億立方メートル）の発見は、東アフリカの国における小規模石油・ガス部門の発展における「大きなマイルストーン」であると述べた。</p><p>新しい油井は来月初めに生産を開始する予定で、国内の供給量を増やすことを目的としている。</p><p>タンザニアには 57 兆 5,400 億立方フィートの天然ガス埋蔵量があります。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Tanzania has announced a significant discovery of natural gas in the Mnazi Bay area in the south of the country - the first such find in a decade.</p><p>Energy Minister Juma Homera attended a ceremony at the Kasa-1X ST2 well, which is jointly owned by state-owned Tanzania Petroleum Development Corporation (TPDC) and French oil firm Maurel & Prom, to mark the occasion.</p><p>He said the estimated 223 billion cubic feet (6.3 billion cubic metres) discovery was a "major milestone" in the development of the small oil and gas sector in the East African nation.</p><p>The new well is expected to start production early next month and is intended to boost domestic supplies.</p><p>Tanzania has existing natural gas reserves of 57.54 trillion cubic feet.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c5m2dry2xwwvo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-10-29";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
