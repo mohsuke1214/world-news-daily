@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年10月30日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/30 01:19</span>
+    </div>
+
+    
+    <p class="title-ja">局地的な停戦が3日目を迎える中、援助ミッションがウクライナのオレシキー入りを予定</p>
+    <p class="title-en"><a href="https://www.france24.com/en/europe/20261029-aid-mission-set-to-enter-ukraine-s-oleshky-as-localised-ceasefire-holds-for-third-day" target="_blank" rel="noopener">Aid mission set to enter Ukraine's Oleshky as localised ceasefire holds for third day</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ウクライナ当局者は木曜、メラニア・トランプ米大統領夫人の仲介によるキエフとモスクワの間の局地的停戦が３日目に続き、人道支援団がウクライナの町オレシキに入港する予定だと発表した。多くの人が飢えているとの報告を受け、ロシア占領下の都市では約2,000人の住民が必需品の供給を絶たれている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A humanitarian aid mission is set to enter the Ukrainian town of Oleshky, a Ukrainian official said on Thuirsday, as a localised truce between Kyiv and Moscow, brokered by US first lady Melania Trump, held for a third day. Some 2,000 residents in the Russian occupied city have been cut off from essential supplies amid reports that many are starving.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/europe/20261029-aid-mission-set-to-enter-ukraine-s-oleshky-as-localised-ceasefire-holds-for-third-day" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/30 00:18</span>
+    </div>
+
+    
+    <p class="title-ja">スペインの走り幅跳び選手、ジュリエタ・ガジェゴ選手が列車衝突事故の犠牲者に</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/sports/2026/10/29/spanish-long-jumper-julieta-gallego-among-victims-of-deadly-train-collision?traffic_source=rss" target="_blank" rel="noopener">Spanish long jumper Julieta Gallego among victims of deadly train collision</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>スペイン王立陸上競技連盟は、スペインのトレド県で少なくとも68人が死亡した列車衝突事故の犠牲者の一人である24歳の走り幅跳び選手フリエタ・ガレゴ選手の死を受け、哀悼の意を表した。</p><p>「スペイン陸上競技連盟（RFEA）は、ウルダ（トレド）で発生した列車事故でADスプリントの選手であるフリエッタ・ガジェゴ氏が亡くなったことへの悲しみに、スペインの陸上競技界の家族も加わっている」と、木曜日のXでの声明で述べ、彼女の家族、友人、クラブのチームメートへの支援を表明した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ガレゴはマドリードを拠点とする AD Sprint に出場し、スペインのクラブ選手権に常連でした。彼女の走り幅跳びの自己ベストは、2023年にアンテケラで記録された5.90メートル（19.4フィート）でした。</p><p>RFEAのラウル・シャパド会長はスペイン紙ABCに対し、「陸上競技界の中心を襲う打撃があった。今日、陸上競技界は、不当に絶たれた彼女の前途の人生であるジュリエッタの死を悼んでいる」と語った。</p><p>水曜日、マドリッドとアンダルシア南部を結ぶ路線で2台の高速列車が衝突し、この1年足らずで2度目となる死亡事故が起きた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The Royal Spanish Athletics Federation expressed its condolences following the death of 24-year-old long jumper Julieta Gallego, who was among the victims of the train collision in Spain’s Toledo province that killed at least 68 people.</p><p>“The Spanish athletics family joins in the grief over the passing of Julieta Gallego, athlete of AD Sprint, in the train accident that occurred in Urda (Toledo),” the federation (RFEA) said in a statement on Thursday on X, offering its support to her family, friends and club teammates.</p><p>Gallego competed for Madrid-based AD Sprint and was a regular participant in Spain’s club championships. Her long jump personal best was 5.90 metres (19.4 feet), set in Antequera in 2023.</p><p>“There are blows that strike at the very heart of the athletics family. Today, the sport mourns the passing of Julieta, a life ahead of her that has been unjustly extinguished,” RFEA president Raul Chapado told Spanish newspaper ABC.</p><p>Two high-speed trains collided on Wednesday in the second deadly accident in less than a year on the line connecting Madrid to southern Andalusia.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/sports/2026/10/29/spanish-long-jumper-julieta-gallego-among-victims-of-deadly-train-collision?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/30 00:14</span>
+    </div>
+
+    
+    <p class="title-ja">EU長官、モントリオール首脳会議でカナダの新たなパートナーシップのビジョンを表明</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cq8ezj7jylrzo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">EU chief lays out vision for new Canada partnership at Montreal summit</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>欧州委員会のウルズラ・フォン・デア・ライエン委員長は、関係者らがモントリオールに集まり緊密な関係について話し合う中、カナダのEUへの「準加盟」ステータスがどのようなものになるかについて自身のビジョンを示した。</p><p>同首相は、2日間にわたるカナダ・EU首脳会議での木曜日の発言で、これは「われわれがこれまでに行ってきたどのパートナーシップよりも加盟に近いパートナーシップ」であると述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>同氏は、これは「一緒に新たなフロンティアを切り開く用意がある欧州外の最も近いパートナーにのみ」開かれるタイプの関係であると付け加えた。</p><p>これには、ガバナンスと政策に関する緊密な連携、研究とイノベーションにおける提携が含まれます。</p><p>何十年もの間、カナダとEUの首脳会談は大した騒ぎもなく開催されてきたが、カナダの都市で行われる今年の会議には当てはまらない。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>European Commission President Ursula von der Leyen has laid out her vision for what an "associate membership" status for Canada to the EU would look like as officials gather in Montreal to discuss closer ties.</p><p>It is "a partnership that comes close to membership than anything we have done before," she said on Thursday's remarks at the two-day Canada-EU summit.</p><p>She added it is a type of relationship that would be open "only to our closest partners outside of Europe who are ready to open a new frontier together."</p><p>It includes close alignment on governance and policies, and partnering in research and innovation.</p><p>For decades, Canada-EU summits took place without much fanfare - but that's not the case for this year's meeting in the Canadian city.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cq8ezj7jylrzo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/29 23:20</span>
+    </div>
+
+    
+    <p class="title-ja">ギニアビサウで足止めされる人身売買被害者</p>
+    <p class="title-en"><a href="https://www.dw.com/en/human-trafficking-victims-stranded-in-guinea-bissau/a-79785558?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Human trafficking victims stranded in Guinea-Bissau</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>この記事には、レイプ、搾取、性的暴行に関する記述が含まれています。読者の判断をお勧めします。</p><p>サディオ・コニンバはより良い未来を望んでいた。 26歳の彼女は夫を亡くし、子供と二人きりでマリの首都バマコに取り残された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>知人から西アフリカの国ギニアビサウを経由してヨーロッパに到達できる可能性について聞いたとき、彼女はその旅を決意した。彼女は6歳の娘を当面親戚に預けた。</p><p>コニンバさんは、仕事と、最終的にはヨーロッパに進学する可能性を約束して首都ビサウに招待されたと語った。</p><p>彼女はバマコからビサウまでの旅費が10万〜12万5,000CFAフラン（約150ユーロ〜190ユーロ、または170ドル〜210ドル）かかると言われ、彼女が支払いました。彼女はギニアビサウに一時的に滞在するつもりだったが、マリに戻りたいと思ったが、お金は返金されなかった。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>This article contains descriptions of rape, exploitation and sexual assault. Reader discretion is advised.</p><p>Sadio Konimba had hoped for a better future. The 26-year-old had lost her husband and was left alone with her child in Bamako, the capital of Mali .</p><p>When an acquaintance told her about the possibility of reaching Europe via the West African nation of Guinea-Bissau , she decided to make the journey. She left her 6-year-old daughter behind with relatives for the time being.</p><p>Konimba says she was invited to the country's capital, Bissau, with the promise of work and better chances of eventually continuing on to Europe .</p><p>She was told the journey from Bamako to Bissau would cost between 100,000–125,000 CFA francs (roughly €150-€190, or $170-$210), which she paid. She had only intended to stay temporarily in Guinea-Bissau, but when she wanted to return to Mali, her money was not refunded.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/human-trafficking-victims-stranded-in-guinea-bissau/a-79785558?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/30 00:47</span>
+    </div>
+
+    
+    <p class="title-ja">ネタニヤフ首相率いるブロックがイスラエル選挙でリードするも過半数には届かず、部分的な結果が判明</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cmdx3knq1xexo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Netanyahu's bloc leading Israel election but short of majority, partial results show</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イスラエル総選挙の一部結果によると、ベテラン首相ベンヤミン・ネタニヤフ氏がライバルの元軍司令官ガディ・アイゼンコット氏をわずかに上回っているものの、依然として議会の過半数には届いていない。</p><p>開票率９９％を迎え、ネタニヤフ首相率いるリクード党とその同盟極右・超正統派ユダヤ人同盟は、定数１２０の国会で５３議席を獲得する勢いだった。アイゼンコット氏のヤシャル党と同氏のブロック内の他のユダヤ系野党３党は定数４８となった。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>両首脳は連立与党の結成を目指すと述べた。</p><p>前例のない19議席を獲得する勢いであるアラブ主導の政党がキングメーカーとして浮上する可能性がある。しかし、ユダヤ人の政党のうち、1つを除くすべての政党は、彼らとは協力しないと約束している。</p><p>当局は木曜日、投票所に行けなかった軍人や外交官、入院患者などの集団からの不在者投票48万枚もの集計を開始した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Partial results from Israel's general election show veteran Prime Minister Benjamin Netanyahu marginally ahead of his rival, former military chief Gadi Eisenkot, but still short of a majority in parliament.</p><p>With 99% of ballots counted, Netanyahu's Likud party and its far-right and ultra-Orthodox Jewish allies were on track to win 53 seats in the 120-seat Knesset. Eisenkot's Yashar party and three other Jewish opposition parties in his bloc were set for 48.</p><p>Both leaders have said they will try to form a governing coalition.</p><p>Arab-led parties, which are on course to win an unprecedented 19 seats, could emerge as kingmakers. But all but one of the Jewish parties have pledged not to work with them.</p><p>On Thursday, officials began counting as many as 480,000 absentee ballots from groups including soldiers, diplomats and hospital patients, who could not get to polling stations.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cmdx3knq1xexo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/30 00:35</span>
+    </div>
+
+    
+    <p class="title-ja">イスラエルの反カタール運動が選挙に影響</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/29/israels-anti-qatar-campaign-bleeds-into-elections?traffic_source=rss" target="_blank" rel="noopener">Israel’s anti-Qatar campaign bleeds into elections</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イスラエルが大激戦の選挙の最終結果を待つ中、一部の政治家は投票干渉を主張してカタールを争いに引きずり込もうとしているが、ドーハ側はこの非難を拒否している。</p><p>イスラエルのベンヤミン・ネタニヤフ首相率いるリクード党とその関係メディアは、カタールが投票を促すためにイスラエルのアラブ政党に資金を送っていると証拠もなく非難した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>カタール外務省報道官は木曜日、選挙結果に影響を与えることを目的とした活動への干渉や資金提供の疑惑をきっぱりと否定した。</p><p>マジェド・アルアンサリ氏はXへの投稿で、「我々は、今週の選挙後にカタールをイスラエルの政治紛争に引きずり込むことを目的とした新たな偽情報キャンペーンを開始した特定のイスラエルの政治家とそのメディア関係者による告発を拒否する」と述べた。</p><p>報道官は「ばかげていると同時に危険だ」と述べた根拠のないイスラエルの主張は、カタールに対する長期にわたるキャンペーンの最新のものである。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>As Israel awaits the final results of its highly contested elections , some political figures have sought to drag Qatar into the fray with claims of voting interference – an accusation Doha rejects.</p><p>Israeli Prime Minister Benjamin Netanyahu’s Likud party and media outlets associated with it have, without evidence, accused Qatar of sending money to Arab parties in Israel for get-out-the-vote drives.</p><p>Qatar’s Ministry of Foreign Affairs spokesman on Thursday categorically denied the allegations of interference or funding of any activities aimed at influencing the election results.</p><p>“We reject the accusations made by certain Israeli politicians and their contacts in the media, who have launched yet another disinformation campaign aiming to drag Qatar into Israeli political disputes following this week’s elections,” Majed al-Ansari said in a post on X.</p><p>The unsubstantiated Israeli claims, which the spokesperson described as “ridiculous and dangerous in equal measure”, are the latest in a long-running campaign against Qatar.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/29/israels-anti-qatar-campaign-bleeds-into-elections?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/29 23:52</span>
+    </div>
+
+    
+    <p class="title-ja">アガサ・クリスティの古巣が独自の謎を提示するバグダッドからのご挨拶</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/29/g-s1-150319/agatha-christie-baghdad-home" target="_blank" rel="noopener">Greetings from Baghdad, where Agatha Christie's old home presents its own mystery</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イラク文化省によると、ここはバグダッドのチグリス川のほとりにあり、イギリスのミステリー小説家アガサ・クリスティがかつて住んでいた住居である。</p><p>ふさわしく、この廃屋には、なぜ過去 1 世紀にわたって朽ち果てたまま放置されてきたのかという独自の謎があります。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>クリスティはイラクへ数十回旅行しており、その中には1930年に考古学者の夫マックス・マローワンと出会った旅行も含まれる。『バグダッドに来た』と『メソポタミアの殺人』は、イラクを舞台にした彼女の2つの小説である。</p><p>この家に関しては、イラクの文化省が管理する遺産だ。イラク政府は、この家を修復してくれる人なら誰でも喜んで利用できるようにするつもりだと述べている。南京錠がかかっていて文字通り落ちてしまいます。</p><p>今月私たちが訪れたとき、ドアの穴に200ドルの電気代の請求書が詰め込まれていたが、これは明らかに最近の歴史における長年の未払い請求書を反映しているようだ。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>This, according to Iraq's culture ministry, is the one-time home of English mystery novelist Agatha Christie, on the banks of the Tigris River in Baghdad.</p><p>Fittingly, the abandoned house has its own mystery: why it's been left to decay over the last century.</p><p>Christie made dozens of trips to Iraq, including the one where she met her archaeologist husband, Max Mallowan, in 1930. They Came to Baghdad and Murder in Mesopotamia were two of her novels set in Iraq.</p><p>As for the house, it's a heritage property controlled by Iraq's culture ministry. The Iraqi government says it's willing to make the house available to anyone who will restore it. It is padlocked and literally falling down.</p><p>When we visited this month, there was a $200 electricity bill stuffed into a hole in the door — apparently reflecting years of unpaid bills in its more recent history.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/29/g-s1-150319/agatha-christie-baghdad-home" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/29 19:04</span>
+    </div>
+
+    
+    <p class="title-ja">イランの懸念が高まる中、オマーン沖で船舶火災が発生と報告</p>
+    <p class="title-en"><a href="https://www.dw.com/en/ship-reported-on-fire-off-oman-as-iran-escalation-fears-mount/a-79792733?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Ship reported on fire off Oman as Iran escalation fears mount</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>英国海事庁UKMTOは木曜日、ホルムズ海峡で船の火災が報告されたと発表した。</p><p>英国海軍が運営する同庁は火災の原因や死傷者の詳細については明らかにしていない。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>しかしイランは最近、適切な許可なく水路を使用しているとみなした船舶への攻撃を強化している。</p><p>イラン革命防衛隊（IRGC）は木曜日の声明で、過去24時間以内にタンカー3隻が「無許可」航路を使用中に機雷に衝突した後に爆発・火災を起こしたと発表したが、UKMTOに報告された事件がそのうちの1隻かどうかは不明である。</p><p>これは、米国とイランの戦争が新たに激化するのではないかとの懸念が高まる中、イランが水路の東で別の米国の無人機を撃墜したと報告したことを受けてのことだ。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A ship on fire has been reported in the Strait of Hormuz , British maritime agency UKMTO said on Thursday.</p><p>The agency, which is run by the British Royal Navy, did not give details on the cause of the blaze or any casualties.</p><p>Iran has, however, recently stepped up its attacks on ships that it sees as using the waterway without proper authorization.</p><p>Iran's Revolutionary Guards Corps (IRGC) said in a statement on Thursday that three tankers had exploded and caught fire in the past 24 hours after hitting sea mines while using an "unauthorized" route, but it is not known if the case reported to the UKMTO is one of them.</p><p>This comes as Iran has reported shooting down another US drone east of the waterway as fears grow of a new escalation in the US-Iran war .</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/ship-reported-on-fire-off-oman-as-iran-escalation-fears-mount/a-79792733?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/30 00:58</span>
+    </div>
+
+    
+    <p class="title-ja">日米両国がミサイル共同生産のための日本施設設立に合意</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/29/g-s1-150666/us-and-japan-agree-to-establish-a-japanese-facility-for-joint-missile-production" target="_blank" rel="noopener">US and Japan agree to establish a Japanese facility for joint missile production</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>左から、フィリピンのジルベルト・テオドロ国防長官、オーストラリアのリチャード・マールズ国防大臣、日本の小泉進次郎防衛大臣、ピート・ヘグセス米国防長官が、2026年10月28日水曜日、フィリピンのセブ島で開催される第20回東南アジア諸国連合（ASEAN）国防大臣会合（ADMM）と第13回ADMMプラス会合に合わせて四か国会合を開催する前に写真撮影をした後、出発の準備をしている。 AP 経由のロレックス デラ ペナ/プール EPA キャプションを隠す</p><p>フィリピン・セブ――米国と日本は、先進的な中距離空対空ミサイルを共同生産するための日本施設を設立することで合意したと日本の国防長官が述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>これは、アジアにおける中国の自己主張の高まりに対して繰り返し警戒を表明してきた同盟国による最新の動きである。</p><p>日本の小泉進次郎防衛大臣は水曜日の夜、フィリピン中部のセブ州で記者会見し、東南アジアの国防長官とアジアと西側の主要国防長官による年次会議の傍らでピート・ヘグセス米国防長官と会談し、この発表を行った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>From left, Philippines Defense Secretary Gilberto Teodoro, Australia Defense Minister Richard Marles, Japan Defense Minister Shinjiro Koizumi and U.S.Defense Secretary Pete Hegseth prepare to leave after posing for pictures before holding a Quadrilateral Meeting on the sidelines of the 20th Association of Southeast Asian Nations (ASEAN) Defence Ministers' Meeting (ADMM) and 13th ADMM-Plus Meetings in Cebu, Philippines, Wednesday, Oct. 28, 2026. Rolex Dela Pena/Pool EPA via AP hide caption</p><p>CEBU, Philippines — The United States and Japan have agreed to establish a Japanese facility for the joint production of advanced medium-range air-to-air missiles, the Japanese defense chief said.</p><p>It is the latest move by the allies, which have repeatedly expressed alarm over China's growing assertiveness in Asia.</p><p>Japanese Defense Minister Shinjiro Koizumi made the announcement in a news conference Wednesday night in the central Philippine province of Cebu, where he met U.S. Defense Secretary Pete Hegseth on the sidelines of an annual meeting of Southeast Asian defense chiefs and their major Asian and Western counterparts.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/29/g-s1-150666/us-and-japan-agree-to-establish-a-japanese-facility-for-joint-missile-production" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/30 00:23</span>
+    </div>
+
+    
+    <p class="title-ja">Nvidia CEO、中国スパイの標的に</p>
+    <p class="title-en"><a href="https://www.theguardian.com/technology/2026/oct/29/nvidia-ceo-targeted-chinese-spy" target="_blank" rel="noopener">Nvidia CEO reportedly targeted by Chinese spy</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ジェンセン・フアン氏は、中国に情報を提供した疑いのあるテクノロジー企業幹部と密接な関係にあったと報じられている</p><p>ニューヨーク・タイムズ紙の新たな報道によると、米諜報機関は、エヌビディアのジェンスン・ファン最高経営責任者（CEO）が取引をしていた中国スパイの標的になっていると考えているという。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>アリス・ファンまたはファン・レーは、Nvidia CEO とは何の関係もありませんが、シンガポールに本拠を置く Megaspeed というデータセンター会社の幹部です。彼女は以前、Nvidiaチップを中国に密輸した疑いがあり、アメリカ当局が彼女を監視し監視するよう促していた。ニューヨーク・タイムズ紙が匿名の情報筋の話として報じたところによると、これら当局者らは彼女が中国の情報機関として活動し、商業情報を中国政府に渡していたと判断したという。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Jensen Huang reported to have had close relationship with tech company executive suspected of passing intel to China</p><p>US intelligence agencies believe the Nvidia chief executive, Jensen Huang, has been targeted by a Chinese spy who had done business with him, according to a new report by the New York Times.</p><p>Alice Huang or Huang Le, of no relation to the Nvidia CEO, is an executive at a Singapore-based datacenter company called Megaspeed. She had previously been suspected of smuggling Nvidia chips to China , prompting American officials to surveil and monitor her. Those officials have determined that she was acting as a Chinese intelligence asset, passing commercial information to Beijing, the New York Times reported, citing unnamed sources.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/technology/2026/oct/29/nvidia-ceo-targeted-chinese-spy" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/30 00:15</span>
+    </div>
+
+    
+    <p class="title-ja">インドの食品安全: 世界で最も人口の多い国にとっての課題</p>
+    <p class="title-en"><a href="https://www.france24.com/en/tv-shows/focus/20261029-food-safety-in-india-a-challenge-for-the-world-s-most-populous-country" target="_blank" rel="noopener">Food safety in India: A challenge for the world's most populous country</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>インドの食品産業は毎日 10 億人以上の人々に食事を提供しています。しかし、消費者に届くものの安全性を確保することは、ますます困難な課題となっています。この国では食品の異物混入事件が増加しており、場合によっては致命的な結果を招くこともある。異物混入や劣悪な衛生状態に対する懸念が高まる中、規制当局がこのような無秩序に広がる部門を効果的に監督できるかどうかについて疑問が生じている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>India's food industry feeds more than a billion people every day. But ensuring that what reaches consumers is safe has become an increasingly difficult challenge. The country has witnessed a rise in cases of food adulteration, with sometimes fatal consequences. As concerns over adulteration and poor hygiene grow, questions are being raised about whether regulators can effectively oversee such a sprawling sector.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/tv-shows/focus/20261029-food-safety-in-india-a-challenge-for-the-world-s-most-populous-country" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/29 22:30</span>
+    </div>
+
+    
+    <p class="title-ja">インドネシア人はヘイズの生活への影響を共有している</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/10/29/indonesians-share-impact-of-haze-on-their-livelihoods?traffic_source=rss" target="_blank" rel="noopener">Indonesians share impact of haze on their livelihoods</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>4 つの職業、1 つの危機: インドネシア人は生計への霧の影響を共有</p><p>インドネシアでは数か月にわたる森林火災と有毒な霧により、日常生活が著しく混乱しています。この危機は広範な健康問題を引き起こし、学校は閉鎖を余儀なくされ、全国の企業は苦境に立たされている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Four professions, one crisis: Indonesians share impact of haze on their livelihoods</p><p>Months of forest fires and toxic haze in Indonesia has severely disrupted daily life. The crisis has caused widespread health problems, forcing schools to close and leaving businesses across the country struggling.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/10/29/indonesians-share-impact-of-haze-on-their-livelihoods?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/30 01:26</span>
+    </div>
+
+    
+    <p class="title-ja">アラスカ州知事、民主党陣営と同名候補者との関係疑惑の捜査を命令</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c8vgx0zrpk6no?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Alaska governor orders probe into Democratic campaign's alleged links to same-name candidate</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>アラスカ州の共和党知事は、ダン・サリバン氏２名を同州の上院議員選挙に立候補させる「陰謀」疑惑についての調査を命じた。</p><p>マイク・ダンリービー知事は、民主党候補メアリー・ペルトラ氏のチームが上院選挙でスポイラー候補者を集めようとした人々と協力したとするニューヨーク・タイムズ（NYT）の記事に反応したと述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>Xに関する知事の投稿では、「この計画がアラスカ州の法律に違反していないか」調査すると述べた。どの法律を念頭に置いているかについては言及しなかった。</p><p>再選を目指して立候補している現職共和党上院議員ダン・サリバン氏とその同盟者らは、民主党が有権者を混乱させようとしていると非難している。ペルトラ氏のチームは不正行為を否定している。</p><p>彼らは、辺鄙な漁村に住む退職教師である二代目ダン・サリバン氏の起立を奨励しなかったと主張している。同氏はペルトラ陣営との関連を否定した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The Republican governor of Alaska has ordered an investigation into an alleged "scheme" which led to two Dan Sullivans standing in the state's US Senate race.</p><p>Governor Mike Dunleavy said he was responding to a New York Times (NYT) story , external which said the team of Democratic candidate Mary Peltola worked with people who tried to recruit spoiler candidates in the Senate race.</p><p>The governor's post on X said he would investigate "whether this scheme violated Alaska's laws". He did not say which laws he had in mind.</p><p>Dan Sullivan, the incumbent Republican senator running for re-election, and allies have accused the Democrats of trying to confuse voters. Peltola's team deny any wrongdoing.</p><p>They say they did not encourage the second Dan Sullivan, a retired teacher who lives in a remote fishing village, to stand. He has denied any links with the Peltola campaign.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c8vgx0zrpk6no?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/30 01:19</span>
+    </div>
+
+    
+    <p class="title-ja">フラビオ・ボルソナロの大いなる逃亡：これは「ボルソナリズム」の終わりの始まりか?</p>
+    <p class="title-en"><a href="https://www.france24.com/en/americas/20261029-flavio-bolsonaro-s-great-escape-is-this-the-beginning-of-the-end-for-bolsonarism" target="_blank" rel="noopener">Flavio Bolsonaro’s great escape: Is this the beginning of the end for ‘Bolsonarism’?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ブラジルの選挙結果は、敗北した大統領候補フラビオ・ボルソナロ氏が荷物をまとめて家族とともに米国へ逃亡するまで、ほとんど発表されていなかった。この動きはすでに傷ついた一族のブランドに深刻な打撃を与えたかもしれないが、それは「ボルソナリズム」に終焉をもたらすのだろうか？</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The Brazilian election results had barely been announced before the defeated presidential candidate, Flavio Bolsonaro, packed his bags and fled with his family to the United States. The move may have dealt a serious blow to the already tarnished family brand, but does it spell the end for “Bolsonarism”?</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/americas/20261029-flavio-bolsonaro-s-great-escape-is-this-the-beginning-of-the-end-for-bolsonarism" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/29 23:25</span>
+    </div>
+
+    
+    <p class="title-ja">米国の中間選挙が近づく中、農家は何を植えるか、どのように投票するかを決める</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/economy/2026/10/29/as-us-midterms-approach-farmers-decide-what-to-plant-and-how-to-vote?traffic_source=rss" target="_blank" rel="noopener">As US midterms approach, farmers decide what to plant and how to vote</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>アーカンソー州北東部の農家であるポール・マッキニーは、息子の子供時代を思い出すとき、広大な野原で遊んでいた小さな男の子のことを思い出します。</p><p>子どもにとって、水に浸かった田んぼは「40エーカーの巨大なプールのようなもの」だと彼は言う。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>米はマッキーニー農場で 4 世代にわたって主食でした。しかし来年、家族は作付量を大幅に減らす予定だ。代わりに、彼らは生産コストが安い作物である大豆に焦点を当てるだろう。</p><p>アメリカ全土の農家と同様に、マッキーニー氏も今年、イランとの戦争開始以来、燃料と肥料の価格が高騰していることを受けて、厳しい決断を下している。</p><p>今週、農家も投票で厳しい選択に直面している。有権者が経済全体の物価高に反応して政党を変えたり、自宅に留まったりするため、中間選挙では民主党が勝利すると予想されている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>When Paul McKinney, a farmer in northeast Arkansas, thinks of his son’s childhood, he remembers a small boy playing in vast fields.</p><p>To a child, a flooded rice field is “like a giant, 40-acre swimming pool”, he said.</p><p>Rice has been a staple on McKinney’s farm for four generations. Next year, however, the family plans to plant much less. Instead, they will focus on soya, a crop that is cheaper to produce.</p><p>Like farmers across the United States , McKinney is making tough decisions this year in response to higher fuel and fertiliser costs, which have skyrocketed since the start of the war on Iran.</p><p>This week, farmers also face tough choices at the polls. Democrats are expected to make gains in the midterm elections, as voters react to high prices economy-wide by switching parties or staying home.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/economy/2026/10/29/as-us-midterms-approach-farmers-decide-what-to-plant-and-how-to-vote?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/29 06:46</span>
+    </div>
+
+    
+    <p class="title-ja">敗北したフラビオ・ボルソナロがマイアミに到着し、ブラジルの政治ドラマが展開</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/28/nx-s1-6020518/brazilian-political-drama-unfolds-as-defeated-flavio-bolsonaro-arrives-in-miami" target="_blank" rel="noopener">Brazilian political drama unfolds as defeated Flavio Bolsonaro arrives in Miami</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>敗北した大統領候補フラビオ・ボルソナロ氏とその家族が、ブラジル当局からパスポートの返納を命じられ、米国に到着した。彼はブラジルで複数の捜査を受けている。</p><p>NPR プログラミングのトランスクリプトの精度と可用性は異なる場合があります。トランスクリプト テキストは、エラーを修正したり、音声の更新に一致させるために改訂される場合もあります。音声は、元の放送または出版後に編集される場合があります。 NPR の番組の信頼できる記録は音声記録です。 NPR のプラットフォームと製品には、サードパーティによって作成されたプログラムも含まれていることに注意してください。 NPR はそのコンテンツのトランスクリプトを保証できず、一部のトランスクリプトは自動ツールまたはその他のツールを使用して作成される場合があります。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>NPR は、取材やインタビューに対して金銭を提供したり受け取ったりしません。そのような申し出や要求を行う者は、NPR の従業員ではなく、NPR を代表するものでもありません。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Defeated presidential candidate Flavio Bolsonaro and his family have arrived in the U.S. after Brazilian authorities ordered him to surrender his passport. He is facing multiple investigations in Brazil.</p><p>Accuracy and availability of transcripts for NPR programming may vary. Transcript text may also be revised to correct errors or match updates to audio. Audio may be edited after its original broadcast or publication. The authoritative record of NPR’s programming is the audio record. Please note that NPR platforms and products also include some programming produced by third parties; NPR cannot guarantee transcripts for that content and some transcripts may be produced using automated or other tools.</p><p>NPR does not offer or accept money for coverage or interviews. Anyone who makes such an offer or request is not an NPR employee and does not represent NPR.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/28/nx-s1-6020518/brazilian-political-drama-unfolds-as-defeated-flavio-bolsonaro-arrives-in-miami" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/29 20:25</span>
+    </div>
+
+    
+    <p class="title-ja">米国、コンゴ民主共和国紛争でルワンダ国防省を制裁</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cm87zw51qw0jo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">US sanctions Rwanda's defence ministry over DR Congo conflict</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米国はコンゴ民主共和国東部の反政府勢力M23を支援した疑いでルワンダ国防省に制裁を発動し、キガリに対し軍隊の撤退と反政府勢力への支援停止を求める圧力を強めている。</p><p>スコット・ベッセント米財務長官は「ルワンダはＭ２３への支援を停止し、コンゴ民主共和国東部から軍隊を撤退させなければならない」と述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>この制裁は、ルワンダとコンゴ民主共和国が紛争終結を目的とした米国の仲介による和平協定に署名してから数カ月後に行われた。</p><p>コンゴ民主共和国東部では、M23がゴマ市とブカブ市を制圧した2025年初頭以来、戦闘が続いている。ルワンダはM23への支援を否定している。</p><p>米財務省は、ルワンダ国防省がコンゴ民主共和国東部でM23とともに戦うよう数千人の軍隊を指示し、武器、装備、兵站、訓練を提供したと発表した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The United States has imposed sanctions on Rwanda's defence ministry over its alleged support for the M23 rebel group in eastern Democratic Republic of Congo, increasing pressure on Kigali to withdraw its troops and halt support for the rebels.</p><p>"Rwanda must halt its support for M23 and withdraw its troops from eastern DRC," US Treasury Secretary Scott Bessent said.</p><p>The sanctions come months after Rwanda and DR Congo signed a US-brokered peace agreement aimed at ending the conflict.</p><p>Fighting has continued in eastern DR Congo since early 2025, when M23 seized the cities of Goma and Bukavu. Rwanda denies backing M23.</p><p>The US Treasury says Rwanda's defence ministry directed thousands of troops to fight alongside M23 in eastern DR Congo, providing weapons, equipment, logistics and training.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cm87zw51qw0jo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/29 01:30</span>
+    </div>
+
+    
+    <p class="title-ja">1 年後、家族は選挙暴力の後、正義を求める</p>
+    <p class="title-en"><a href="https://www.dw.com/en/one-year-on-families-seek-justice-after-election-violence/a-79779105?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">One year on, families seek justice after election violence</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>警告：この記事には暴力的な記述が含まれています。</p><p>タンザニア第二の都市ムワンザに住むある家族にとって、正義は謝罪という単純な行為から始まる可能性がある。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>安全上の理由から名前が変更されたラハさんは、彼女が育てた甥が、2025年10月のタンザニア総選挙後に勃発した抗議活動中に殺害されたと語った。</p><p>「政府は起きたことに対して許しを求めるべきだった。お悔やみを伝えるだけでも」とラハさんは語った。</p><p>1年が経った今も、家族は愛する人の死についての答えを待っている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Warning: This article contains descriptions of violence.</p><p>For one family member in Mwanza, Tanzania 's second-largest city, justice could begin with a simple act: an apology.</p><p>Raha, whose name has been changed for safety reasons, said her nephew, who she raised, was killed during protests that erupted following Tanzania's October 2025 general election .</p><p>"The government should have asked for forgiveness for what happened. Even just offering condolences," Raha said.</p><p>A year later, the family is still waiting for answers about the death of their loved one.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/one-year-on-families-seek-justice-after-election-violence/a-79779105?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-10-30";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
