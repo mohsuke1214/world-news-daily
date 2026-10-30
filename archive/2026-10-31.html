@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年10月31日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/31 01:01</span>
+    </div>
+
+    
+    <p class="title-ja">ウクライナ戦争：ロシア占領下のオレシキで避難が進行中</p>
+    <p class="title-en"><a href="https://www.france24.com/en/video/20261030-war-in-ukraine-evacuations-under-way-in-russian-occupied-oleshky" target="_blank" rel="noopener">War in Ukraine: Evacuations under way in Russian-occupied Oleshky</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>10月30日金曜日、ウクライナ南部のロシア占領下の町オレシキの飢えと疲労困憊の住民が避難させられていた。これは、4年8カ月の戦争において初めてのこの種の作戦である、敵対側が参加する共同救援作戦の一環である。 FRANCE 24のウクライナ特派員エマニュエル・チェーズが報じた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Starving and exhausted residents of Oleshky, a Russian-occupied town in southern Ukraine, were being evacuated on Friday, October 30, as part of a joint relief operation involving the opposing sides – the first operation of its kind in four years and eight months of war. FRANCE 24’s Ukraine correspondent Emmanuelle Chaze reports.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261030-war-in-ukraine-evacuations-under-way-in-russian-occupied-oleshky" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/31 00:37</span>
+    </div>
+
+    
+    <p class="title-ja">スイス外相、異例の北朝鮮訪問で政治的つながりを語る</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/30/swiss-foreign-minister-talks-political-ties-on-rare-visit-to-north-korea?traffic_source=rss" target="_blank" rel="noopener">Swiss foreign minister talks political ties on rare visit to North Korea</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イグナツィオ・カシス外相が平壌で両国間の政治関係正常化について協議を行い、スイスは北朝鮮での外交事務所を正式に再開した。</p><p>金曜日、カシス氏はスイス政府閣僚としては20年以上ぶりとなる2日間の北朝鮮訪問を終え、そこで「政治関係の正常化と政治対話の再確立」について話し合った、とXに書いた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>スイスの副大統領でもあるカシス氏は、崔善姫外相や朝鮮労働党中央委員会書​​記のチョ・ヨンウォン氏と会談した。</p><p>同氏はXについて「朝鮮半島の安全保障や、より広範なユーラシアの安全保障上の課題についても意見交換した」と付け加えた。</p><p>木曜日にスイス在外公館が正式に再開された後、カシス氏は、スイス在外公館が北朝鮮との「直接対話の強化に向けた具体的な一歩」となると称賛し、スイスの平壌駐留に「新たな章」を刻むことができて「うれしい」と投稿した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Switzerland has formally reopened its diplomatic office in North Korea as Foreign Minister Ignazio Cassis held talks in Pyongyang about normalising political relations between the two countries.</p><p>On Friday Cassis wrapped up a two-day visit to North Korea – the first by a Swiss government minister in more than two decades – in which he discussed “regularising political relations and reestablishing a political dialogue”, he wrote on X.</p><p>Cassis, who is also Switzerland’s vice president, met Foreign Minister Choe Son Hui and Jo Yong Won, a secretary of the Central Committee of the ruling Korean Workers’ Party.</p><p>“We also exchanged views on security on the Korean Peninsula and broader Eurasian security challenges,” he added on X.</p><p>After the formal reopening of the Swiss diplomatic office on Thursday, Cassis posted that he was “pleased” to mark a “new chapter” in his country’s presence in Pyongyang, hailing the office as a “concrete step towards strengthening direct dialogue” with North Korea.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/30/swiss-foreign-minister-talks-political-ties-on-rare-visit-to-north-korea?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/31 00:03</span>
+    </div>
+
+    
+    <p class="title-ja">スペイン運輸相、高速鉄道事故で辞任しないと表明</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c6zxj2e5qlxxo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Spain transport minister says he won't resign over high-speed rail disaster</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>スペインの運輸大臣は、少なくとも69人が死亡した高速鉄道衝突事故を巡り、辞任するつもりはないと述べた。</p><p>スカル・プエンテ氏はマドリードでの記者会見で、「隠すことは何もない」と語り、災害の真相を解明するという政府の誓いを繰り返し、多くの疑問に答える必要があると述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>プエンテ氏は「今の私の義務は、自分の立場に留まるべきかどうかについて話すことではなく、問題を解決することだ」と語った。</p><p>悲劇を受けて運輸大臣は、政敵や労働組合、水曜夜に運輸省前で抗議活動を行ったデモ参加者などから辞任を求める声に直面している。</p><p>水曜日の朝、中央トレド県ウルダ町近くで、国営レンフェ高速列車がIryo社が運行する別の静止列車の後部に衝突し、数十人が死亡、さらに多くが負傷した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Spain's transport minister says he won't resign over the high-speed rail collision that has left at least 69 people dead.</p><p>Ãscar Puente told a news conference in Madrid he had "nothing to hide" while repeating the government's vow to get to the bottom of the disaster, saying many questions needed to be answered.</p><p>"My duty right now is not to talk about whether I should remain in my position, but to resolve the problem," Puente said.</p><p>The transport minister has been facing calls to step down in the aftermath of the tragedy, including from political rivals, a trade union and demonstrators who protested outside the transport ministry on Wednesday night.</p><p>Dozens were killed and many more injured when a state-operated Renfe high-speed train smashed into the back of another stationary train operated by the Iryo company near the town of Urda, in the central Toledo province, on Wednesday morning.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c6zxj2e5qlxxo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/30 20:26</span>
+    </div>
+
+    
+    <p class="title-ja">ドイツ、イスラエルの選挙結果に慎重な姿勢を示す</p>
+    <p class="title-en"><a href="https://www.dw.com/en/germany-takes-cautious-approach-on-israeli-election-results/a-79805184?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Germany takes cautious approach on Israeli election results</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イスラエルの議会選挙から2日が経過したが、イスラエルの新政府を誰が率いるかがまだ明らかでないため、ドイツの政治家らは依然として対応に慎重である。</p><p>現職のベンヤミン・ネタニヤフ首相率いる宗教強硬派を含む右派陣営は、元軍司令官ガディ・アイゼンコット率いる野党陣営を上回っているが、どちらもクネセトの与党多数派への明確な道筋は見えていない。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>連立政権樹立は極めて困難となる可能性が高い。</p><p>ドイツのヨハン・ヴァーデプル外相の報道官マルティン・ギーゼ氏は、水曜日のベルリンでの政府定例記者会見でコメントを控えた。</p><p>しかし同氏は、ドイツがドイツ大使を通じてイスラエルの多数の当局者や政治家と接触していることを強調した。ワデプル氏は「ユダヤ国家とドイツは歴史的に切っても切れない関係にあり、将来どの政府ともうまく連携できるよう全力を尽くす」と述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Though it has been two days since Israel's parliamentary elections , German politicians are still being cautious to respond, as it is still unclear who will lead Israel's new government.</p><p>Although the right-wing bloc, including religious hardliners, led by incumbent Prime Minister Benjamin Netanyahu is ahead of the opposition bloc led by former military chief Gadi Eisenkot, neither has a clear path to a governing majority in the Knesset.</p><p>Forming a coalition government is likely to be extremely difficult.</p><p>Martin Giese, spokesperson for German Foreign Minister Johann Wadephul, declined to comment at Wednesday's regular government press conference in Berlin.</p><p>But he did stress that Germany has been in contact with numerous officials and politicians in Israel via Germany's ambassador. "The Jewish state and Germany are inextricably linked by our history, and we will do everything we can to work well with any future government," Wadephul said.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/germany-takes-cautious-approach-on-israeli-election-results/a-79805184?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/31 00:34</span>
+    </div>
+
+    
+    <p class="title-ja">イスラエル選挙：「ネタニヤフ首相は勝ったのではなく、劇的に負けた」とバラク元首相が語る</p>
+    <p class="title-en"><a href="https://www.france24.com/en/tv-shows/t%C3%AAte-%C3%A0-t%C3%AAte/20261030-israeli-election-netanyahu-did-not-win-he-lost-dramatically-former-pm-barak-says" target="_blank" rel="noopener">Israeli election: 'Netanyahu did not win, he lost dramatically,' former PM Barak says</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>元イスラエル首相エフド・バラク氏は、フランス24とのインタビューで、今週のイスラエル総選挙でベンヤミン・ネタニヤフ首相は「勝てなかった」ものの「劇的に負けた」とし、ライバルのガディ・アイゼンコット氏はアラブ政党と同盟すべきだと述べた。バラク氏はまた、カタールがアラブ政党に資金を提供しているという主張は、現在進行中の汚職スキャンダルから目をそらすことを目的としていると示唆し、ネタニヤフ首相が権力の座を維持するためにイランを攻撃する用意があると警告した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>In an interview with FRANCE 24, former Israeli prime minister Ehud Barak said Prime Minister Benjamin Netanyahu "did not win" this week's election in Israel but "lost dramatically", and that his rival Gadi Eisenkot should ally with Arab parties. Barak also suggested that claims of Qatari funding for an Arab party aimed to distract from an ongoing corruption scandal, and warned that Netanyahu was ready to strike Iran to stay in power.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/tv-shows/t%C3%AAte-%C3%A0-t%C3%AAte/20261030-israeli-election-netanyahu-did-not-win-he-lost-dramatically-former-pm-barak-says" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/31 00:26</span>
+    </div>
+
+    
+    <p class="title-ja">「プランBが必要」：ミサイルが落下する中、アデンのイエメン人は新たな戦争に備える</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/30/need-a-plan-b-yemenis-in-aden-prepare-for-another-war-as-missiles-fall?traffic_source=rss" target="_blank" rel="noopener">‘Need a Plan B’: Yemenis in Aden prepare for another war as missiles fall</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ムハンマド・アブドゥル・マリクにとって、過去1か月間イエメン南部の都市アデンを繰り返し襲った強力な爆発は、今後の暗い日々に対する不気味な警告だ。</p><p>イエメンのフーシ派は、国際空港、軍事キャンプ、市内の港、イエメン政府の本拠地である大統領官邸など、アデンの複数の場所に対する攻撃を主張している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>アブドゥル・マリクさんは、市が再び大規模な暴力行為に陥る可能性を懸念し、予防策を講じ始めた。彼は食料を備蓄し、出発する必要がある場合に備えて長旅に備えて車の準備をしました。</p><p>「私自身と私の親しい友人たちのことをお話しますが、私たちは砂糖やその他の必需品などの基本的な食料の購入と備蓄を始めました」とアブドゥル・マリクさんはアルジャジーラに語った。</p><p>治安状況がさらに悪化して国家機関が崩壊した場合、彼のプランBは家族とともにアデンから避難し、北東のシャブワか東のハドラマウトに避難することだ。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>For Mohammed Abdul Malik, the powerful explosions that have hit Yemen’s southern city of Aden repeatedly over the past month are an ominous warning of darker days ahead.</p><p>Yemen’s Houthis have claimed attacks against several locations in Aden, including the international airport, military camps, the city’s port, and the presidential palace – which serves as a base for Yemen’s government.</p><p>Fearing that the city could once again descend into widespread violence, Abdul Malik has begun taking precautions. He has stockpiled food and prepared his car for a long journey if he needs to leave.</p><p>“I’ll tell you about myself and my close friends: We’ve started buying and stockpiling basic provisions, like sugar and other staples,” Abdul Malik told Al Jazeera.</p><p>If the security situation deteriorates further and state institutions collapse, his Plan B is to flee Aden with his family and seek refuge in Shabwa, to the northeast, or Hadramout, to the east.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/30/need-a-plan-b-yemenis-in-aden-prepare-for-another-war-as-missiles-fall?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/30 18:00</span>
+    </div>
+
+    
+    <p class="title-ja">イスラエルは政治的行き詰まりに陥っている。次に何が来るでしょうか？</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/30/g-s1-150761/israel-election-politics-deadlock-arabs" target="_blank" rel="noopener">Israel is in a political deadlock. What comes next?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>木曜日、イスラエルのヘルツェリヤにあるヤシャル党指導者ガディ・アイゼンコットの邸宅前で、イスラエルの左翼活動家らがアラブ政党による政権樹立を呼びかけた。デビッド・ゴールドマン/AP キャプションを隠す</p><p>テルアビブ、イスラエル — イスラエルの選挙は政治的行き詰まりを生み出し、ベンヤミン・ネタニヤフ首相も彼の主な挑戦者であるガディ・アイゼンコットにも政権樹立への明確な道筋が残されていない。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>金曜日に発表された最終結果では、野党にネタニヤフ首相の右派ブロックよりも多くの議席が与えられた。しかし、中道右派の元軍参謀総長であるアイゼンコット氏は、主にアラブ政党の支持がなければ与党過半数に達することはできないが、アイゼンコット氏の同盟者らは選挙期間中にこの選択肢を繰り返し排除していた。</p><p>ネタニヤフ首相のリクード党は最多票を獲得し、27議席を獲得したが、同氏の政党は選挙前に得ていた過半数を失った。同政権を支持する右翼、極右、超正統派の連合は合計５３議席を獲得した。クネセトとして知られるイスラエルの議会（定数120）で過半数を獲得するには、少なくとも61議席が必要である。</p><p>次に何が起こるのか、そしてイスラエルの新政府が誕生する可能性のある道筋は次のとおりです。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Israeli left-wing activists call for a government with Arab parties outside Yashar party leader Gadi Eisenkot's residence in Herzliya, Israel, Thursday. David Goldman/AP hide caption</p><p>TEL AVIV, Israel — Israel's election has produced a political deadlock, leaving neither Prime Minister Benjamin Netanyahu nor his main challenger, Gadi Eisenkot, with a clear path to forming a government.</p><p>The final results announced Friday give opposition parties more seats than Netanyahu's right-wing bloc. But Eisenkot, a center-right former military chief of staff, cannot reach a governing majority without the support of predominantly Arab parties — an option Eisenkot's allies repeatedly ruled out during the campaign.</p><p>Netanyahu's Likud party received the most votes — winning 27 seats — but his bloc lost the majority it had before the election. The coalition of right-wing, far-right and ultra-Orthodox parties that supported his government won a combined 53 seats. At least 61 seats are needed for a majority in Israel's 120-seat parliament, known as the Knesset.</p><p>Here is what happens next and the possible paths to a new Israeli government.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/30/g-s1-150761/israel-election-politics-deadlock-arabs" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/30 14:00</span>
+    </div>
+
+    
+    <p class="title-ja">スーダン離散民と人権団体、国連トップのポストにアラブ首長国連邦の候補者を非難</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/oct/30/sudanese-diaspora-human-rights-groups-denounce-uae-nominee-un-top-job" target="_blank" rel="noopener">Sudanese diaspora and human rights groups denounce UAE nominee for UN top job</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>批評家たちは、UAEが民兵組織RSFを支援することでスーダン戦争を煽っているという告発のラナ・ヌセイベ氏の否定を引用</p><p>離散スーダンのメンバーや国際人権監視団は、アラブ首長国連邦が民兵組織の迅速支援部隊を支援することでスーダンでの戦争を煽っているという非難を彼女が否定したことを引き合いに出し、アラブ首長国連邦の外交官が国連のトップ職に立候補したことを非難した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>UAEは先週、今年2期目の5年間の任期を終えるアントニオ・グテーレス国連事務総長の後任にラナ・ヌセイベ氏を指名し、こう着状態となった選挙戦を一変させた。</p><p>人権団体などは長年、アラブ首長国連邦によるRSFへの支援の証拠を文書化してきたが、RSFはスーダン軍との戦争中に残虐行為を行ったと非難されており、その中には国連が「大量虐殺の特徴がある」とした2025年10月のエル・ファシェル市への攻撃も含まれる。</p><p>2024年までUAEの国連代表を務めるヌセイベ氏は、この告発に対するUAEの全面的な否定を繰り返し表明してきた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Critics cite Lana Nusseibeh’s denial of accusations the UAE is fuelling Sudan war by supporting paramilitary RSF</p><p>Members of the Sudanese diaspora and international human rights monitors have denounced the candidature of an Emirati diplomat for the top job at the UN, citing her denial of accusations that the United Arab Emirates is fuelling the war in Sudan by supporting the paramilitary Rapid Support Forces.</p><p>The UAE nominated Lana Nusseibeh last week to replace the UN secretary general, António Guterres, as he finishes his second five-year term ⁠this year, upending a race that had become gridlocked.</p><p>Rights groups and others have for years documented evidence of UAE support for the RSF, which has been accused of atrocities during the course of its war against the Sudanese army, including an attack on the city of El Fasher in October 2025 that the UN said had “hallmarks of genocide” .</p><p>Nusseibeh, the UAE’s representative to the UN until 2024, has repeatedly reflected the UAE’s blanket denials of the accusations.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/oct/30/sudanese-diaspora-human-rights-groups-denounce-uae-nominee-un-top-job" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/31 00:34</span>
+    </div>
+
+    
+    <p class="title-ja">史上最大のハッキング：仮想通貨大手バイナンス、63億ドル損失</p>
+    <p class="title-en"><a href="https://www.france24.com/en/video/20261030-biggest-hack-in-history-cryptocurrency-giant-binance-loses-6-3-billion" target="_blank" rel="noopener">Biggest hack in history: Cryptocurrency giant Binance loses $6.3 billion</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>仮想通貨取引所大手バイナンスは、63億ドルに上る記録的なサイバー強盗の標的となっており、ブロックチェーン情報企業はこの攻撃を北朝鮮と関連付けている。米国では木曜夜までに、デジタル資金の追跡と安全確保をめぐる一か八かの競争の中で、主要暗号プラットフォームによる連携した取り組みにより、盗まれた資産のうち約30億ドルを凍結することに成功した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Cryptocurrency exchange giant Binance has been targeted by a record-breaking $6.3 billion cyber heist, with blockchain intelligence firms linking the attack to North Korea. By Thursday night in the US, a coordinated effort by major crypto platforms successfully froze roughly $3 billion of the stolen assets during a high-stakes race to track and secure the digital funds.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261030-biggest-hack-in-history-cryptocurrency-giant-binance-loses-6-3-billion" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/31 00:06</span>
+    </div>
+
+    
+    <p class="title-ja">インド北部州でヘリコプター墜落、6人死亡</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cr93zxyn9eqeo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Six dead after helicopter crashes in northern Indian state</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>インド北部ウッタラーカンド州でヘリコプターが墜落し、巡礼者５人とパイロット１人が死亡したと当局者が発表した。</p><p>伝えられるところによると、航空機は金曜午後にヒンズー教の巡礼地バドリナートを離陸し、その後連絡が途絶えたという。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>事故の原因はまだわかっていないが、付近では大雨が降り視界が悪くなったとの報告があった。</p><p>中国とネパールと国境を接するヒマラヤ山脈のウッタラカンド州には、ヒンズー教の最も神聖な神社がいくつかあり、毎年何百万人もの巡礼者が訪れます。</p><p>バドリナートは、ケダルナート、ガンゴトリ、ヤムノトリと並ぶチャールダム巡礼路の 4 つの聖地の 1 つです。多くの信者がヒマラヤの急峻な渓谷を通って寺院に辿り着きますが、冬の厳しい条件のため、寺院が開かれているのは一年のうちの一時期だけです。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Five pilgrims and a pilot have died after their helicopter crashed in the northern Indian state of Uttarakhand, officials say.</p><p>The aircraft reportedly took off from the Hindu pilgrimage site of Badrinath on Friday afternoon before losing contact.</p><p>The cause of the crash is not yet known but there had been reports of heavy rain and poor visibility in the region.</p><p>Uttarakhand, a Himalayan state which borders China and Nepal, is home to some of Hinduism's holiest shrines and attracts millions of pilgrims every year.</p><p>Badrinath is one of four sacred sites on the Char Dham pilgrimage circuit, alongside Kedarnath, Gangotri and Yamunotri. Many devotees travel through steep Himalayan valleys to reach the temples, which are open for only part of the year because of harsh winter conditions.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cr93zxyn9eqeo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/30 23:08</span>
+    </div>
+
+    
+    <p class="title-ja">米国が北朝鮮に手を伸ばす中、韓国政府は無視されることを恐れている</p>
+    <p class="title-en"><a href="https://www.dw.com/en/seoul-fears-being-sidelined-as-us-reaches-out-to-north-korea/a-79808098?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Seoul fears being sidelined as US reaches out to North Korea</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>韓国と北朝鮮の関係は常に緊張しているが、ここ数週間は特に敵対的な局面を迎えているようだ。</p><p>韓国政府は先月、北朝鮮が厳重に要塞化された国境の南側に地雷を設置したと非難した。装置が爆発し、韓国軍兵士３人が負傷した。北朝鮮は謝罪を拒否し、これは孤立した国家を汚すことを目的とした偽旗事件であると主張した。それ以来、北朝鮮政権は複数の兵器実験を実施し、金正恩氏も出席する史上初の軍事用無人機展示会を開催し、自走砲部隊を国境に配備し、韓国にプロパガンダを流すための拡声器システムの準備を始めた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>木曜日、北朝鮮はまた、ドイツのフリードリヒ・メルツ首相の予定されている韓国訪問の直前に、日本海に向けて短距離弾道ミサイル約10発を発射した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>South Korea 's relationship with the North, always strained, seems to be going through a particularly hostile patch in recent weeks.</p><p>Last month, Seoul accused North Korea of planting a mine on the southern side of the heavily fortified border. The device exploded, injuring three South Korean soldiers . Pyongyang refused to apologize and insisted this was a false-flag incident designed to tarnish the isolated nation. The North Korean regime has since conducted multiple weapons tests , held its first-ever exhibition of military drones attended by Kim Jong Un, brought up self-propelled artillery units to the border and started preparing loudspeaker systems that will blast propaganda into the South.</p><p>On Thursday, North Korea also fired around 10 short-range ballistic missiles towards the Sea of Japan just before a scheduled visit to South Korea by German Chancellor Friedrich Merz .</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/seoul-fears-being-sidelined-as-us-reaches-out-to-north-korea/a-79808098?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/30 22:56</span>
+    </div>
+
+    
+    <p class="title-ja">ミルプールテストで西インド諸島がトップとなり、チェイスがバングラデシュ崩壊のきっかけを作る</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/sports/2026/10/30/chase-sparks-bangladesh-collapse-as-west-indies-on-top-in-mirpur-test?traffic_source=rss" target="_blank" rel="noopener">Chase sparks Bangladesh collapse as West Indies on top in Mirpur Test</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>船長のロストン・チェイスが3-25で勝利し、3日間の最初のクリケットテストを終えて西インド諸島がバングラデシュに勝つという望みを繋ぎ止めた。</p><p>バングラデシュは切り株での2回で79-6と106点のリードを奪われたが、照明が悪かったために試合が早まり、チェイスのオフスピンが崩壊の引き金となった。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>左腕のスピナー、ジョメル・ワリカンは最初のイニングで5勝53敗の成績を収めたが、2勝19敗で主将を補った。</p><p>西インド諸島打撃コーチのフロイド・ライファー氏は「明日彼らがどんなスコアを出しても、我々はそれを追いかけるつもりだ」と語った。</p><p>「合計点を上回ることができなかったのは残念ですが、反撃してバングラデシュを79-6で破ったのは選手たちの素晴らしい努力のおかげです。私たちは規律あるエリアでボウリングをし、チームの計画を忠実に守り、暑い中全員が全力で戦いました。」</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Skipper Roston Chase claimed 3-25 and kept alive the West Indies’ hopes of beating Bangladesh after three days of the first cricket Test .</p><p>Chase’s off-spin was instrumental in triggering a collapse as Bangladesh slumped to 79-6 and a lead of 106 runs in the second innings at stumps, which came early due to bad light.</p><p>Left-arm spinner Jomel Warrican, who had figures of 5-53 in the first innings, took 2-19 to complement his captain.</p><p>“Whatever score they give us tomorrow, we are going to chase it down,” West Indies batting coach Floyd Reifer said.</p><p>“It is unfortunate that we didn’t get past their total, but it was a great effort from the guys to come back and have Bangladesh at 79-6. We bowled in disciplined areas, stuck to our team plans and everyone really hustled out there in the heat.”</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/sports/2026/10/30/chase-sparks-bangladesh-collapse-as-west-indies-on-top-in-mirpur-test?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/31 00:35</span>
+    </div>
+
+    
+    <p class="title-ja">トランプ大統領が方針を転換、中止された選挙集会を再開</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/30/trump-reverses-course-reinstates-cancelled-campaign-rallies?traffic_source=rss" target="_blank" rel="noopener">Trump reverses course, reinstates cancelled campaign rallies</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>2つの選挙集会を中止すると発表した翌日、ドナルド・トランプ米大統領は方針を転換し、これらのイベントをカレンダーに戻すことを選択した。</p><p>トランプ政権に近い関係者が金曜日、アルジャジーラに語ったところによると、火曜日の中間選挙に先立ち、これまで中止されていたカンザス州とアイオワ州での集会でトランプ大統領が自ら先頭に立って行う予定だという。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「ラリーが再開します！」関係者は語った。 「ドナルド・J・トランプ大統領ほど、懸命に働き、懸命に戦い、米国国民を愛している人はいない！」</p><p>これまでトランプ大統領は土曜日にカンザス州、日曜日にアイオワ州を訪問する予定だった。しかし今後は両方の集会が日曜日に開催されることになる。</p><p>同関係者によると、イベントはより多くの電話集会を含むように再調整され、トランプ大統領がバーチャルで参加できるようになったという。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A day after announcing he would cancel a pair of campaign rallies, United States President Donald Trump has reversed course, opting to put those events back on the calendar.</p><p>A source close to the Trump administration told Al Jazeera on Friday that Trump will be headlining, in person, the previously cancelled rallies in Kansas and Iowa ahead of Tuesday’s midterm elections.</p><p>“Rallies are BACK ON!” the source said. “No one works harder, fights harder, or loves the American people more than President Donald J. Trump!”</p><p>Previously, Trump was due to travel to Kansas on Saturday and Iowa on Sunday. But now both rallies will take place on Sunday.</p><p>The source said the events were rearranged to include more tele-rallies, which allow Trump to attend virtually.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/30/trump-reverses-course-reinstates-cancelled-campaign-rallies?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/31 00:34</span>
+    </div>
+
+    
+    <p class="title-ja">2026年中間選挙：元ネオナチ牧師がトランプ大統領に反対の声を上げる</p>
+    <p class="title-en"><a href="https://www.france24.com/en/video/20261030-midterms-2026-the-former-neo-nazi-pastor-speaking-out-against-trump" target="_blank" rel="noopener">Midterms 2026: The former neo-Nazi pastor speaking out against Trump</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ある世論調査によると、白人の福音派プロテスタントの82パーセントが2024年の米国大統領選挙でドナルド・トランプに投票した。そのため、ケイレブ・キャンベル牧師は、トランプ政権を率直に批判する数少ない福音派批判者の一人であり、移民取り締まりの一環として「子供たちを檻に入れる」というトランプ大統領の計画に反対しなければならなくなった大統領一期目に遡る。 「悪魔に取り憑かれていると言われたんです」とキャンベルさんは思い出す。中間選挙が近づく今、米国政治と現政権がこれまで以上に聖書の教えから遠ざかっているのではないかと彼は懸念している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>According to one poll, 82 per cent of white evangelical Protestants voted for Donald Trump in the 2024 US presidential election. That makes pastor Caleb Campbell a significant outlier – he has been one of the few outspoken evangelical critics of the Trump administration, dating back to the president’s first term when he felt compelled to speak out against Trump’s plans to put “kids in cages” as part of an immigration crackdown. “I was told that I was possessed by a demon,” Campbell remembers. Now, as the midterms approach, he fears US politics and the current administration have become more distant than ever from the Bible’s teachings.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261030-midterms-2026-the-former-neo-nazi-pastor-speaking-out-against-trump" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/30 23:48</span>
+    </div>
+
+    
+    <p class="title-ja">教皇レオ14世、米国選挙で投票する初の教皇となる</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/ckwyq2509p7xo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Pope Leo XIV becomes first pontiff to vote in a US election</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ローマ法王レオ14世は中間選挙に向けてイリノイ州で郵便投票を提出し、米国選挙で投票した史上初の法王となった。</p><p>教皇庁報道局は声明で「教皇は国民が民主的プロセスに参加する権利と義務についての信念を表明した」と述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>シカゴ生まれの法王は、2025年5月の選出後、バチカンの最高位の議席に就いた初の米国人となった。</p><p>それ以来、同氏は移民取締りや米国・イスラエルとイランとの戦争など、さまざまな問題をめぐってトランプ政権と衝突してきた。</p><p>同報道局は、「教皇レオ14世は、ペルー滞在中も含め、資格があるときはいつでも、米国国民として投票する権利を行使してきた」と述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Pope Leo XIV has submitted his mail-in ballot in Illinois, for the midterm elections, becoming the first-ever pope to vote in a US election.</p><p>"The Holy Father expresses his belief in the right and the duty of citizens to participate in democratic processes," the Holy See Press Office said in a statement.</p><p>The Chicago-born pontiff is the first US citizen to hold the Vatican's highest seat, after his selection in May 2025.</p><p>Since then, he has clashed with the Trump administration over various issues, including immigration enforcement and the US-Israel war with Iran.</p><p>"Pope Leo XIV has exercised his right to vote as a United States citizen, whenever he was eligible to do so," the press office said, including during his years in Peru.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/ckwyq2509p7xo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/30 23:08</span>
+    </div>
+
+    
+    <p class="title-ja">「アマチュアの愚か者」：フラビオ・ボルソナロの短命な「次期大統領」主張は嘲笑にさらされた</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/oct/30/flavio-bolsonaros-president-elect-claim-mockery-brazil" target="_blank" rel="noopener">‘Amateur morons’: Flávio Bolsonaro’s short-lived ‘president-elect’ claim met with mockery</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ブラジルメディア、米国への「恥ずべき」逃亡と間違った紋章付きの奇妙な手紙を巡り、敗北した候補者を嘲笑</p><p>フラヴィオ・ボルソナロ氏は、日曜日の夜までに人々が自分をブラジルの次期大統領と呼ぶようになるだろうと期待していた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>むしろ、選挙に負けた後米国に逃亡し、58分間にわたって自らを「ブラジルの真の次期大統領」と宣言したこの極右政治家の決断は笑い者となり、ブラジルの新聞や評論家は勝利した候補者に軽蔑的な形容詞の雨を浴びせている。</p><p>金曜日、保守系のエスタード・デ・サンパウロ紙は「フラヴィオ氏の愚かさは、あまりにも長い間、彼らの無謀な愚行とブラジルに対する取り返しのつかない軽蔑の人質にされていたクーデター実行犯一家から民主右派を解放したことになる」と激しく非難した。</p><p>ボルソナロ氏は、左翼の敵である現職大統領ルイス・イナシオ・ルーラ・ダ・シルバ氏に440万票の差で敗れてから48時間後、火曜日の夜、マイアミに逃亡した。ルラ氏の勝利は、ボルソナロ氏自身の党や多くの主要同盟国はもちろん、エルサルバドルのナイブ・ブケレ氏やイタリアのジョルジア・メローニ氏など世界中の右翼指導者らによって認められた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Brazilian media ridicule defeated candidate over ‘shameful’ absconsion to US and bizarre letter with wrong coat of arms</p><p>Flávio Bolsonaro had hoped that by Sunday night people would be calling him the next president of Brazil.</p><p>Instead, the far-right politician’s decision to flee to the US after losing the election and – for 58 minutes – to declare himself “Brazil’s true president-elect” , has made him a laughing stock, with Brazilian newspapers and commentators raining a barrage of scornful adjectives down on the conquered candidate.</p><p>“If it served any purpose at all, Flávio’s foolishness liberated the democratic right from a family of coup-mongers, which for far too long held it hostage to their reckless folly and irremediable disdain for Brazil,” the conservative Estado de São Paulo newspaper thundered on Friday.</p><p>Bolsonaro fled to Miami on Tuesday night, 48 hours after being beaten by his leftwing adversary, the incumbent president, Luiz Inácio Lula da Silva, by 4.4m votes. Lula’s victory has been recognised by rightwing leaders from around the world, including El Salvador’s Nayib Bukele and Italy’s Giorgia Meloni, not to mention Bolsonaro’s own party and many key allies.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/oct/30/flavio-bolsonaros-president-elect-claim-mockery-brazil" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/31 00:17</span>
+    </div>
+
+    
+    <p class="title-ja">民主党上院議員、米軍事援助決定に対するエジプトの報道弾圧を非難</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c63r529wn2vzo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Democratic senator blames Egypt press crackdown on US military aid decision</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>民主党トップ上院議員は、エジプトにおける米国の軍事資金提供に関する人権条件を免除するというトランプ政権の決定のせいで、エジプトでの独立系ジャーナリズムに対する弾圧を非難した。</p><p>上院外交委員会の委員を務めるクリス・マーフィー氏は、米国政府が3億ドル以上の国防援助に関する制限を解除した後、エジプト国民を「見捨てた」と非難した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>先月、エジプトに残る数少ない独立系報道機関のうち２社でジャーナリストの逮捕が相次いでおり、そこでは新聞社やテレビ局が当局によって厳しく管理されている。</p><p>米国国務省はBBCに対し、同国が「米国の国家安全保障上の利益にとって重要である」ことを理由に、9月にエジプトへの軍事援助の一部条件を放棄したと語った。</p><p>マーフィー氏は今週、ワシントンの中東研究所（MEI）で講演し、この2つが関連していることは疑いないと述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A top Democratic senator has blamed a crackdown on independent journalism in Egypt on a decision by the Trump administration to waive human rights conditions on US military funding to the country.</p><p>Chris Murphy, who sits on the Senate Foreign Relations Committee, accused the US government of "abandoning" the Egyptian people after it lifted restrictions relating to more than $300m of defence assistance.</p><p>Over the last month a series of arrests has taken place of journalists at two of the few remaining independent news outlets in Egypt, where newspapers and TV stations are closely controlled by the authorities.</p><p>The US State Department told the BBC it waived conditions on a portion of military aid to Egypt in September due to the country's "importance to US national security interests".</p><p>Murphy, speaking at the Middle East Institute (MEI) in Washington this week, said he was in no doubt the two were linked.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c63r529wn2vzo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/30 14:00</span>
+    </div>
+
+    
+    <p class="title-ja">陥没穴、傷ついた土地、そしてスケープゴート：ヨハネスブルグの違法金採掘の惨劇</p>
+    <p class="title-en"><a href="https://www.theguardian.com/business/2026/oct/30/sinkholes-scarred-land-scapegoats-illegal-gold-mining-johannesburg" target="_blank" rel="noopener">Sinkholes, scarred land and scapegoats: the scourge of illegal gold mining in Johannesburg</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>違法採掘のドライバーの終焉は見えないが、警察の措置は効果がないようだ</p><p>コーラ・ベイリーさんは、1991年にヨハネスブルグ西部のロードポート周辺の集落で負傷した動物の治療を始めて以来、不法採掘者に遭遇し続けている。しかし、金の価格が高騰するにつれ、この地域を特徴づける廃坑の活動も活発化している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>9月下旬、数十人のザマ・ザマ（南アフリカの不法鉱山労働者に与えられた名前、ズールー語で大まかに「チャンスを掴む」という意味）が、彼女の慈善団体であるクロウ（地域主導動物愛護団体）の未舗装の道路を渡って金を掘るために到着した。</p><p>すぐに、彼らは、組織の2つの25,000リットルの水タンクからパンニングと処理のために水を汲むようになりました。このタンクは、現場で救助され負傷した約100頭の動物のために市政府によって不定期に満たされています。</p><p>「私たちは彼らにとても丁寧にお願いしてきましたし、水を飲むのを断ったことは一度もありません…しかし、初めて（正午）12時に門を閉めました。文字通りバケツ約2杯の水が残っていたからです」とベイリーさんは10月中旬に語った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>There is no end in sight for the drivers of illegal mining, while police action appears ineffective</p><p>C ora Bailey has been encountering illegal miners ever since she first started treating injured animals in the townships around Roodepoort, west of Johannesburg, in 1991. But as the price of gold has soared, so too has activity in the abandoned mine shafts that mark the area.</p><p>In late September, dozens of zama zamas – the name given to illegal miners in South Africa , meaning roughly “to take a chance” in Zulu – arrived to dig for gold across the dirt road from her charity, Claw (Community Led Animal Welfare).</p><p>Soon, they were taking water for their panning and processing from the organisation’s two 25,000-litre water tanks, which are filled irregularly by the city government for the 100 or so rescued and injured animals on site.</p><p>“We’ve asked them really nicely and haven’t ever refused them water to drink … But, for the first time ever, we closed the gate at 12 [midday], because we literally had about two buckets of water left,” Bailey said in mid-October.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/business/2026/oct/30/sinkholes-scarred-land-scapegoats-illegal-gold-mining-johannesburg" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-10-31";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
