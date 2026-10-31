@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年11月1日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/31 23:53</span>
+    </div>
+
+    
+    <p class="title-ja">住民が雑草を食べたロシア占領下の都市からの避難者がウクライナに到着</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cqx2818elrnzo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Evacuees from Russia-occupied city where residents ate weeds arrive in Ukraine</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ボロディミル・ゼレンスキー大統領は、荒廃したロシア占領下の都市オレシキから避難した人々がウクライナのチェルニーヒウ地域に渡ったことを認めた。</p><p>最前線の都市の住民の中には何年も会っていなかった親戚と会う人もおり、感動的な場面もあった。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>高齢者の中には担架で運ばれるほど衰弱した人もいた。彼らは食べ物、水、電気もなく閉じ込められており、多くの人が生き残るために庭の雑草を調理することに頼っていました。</p><p>ウクライナ大統領は金曜日、避難への道を開いた地元の停戦仲介に尽力したメラニア・トランプ米大統領夫人に感謝の意を表した。</p><p>ゼレンスキー大統領はＸへの投稿で、「現時点でオレシキ出身のウクライナ国民はチェルニーヒウ地域でウクライナ国境を越えている」と述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>People evacuated from the devastated Russian-occupied city of Oleshky have crossed into the Ukrainian region of Chernihiv, President Volodymyr Zelensky has confirmed.</p><p>There were emotional scenes as some of the residents of the frontline city met relatives they had not seen for years.</p><p>Some elderly residents were so weak that they were carried on stretchers. They had been trapped without food, water and electricity, with many resorting to cooking garden weeds to survive.</p><p>The Ukrainian president thanked US First Lady Melania Trump for her efforts in brokering a local ceasefire that paved the way for their evacuation on Friday.</p><p>"As of now, Ukrainian citizens from Oleshky have crossed the Ukrainian border in the Chernihiv region," Zelensky said in a post on X.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cqx2818elrnzo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/31 22:19</span>
+    </div>
+
+    
+    <p class="title-ja">バーナム氏、英国の奴隷貿易に対する正式な謝罪への扉を開く</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/31/burnham-opens-door-to-formal-apology-for-britains-slave-trade?traffic_source=rss" target="_blank" rel="noopener">Burnham opens door to formal apology for Britain’s slave trade</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>英国首相は、経済的賠償の可能性を排除しながら、大西洋横断奴隷貿易における役割に対する正式な謝罪への扉を開いた。</p><p>アンディ・バーナム氏は、日曜日にアンティグア・バーブーダで開かれる英連邦首脳会議に先立って、金曜日のガーディアン紙の記事で自身の立場を述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>イギリス連邦は56か国で構成されており、そのほとんどが元イギリス植民地であり、カリブ海諸国は長年イギリスに対し、奴隷制の遺産を認め、救済を提供するよう圧力をかけてきた。</p><p>バーナム氏は、英国が公式の国家謝罪をすべきかどうかについての議論を含め、奴隷制度の影響を受けている国々や運動団体との構造的な協議を提案した。</p><p>バーナム氏は「英国国家を代表して正式な謝罪を求める声に耳を傾けることは、このプロセスの重要な部分を形成するものであり、私は彼らの声を受け入れるつもりだ」と書いた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Britain’s prime minister has opened the door to a formal apology for its role in the transatlantic slave trade, while ruling out financial reparations.</p><p>Andy Burnham set out his position in a Guardian article on Friday, ahead of a Commonwealth leaders’ summit in Antigua and Barbuda on Sunday.</p><p>The Commonwealth comprises 56 countries, mostly former British colonies, whose Caribbean members have long pressed Britain to acknowledge slavery’s legacy and offer redress.</p><p>Burnham offered structured talks with countries and campaign groups affected by slavery, including discussions on whether Britain should issue an official state apology.</p><p>“Listening to calls for a formal apology on behalf of the British state will form an important part of this process and I am open to them,” Burnham wrote.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/31/burnham-opens-door-to-formal-apology-for-britains-slave-trade?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/31 21:31</span>
+    </div>
+
+    
+    <p class="title-ja">英国のバーナム首相、奴隷制度の謝罪には「オープン」だが経済的賠償は除外</p>
+    <p class="title-en"><a href="https://www.france24.com/en/europe/20261031-burnham-says-uk-open-to-slavery-apology-but-rules-out-financial-reparations" target="_blank" rel="noopener">UK PM Burnham says 'open' to slavery apology but rules out financial reparations</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>英国のアンディ・バーナム首相は、英国が大西洋横断奴隷貿易における役割について初めて謝罪することに「オープン」であると述べたが、同国に金銭賠償を求める要求は拒否した。英国の植民地時代の歴史を巡る問題は、英連邦首脳会議に向けて継続中のチャールズ国王のカリブ海３カ国訪問をめぐって大きく浮上している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>British Prime Minister Andy Burnham says he was "open" to the UK apologizing for the first time for its role in the transatlantic slave trade, but has rejected calls for the country to pay financial reparations. Issues around Britain's colonial history have loomed large over King Charles' ongoing visit to three Carribean countries leading up to a Commonwealth leaders summit.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/europe/20261031-burnham-says-uk-open-to-slavery-apology-but-rules-out-financial-reparations" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/31 04:42</span>
+    </div>
+
+    
+    <p class="title-ja">カナダとEU、志を同じくする国々に開かれた新たな同盟を発表</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/oct/30/canada-european-union-alliance" target="_blank" rel="noopener">Canada and EU announce new alliance open to like-minded countries</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>「新たな嵐に揺れる」世界のために構想された未来のための同盟、モントリオールサミットで発表され他国にも開放</p><p>カナダと欧州は、他国の参加を歓迎しながら、「国民が繁栄できる保護の天蓋」と地政学の予測不可能な性質に対する強力なヘッジの両方として機能する、志を同じくする国々による新たな同盟を発表した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>金曜、モントリオールからマーク・カーニー首相とウルズラ・フォン・デア・ライエン欧州委員長は記者団に対し、この新たなパートナーシップを「未来のための同盟」と呼び、「カナダと27カ国加盟ブロックとの間の可能な限り最も深いパートナーシップは、前例のない安定性と機会を提供する可能性がある」と述べた。</p><p>カーニー氏は記者団に対し、「私たちの社会は新たな嵐に揺さぶられている」と述べ、気候緊急事態による悪影響だけでなく「民主的規範の侵食」や「貿易の武器化」にも言及した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Alliance for the Future, unveiled at Montreal summit and open to other countries, conceived for world ‘shaken by new storms’</p><p>Canada and Europe have announced a new alliance of like-minded nations to serve as both a “protective canopy under which our citizens can thrive” and a powerful hedge against the unpredictable nature of geopolitics, while welcoming other countries to join.</p><p>Speaking to reporters on Friday from Montreal, the prime minister, Mark Carney, and the European Commission president, Ursula von der Leyen , called the new partnership the Alliance for the Future and said the “deepest possible partnership between Canada and the 27-member bloc had the potential to offer unprecedented stability and opportunity”.</p><p>“Our societies have been shaken by new storms,” Carney told reporters, referring to the damaging effects of the climate emergency but also the “erosion of democratic norms” and “the weaponization of trade”.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/oct/30/canada-european-union-alliance" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/31 23:31</span>
+    </div>
+
+    
+    <p class="title-ja">イランFMは、米国がカタールでの協議のための代表団として「前向きな一歩」を支援していると述べた</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/10/31/iran-fm-says-us-outreach-a-positive-step-as-delegation-in-qatar-for-talks?traffic_source=rss" target="_blank" rel="noopener">Iran FM says US outreach a ‘positive step’ as delegation in Qatar for talks</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イランのアッバス・アラグチ外務大臣は、イランとの対話を開始しようとする米国の努力は「前向きな一歩」だが、現時点では8か月にわたる戦争に関して米国当局者らと会談する予定はないと述べた。</p><p>土曜日にアルジャジーラに語ったアラグシ氏は、イランはハイレベル会合でバンス米国副大統領が送った書簡を検討し、ホルムズ海峡再開に向けたテヘランの条件を提示したと述べ、それが米国との再交渉への道を開くものだと述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>同氏は、米国とイランの停戦再開に向けた交渉を明らかに目的としてカタールの調停委員らがテヘランを訪れた翌日、イラン代表団がドーハを訪れたと付け加えた。アラグチ氏は、側近の１人が協議を続けるためカタールに滞在していると述べた。</p><p>同外相はアルジャジーラに対し、「より広範な対話と理解への扉を開こうとする米国側の試みは前向きな一歩だ」と語った。</p><p>しかし、同氏は、「この書簡を送るワシントンの目的が不和を煽ることであるとすれば、以前の書簡にさらに誤りを加えるのはさらなる間違いだろう」と警告した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Iran’s Foreign Minister Abbas Araghchi says a United States effort to open dialogue with Tehran is “a positive step”, but that there are currently no plans for meetings with US officials regarding the eight-month-old war.</p><p>Speaking to Al Jazeera on Saturday, Araghchi said Iran had studied a letter sent by US Vice President JD Vance in high-level meetings, and set out Tehran’s conditions for reopening the Strait of Hormuz, which he said would pave the way for renewed negotiations with Washington.</p><p>He added that an Iranian delegation has travelled to Doha, a day after Qatari mediators were in Tehran in an apparent bid to negotiate a revival of the US-Iran ceasefire. Araghchi said one of his aides is in Qatar to continue consultations.</p><p>“The American side’s attempt to open the door to dialogue and understanding more broadly is a positive step,” the foreign minister told Al Jazeera.</p><p>However, he warned: “If Washington’s goal in sending this letter is to stir up discord, it would be yet another mistake to add to its previous ones.”</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/10/31/iran-fm-says-us-outreach-a-positive-step-as-delegation-in-qatar-for-talks?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/31 23:28</span>
+    </div>
+
+    
+    <p class="title-ja">トルコ、シニルリオグル元外相を国連長官に指名</p>
+    <p class="title-en"><a href="https://www.france24.com/en/asia-pacific/20261031-turkey-nominates-former-foreign-minister-sinirlioglu-as-un-chief" target="_blank" rel="noopener">Turkey nominates former foreign minister Sinirlioglu as UN chief</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>トルコは国連事務総長ポストに元外務大臣兼国連大使のフェリドゥン・ハディ・シニルリオグル氏を指名したと国営メディアが土曜日に報じた。この提案は、国連安全保障理事会の改革を特に声高に求めてきたトルコのレジェップ・タイップ・エルドアン大統領によって正式に支持された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Turkey has nominated its former foreign minister and UN ambassador Feridun Hadi Sinirlioglu for the position of UN secretary-general, state-media reported on Saturday. The submission was officially backed by Turkish President Recep Tayyip Erdogan who has been particularly vocal in calling for reform of the UN Security Council.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/asia-pacific/20261031-turkey-nominates-former-foreign-minister-sinirlioglu-as-un-chief" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">10/30 18:00</span>
+    </div>
+
+    
+    <p class="title-ja">イスラエルは政治的行き詰まりに陥っている。次に何が来るでしょうか？</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/10/30/g-s1-150761/israel-election-politics-deadlock-arabs" target="_blank" rel="noopener">Israel is in a political deadlock. What comes next?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>木曜日、イスラエルのヘルツェリヤにあるヤシャル党指導者ガディ・アイゼンコットの邸宅前で、イスラエルの左翼活動家らがアラブ政党による政権樹立を呼びかけた。デビッド・ゴールドマン/AP キャプションを隠す</p><p>テルアビブ、イスラエル — イスラエルの選挙は政治的行き詰まりを生み出し、ベンヤミン・ネタニヤフ首相も彼の主な挑戦者であるガディ・アイゼンコットにも政権樹立への明確な道筋が残されていない。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>金曜日に発表された最終結果では、野党にネタニヤフ首相の右派ブロックよりも多くの議席が与えられた。しかし、中道右派の元軍参謀総長であるアイゼンコット氏は、主にアラブ政党の支持がなければ与党過半数に達することはできないが、アイゼンコット氏の同盟者らは選挙期間中にこの選択肢を繰り返し排除していた。</p><p>ネタニヤフ首相のリクード党は最多票を獲得し、27議席を獲得したが、同氏の政党は選挙前に得ていた過半数を失った。同政権を支持する右翼、極右、超正統派の連合は合計５３議席を獲得した。クネセトとして知られるイスラエルの議会（定数120）で過半数を獲得するには、少なくとも61議席が必要である。</p><p>次に何が起こるのか、そしてイスラエルの新政府が誕生する可能性のある道筋は次のとおりです。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Israeli left-wing activists call for a government with Arab parties outside Yashar party leader Gadi Eisenkot's residence in Herzliya, Israel, Thursday. David Goldman/AP hide caption</p><p>TEL AVIV, Israel — Israel's election has produced a political deadlock, leaving neither Prime Minister Benjamin Netanyahu nor his main challenger, Gadi Eisenkot, with a clear path to forming a government.</p><p>The final results announced Friday give opposition parties more seats than Netanyahu's right-wing bloc. But Eisenkot, a center-right former military chief of staff, cannot reach a governing majority without the support of predominantly Arab parties — an option Eisenkot's allies repeatedly ruled out during the campaign.</p><p>Netanyahu's Likud party received the most votes — winning 27 seats — but his bloc lost the majority it had before the election. The coalition of right-wing, far-right and ultra-Orthodox parties that supported his government won a combined 53 seats. At least 61 seats are needed for a majority in Israel's 120-seat parliament, known as the Knesset.</p><p>Here is what happens next and the possible paths to a new Israeli government.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/10/30/g-s1-150761/israel-election-politics-deadlock-arabs" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/30 14:00</span>
+    </div>
+
+    
+    <p class="title-ja">スーダン離散民と人権団体、国連トップのポストにアラブ首長国連邦の候補者を非難</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/oct/30/sudanese-diaspora-human-rights-groups-denounce-uae-nominee-un-top-job" target="_blank" rel="noopener">Sudanese diaspora and human rights groups denounce UAE nominee for UN top job</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>批評家らは、UAEが民兵組織RSFを支援してスーダン戦争を煽っているという告発のラナ・ヌセイベ氏の否定を引用</p><p>離散スーダンのメンバーや国際人権監視団は、アラブ首長国連邦が民兵組織の迅速支援部隊を支援することでスーダンでの戦争を煽っているという非難を彼女が否定したことを引き合いに出し、アラブ首長国連邦の外交官が国連のトップ職に立候補したことを非難した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>UAEは先週、今年2期目の5年間の任期を終えるアントニオ・グテーレス国連事務総長の後任にラナ・ヌセイベ氏を指名し、こう着状態となった選挙戦を一変させた。</p><p>人権団体などは長年、アラブ首長国連邦によるRSFへの支援の証拠を文書化してきたが、RSFはスーダン軍との戦争中に残虐行為を行ったと非難されており、その中には国連が「大量虐殺の特徴がある」とした2025年10月のエル・ファシェル市への攻撃も含まれる。</p><p>2024年までUAEの国連代表を務めるヌセイベ氏は、この告発に対するUAEの全面的な否定を繰り返し表明してきた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Critics cite Lana Nusseibeh’s denial of accusations the UAE is fuelling Sudan war by supporting paramilitary RSF</p><p>Members of the Sudanese diaspora and international human rights monitors have denounced the candidature of an Emirati diplomat for the top job at the UN, citing her denial of accusations that the United Arab Emirates is fuelling the war in Sudan by supporting the paramilitary Rapid Support Forces.</p><p>The UAE nominated Lana Nusseibeh last week to replace the UN secretary general, António Guterres, as he finishes his second five-year term ⁠this year, upending a race that had become gridlocked.</p><p>Rights groups and others have for years documented evidence of UAE support for the RSF, which has been accused of atrocities during the course of its war against the Sudanese army, including an attack on the city of El Fasher in October 2025 that the UN said had “hallmarks of genocide” .</p><p>Nusseibeh, the UAE’s representative to the UN until 2024, has repeatedly reflected the UAE’s blanket denials of the accusations.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/oct/30/sudanese-diaspora-human-rights-groups-denounce-uae-nominee-un-top-job" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/31 21:55</span>
+    </div>
+
+    
+    <p class="title-ja">ミルプールでの最初のテストで西インド諸島がバングラデシュを8ウィケットで破る</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/sports/2026/10/31/west-indies-bangladesh-first-test-eight-wickets-mirpur-series-lead?traffic_source=rss" target="_blank" rel="noopener">West Indies thrash Bangladesh by eight wickets in first Test in Mirpur</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>土曜日の第1テストで西インド諸島がバングラデシュに8ウィケットで勝利し、2連戦シリーズで1-0のリードを奪い、ブランドン・キングがキャリアベストとなる81点をノーアウトでマークした。</p><p>ミルプールでの4日目、バングラデシュが2回で142でボウルアウトされた後、キングは115球のノックで10のフォーと6を成功させ、訪問チームが35.1オーバーで170の目標を追いかけるのに貢献した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>プレーヤー・オブ・ザ・マッチに選ばれたジョメル・ワリカンは、バングラデシュ代表が48.4オーバーでボウルアウトされる中、バングラデシュの最初のイニングで5ウィケットを獲得し、4勝63敗で追い上げた。</p><p>西インド諸島のキャプテン、ロストン・チェイスは2回で5対36で勝利し、テストクリケットで5回目の5ウィケット獲得を達成した。</p><p>チェイス氏は、チームはシリーズに勝ってランキングを上げる決意をしていると語った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Brandon King struck a career-best 81 not out as West Indies cruised to an eight-wicket win over Bangladesh in the first Test on Saturday to take a 1-0 lead in the two-match series.</p><p>King hit 10 fours and a six in his 115-ball knock to help the visitors chase down the target of 170 in 35.1 overs on the fourth day in Mirpur after Bangladesh were bowled out for 142 in their second innings.</p><p>Jomel Warrican, named player of the match, claimed 4-63 to follow up his five-wicket haul in Bangladesh’s first innings as the hosts were bowled out in 48.4 overs.</p><p>West Indies captain Roston Chase took 5-36 in the second innings , his fifth five-wicket haul in Test cricket.</p><p>Chase said the team was determined to win the series and go up in the rankings.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/sports/2026/10/31/west-indies-bangladesh-first-test-eight-wickets-mirpur-series-lead?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/31 20:16</span>
+    </div>
+
+    
+    <p class="title-ja">バイナンス、63億ドル相当の仮想通貨盗難被害に遭う</p>
+    <p class="title-en"><a href="https://www.france24.com/en/binance-hit-by-6-3-billion-dollar-crypto-theft" target="_blank" rel="noopener">Binance hit by 6.3 billion dollar crypto theft</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>仮想通貨史上最大と言われる強盗に仮想通貨プラットフォームが被害を受けたことを受け、バイナンスの幹部らは数十億ドルの回収に奔走している。ハッカーがユーザーから63億ドルを盗んだと伝えられており、アナリストらは北朝鮮を指摘している。この攻撃は、ハッカーが仮想通貨取引所Bybitから15億ドルを盗んだ2025年2月に樹立された以前の記録をはるかに上回っている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Binance executives are scrambling to recover billions of dollars after the crypto platform was hit by what is being described as the biggest heist in cryptocurrency history. Hackers reportedly stole $6.3 billion from users, with analysts pointing the finger at North Korea. The attack far surpasses the previous record set in February 2025, when hackers stole $1.5 billion from crypto exchange Bybit.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/binance-hit-by-6-3-billion-dollar-crypto-theft" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/31 16:26</span>
+    </div>
+
+    
+    <p class="title-ja">ボリウッドと裏社会 ― 一緒にスポットライトを浴びる？</p>
+    <p class="title-en"><a href="https://www.dw.com/en/bollywood-and-the-underworld-together-in-the-spotlight/a-79806129?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Bollywood and the underworld — together in the spotlight?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>「映画業界全体で、我々と協力せずに仕事をする者、あるいはサルマン・カーンと協力する者は殺されるだろう。」</p><p>この警告は、今月初めにムンバイでインド人俳優タイガー・シュロフを襲撃したとされる犯人らが、銃撃の犯行声明として音声メッセージで伝えたものである。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>明らかに加害者らは、2014年から刑務所にいる学生政治家からギャングスターとなったローレンス・ビシュノイと関係があると述べた。特に警察はギャングの関与を確認していない。</p><p>シュロフさんに向けて発砲され、運転手が負傷したこの事件は、一般に「ボリウッド」として知られるムンバイに本拠を置く映画業界の著名人を狙った一連の襲撃事件の最新のものにすぎなかった。</p><p>2022年以来、武装集団はムンバイにある俳優サルマン・カーンのアパートや映画監督ロヒット・シェティの自宅、さらにインド北部にある俳優ディシャ・パタニの実家でも銃撃を行った。俳優のランヴィール・シンも110万ドル（約98万ユーロ）近くの恐喝要求を受けたと伝えられている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>"In the entire film industry, whoever works without aligning with us, or works with Salman Khan, will be killed."</p><p>This warning was delivered in an audio message by presumed attackers on Indian actor Tiger Shroff in Mumbai earlier this month, as they claimed responsibility for the shooting.</p><p>The apparent perpetrators said they were connected to Lawrence Bishnoi, a student-politician-turned-gangster who has been in prison since 2014. Notably, police have not confirmed the gang's involvement.</p><p>The shots fired at Shroff, which injured his driver, were only the latest in a string of attacks targeting prominent figures from the Mumbai-based film industry, popularly known as "Bollywood" .</p><p>Since 2022, gunmen fired shots at actor Salman Khan's apartment and at the home of filmmaker Rohit Shetty in Mumbai, as well as actor Disha Patani's family home in northern India. Actor Ranveer Singh also reportedly received an extortion demand of nearly $1.1 million (around €980,000).</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/bollywood-and-the-underworld-together-in-the-spotlight/a-79806129?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/31 11:12</span>
+    </div>
+
+    
+    <p class="title-ja">なぜ北朝鮮の「エリート」ハッカーがバイナンス大規模ハッキングの主な容疑者なのか</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/ck9dz3v7z7v3o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Why North Korea's 'elite' hackers are the prime suspect in major Binance hack</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>大手ブロックチェーン分析会社2社は、世界最大の仮想通貨取引所であるバイナンスへの63億ドル（47億ポンド）のハッキング事件の犯人の可能性が高いのは北朝鮮国家支援グループであることを示す強力な情報を持っていると述べた。</p><p>TraderTraitorとしても知られる北朝鮮のハッキング部隊であるLazarus Groupは、TRM LabsとChainaliesによって「高い自信を持って」特定された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>この事件は、世界で最も貧しい国の一つであり、インターネットへのアクセスが厳しく制限されているこの国に関連した最新の事件である。</p><p>専門家らは、北朝鮮の指導者、金正恩政権が財政を賄うためにサイバー犯罪に依存していると非難しているが、北朝鮮はこれを長年否定している。</p><p>金銭的なものではありませんでしたが、国内で最も壮絶なハッキング疑惑が 2014 年に発生しました。ターゲットは、ハリウッド映画「ザ・インタビュー」を製作したソニー・ピクチャーズでした。この映画にはキム暗殺計画が含まれている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Two major blockchain analytics firms say they have robust intelligence pointing to a North Korean state-backed group as the likely culprits in the $6.3bn (Â£4.7bn) hack of Binance , the world's largest cryptocurrency exchange.</p><p>The Lazarus Group, a North Korean hacking unit also known as TraderTraitor, was identified "with high confidence" by TRM Labs, as well as Chainalysis.</p><p>This incident is just the latest linked to the country, one of the poorest in the world and where access to the internet is severely restricted.</p><p>Experts accuse the government of North Korean leader Kim Jong Un of relying on cybercrime to finance itself, something Pyongyang has long denied.</p><p>Though not financial, the nation's most spectacular suspected hack took place in 2014. The target: Sony Pictures, which had made the Hollywood film The Interview. The film involves a plot to assassinate Kim.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/ck9dz3v7z7v3o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">10/31 19:11</span>
+    </div>
+
+    
+    <p class="title-ja">トランプ vs MAGA: 彼の運動が分裂している理由</p>
+    <p class="title-en"><a href="https://www.france24.com/en/video/20261031-trump-vs-maga-why-his-movement-is-splitting" target="_blank" rel="noopener">Trump vs MAGA: Why his movement is splitting</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>2026年の中間選挙が近づくにつれ、MAGA陣営内の分裂がますます顕著になっている。イラン戦争や燃料価格の高騰からエプスタイン事件に至るまで、トランプ大統領の決断のいくつかは最も忠実な支持者の間で分裂を煽っている。かつてはアメリカの共通のビジョンによって団結していた MAGA は、現在では外交政策、経済、そして「アメリカ第一」が実際に何を意味するのかをめぐってますます意見の相違を強めている諸派を結集させています。しかし、トランプ氏は依然としてこの政治的連合をまとめる中心人物であり、それを維持するために戦っている。大統領の長年の同盟者の一部が大統領から距離を置くのはなぜでしょうか?こうした意見の相違にもかかわらず、MAGA は団結を続けることができるでしょうか?そして、トランプ大統領は中間選挙に先立って支持基盤を動員できるだろうか？ 🔍 私たちのジャーナリスト、ステラ・エルガースマが、MAGA運動内の分裂と支持者を再び結集させるドナルド・トランプの戦略を打ち砕きます。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>As the 2026 midterm elections approach, divisions within the MAGA camp are becoming increasingly visible. From the war in Iran and rising fuel prices to the Epstein files, several of Trump’s decisions are fuelling divisions among his most loyal supporters. Once united by a shared vision of America, MAGA now brings together factions that increasingly disagree over foreign policy, the economy and what “America First” should actually mean. Yet Trump remains the central figure holding this political coalition together – and he is fighting to keep it that way. Why are some of the president’s longtime allies distancing themselves from him? Can MAGA remain united despite these disagreements? And can Trump still mobilise his base ahead of the midterms? 🔍 Our journalist Stella Elgersma breaks down the divisions within the MAGA movement and Donald Trump’s strategy to rally his supporters, once again.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261031-trump-vs-maga-why-his-movement-is-splitting" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">10/31 11:39</span>
+    </div>
+
+    
+    <p class="title-ja">トランプ大統領の関税で脅かされるカナダの町を救う闘い</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cmly016ep243o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">The fight to save Canadian town threatened by Trump's tariffs</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>町自体は 1 世紀以上前に、工場の周囲と、松、樺、トウヒ、モミが生い茂る地域の森に建てられました。現在、カナダと米国の間の通商協議が決裂し、ドナルド・トランプ大統領が同国に追加関税を課したことを受けて、主要な雇用主であり経済の要である同国は活動を休止している。</p><p>工場の 360 人の従業員のほとんどは失業中ですが、当面は政府の関税軽減措置による給与の一部で何とか凌いでいます。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ナディーン・スーリーのように、工場の閉鎖は生計を失うだけでなく、生き方の喪失を意味する人もいます。</p><p>彼女は「都会っ子」ではなく、町の他の地域と同じように、短い季節を利用して、この後ヘラジカ狩りに出かける予定だ。彼女は、今年は動物たちから無料で提供される肉が必要になるだろうと冗談を言う。</p><p>「これは単なる仕事ではありません。ここは私たちの家なのです」とスーリーさんは言い、彼女の町に対する米国の関税は「個人攻撃」のように感じられると付け加えた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The town itself was built over a century ago, around the mill and the region's forests filled with pine, birch, spruce and fir. Now, the main employer and economic anchor sits idle after trade talks broke down between Canada and the US and President Donald Trump imposed more tariffs on the country.</p><p>Most of the millâs 360 employees are out of work, kept afloat for the moment with partial pay from government tariff-relief.</p><p>For some, like Nadine Suley, the shuttering of the mill could mark not just a lost livelihood, but a lost way of life.</p><p>She is not "a city girl", and is heading out moose hunting later to take advantage of the short season, like much of the town. She quips they'll all need the free meat provided by the animals this year.</p><p>"It's not just a job. It's our home," Suley says, adding that the US tariffs on her town feel like "a personal attack".</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cmly016ep243o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">10/31 05:55</span>
+    </div>
+
+    
+    <p class="title-ja">カナダのマーク・カーニー首相はDWのインタビューでEUとの協議、米国への過度の依存、ドナルド・トランプへの対処法について語った。</p>
+    <p class="title-en"><a href="https://www.dw.com/en/canadian-pm-mark-carney-discusses-talks-with-the-eu-overdependence-on-the-us-and-how-to-deal-with-donald-trump-in-a-dw-interview/a-79811469?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Canadian PM Mark Carney discusses talks with the EU, overdependence on the US and how to deal with Donald Trump in a DW interview.</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>カナダのマーク・カーニー首相は金曜日、カナダとEUの新たな緊密なパートナーシップの詳細を詰めようとする欧州連合首脳らとモントリオールで会談した後、DWに語った。</p><p>カナダの最大の貿易相手国を代表するドナルド・トランプ米大統領との交渉が難航する中、カーニー氏は同国が南部の経済大国に依存しすぎていると認識したと述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>カーニー氏は「カナダ人全体が得た教訓は、米国に過度に依存しているということだ。米国との結びつきが強すぎる。そして、国内で力を築き、国際的に志を同じくする国々とのパートナーシップを多様化し、深化させる必要がある」と述べた。</p><p>このビデオを表示するには、JavaScript を有効にし、HTML5 ビデオをサポートする Web ブラウザへのアップグレードを検討してください。</p><p>欧州委員会のウルズラ・フォン・デア・ライエン委員長と欧州理事会のアントニオ・コスタ議長が率いるEU代表団は金曜日、モントリオールでカーニー氏や他のカナダ当局者らと会談した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Canadian Prime Minister Mark Carney spoke to DW on Friday after talks in Montreal with European Union leaders seeking to hammer out details of a new, closer partnership between Canada and the EU .</p><p>Amid difficult negotiations with US President Donald Trump , representing Canada 's biggest trading partner, Carney said that he and his compatriots had come to realize the country was too dependent on the economic powerhouse to the south.</p><p>"The lesson we've taken, Canadians as a whole, is we're overdependent on the United States. Too closely connected to the United States. And we need to build our strength here at home and diversify and deepen our partnerships with like-minded countries internationally," Carney said.</p><p>To view this video please enable JavaScript, and consider upgrading to a web browser that supports HTML5 video</p><p>An EU delegation led by European Commission President Ursula von der Leyen and European Council President Antonio Costa held talks with Carney and other Canadian officials in Montreal on Friday.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/canadian-pm-mark-carney-discusses-talks-with-the-eu-overdependence-on-the-us-and-how-to-deal-with-donald-trump-in-a-dw-interview/a-79811469?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">10/30 23:08</span>
+    </div>
+
+    
+    <p class="title-ja">「アマチュアの愚か者」：フラビオ・ボルソナロの短命な「次期大統領」主張は嘲笑にさらされた</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/oct/30/flavio-bolsonaros-president-elect-claim-mockery-brazil" target="_blank" rel="noopener">‘Amateur morons’: Flávio Bolsonaro’s short-lived ‘president-elect’ claim met with mockery</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ブラジルメディア、米国への「恥ずべき」逃亡と間違った紋章付きの奇妙な手紙を巡り、敗北した候補者を嘲笑</p><p>フラヴィオ・ボルソナロ氏は、日曜日の夜までに人々が自分をブラジルの次期大統領と呼ぶようになるだろうと期待していた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>むしろ、選挙に負けた後米国に逃亡し、58分間にわたって自らを「ブラジルの真の次期大統領」と宣言したこの極右政治家の決断は笑い者となり、ブラジルの新聞や評論家は勝利した候補者に軽蔑的な形容詞の雨を浴びせている。</p><p>金曜日、保守系のエスタード・デ・サンパウロ紙は「フラヴィオ氏の愚かさは、あまりにも長い間、彼らの無謀な愚行とブラジルに対する取り返しのつかない軽蔑の人質にされていたクーデター実行犯一家から民主右派を解放したことになる」と激しく非難した。</p><p>ボルソナロ氏は、左翼の敵である現職大統領ルイス・イナシオ・ルーラ・ダ・シルバ氏に440万票の差で敗れてから48時間後、火曜日の夜、マイアミに逃亡した。ルラ氏の勝利は、ボルソナロ氏自身の党や多くの主要同盟国はもちろん、エルサルバドルのナイブ・ブケレ氏やイタリアのジョルジア・メローニ氏など世界中の右翼指導者らによって認められた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Brazilian media ridicule defeated candidate over ‘shameful’ absconsion to US and bizarre letter with wrong coat of arms</p><p>Flávio Bolsonaro had hoped that by Sunday night people would be calling him the next president of Brazil.</p><p>Instead, the far-right politician’s decision to flee to the US after losing the election and – for 58 minutes – to declare himself “Brazil’s true president-elect” , has made him a laughing stock, with Brazilian newspapers and commentators raining a barrage of scornful adjectives down on the conquered candidate.</p><p>“If it served any purpose at all, Flávio’s foolishness liberated the democratic right from a family of coup-mongers, which for far too long held it hostage to their reckless folly and irremediable disdain for Brazil,” the conservative Estado de São Paulo newspaper thundered on Friday.</p><p>Bolsonaro fled to Miami on Tuesday night, 48 hours after being beaten by his leftwing adversary, the incumbent president, Luiz Inácio Lula da Silva, by 4.4m votes. Lula’s victory has been recognised by rightwing leaders from around the world, including El Salvador’s Nayib Bukele and Italy’s Giorgia Meloni, not to mention Bolsonaro’s own party and many key allies.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/oct/30/flavio-bolsonaros-president-elect-claim-mockery-brazil" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/01 00:16</span>
+    </div>
+
+    
+    <p class="title-ja">コンゴ民主共和国で最悪の流行でエボラ出血熱で5,000人以上死亡</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cj5ynryyep2yo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">More than 5,000 die from Ebola in DR Congo's deadliest outbreak</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>政府のデータによると、コンゴ民主共和国で進行中のエボラ出血熱の流行により、5,000人以上が死亡した。</p><p>現在26州中8州が影響を受けており、感染者数は1万300人を超えている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>公衆衛生当局者らによると、5月に始まった流行は8月には同国史上最悪の死者数となった。現在の致死率は48.6%です。</p><p>保健省は最新の最新情報で、感染の震源地は依然として紛争地域である同国の北東部イトゥリ県にあり、ウイルスを封じ込めるのは困難になっていると述べた。</p><p>ケニア、ナイジェリア、ウガンダでも感染者が確認されている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>More than 5,000 people have died from an ongoing Ebola outbreak in the Democratic Republic of Congo, government data shows.</p><p>Eight of 26 provinces are now affected, with more than 10,300 confirmed cases.</p><p>The outbreak, which started in May, became the country's deadliest in its history in August, public health officials said. The current case fatality rate is 48.6%.</p><p>In its latest update, the health ministry said the epicentre of the epidemic remains in the Ituri province, in the north-east of the country, which is a conflict zone, making it harder to contain the virus.</p><p>Cases have also been confirmed in Kenya, Nigeria and Uganda.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cj5ynryyep2yo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">10/31 21:49</span>
+    </div>
+
+    
+    <p class="title-ja">スタジオは破壊され、伝統は守られる：アーティストたちはスーダンの文化を救うために戦う</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/features/2026/10/31/studios-destroyed-traditions-saved-artists-fight-to-save-sudans-culture?traffic_source=rss" target="_blank" rel="noopener">Studios destroyed, traditions saved: Artists fight to save Sudan’s culture</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>スーダン、ポートスーダン – ビジュアルアーティスト兼演劇監督のアワド・ハロウンさん（45歳）は、首都で苦労して築き上げてきた生活を戦争で破壊された後、ハルツーム北のアル・ハルファヤにある自宅から逃げ出した。</p><p>2023年4月にスーダン国軍（SAF）と民兵組織の迅速支援部隊（RSF）の間で戦闘が勃発した直後、彼は自宅、芸術的な作業スペース、仕事に必要な道具を残して妻と息子とともにポートスーダンに移住した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>逃げるとき、彼はほとんど持っていませんでした：シャツ2枚、ズボン2枚、本2冊、そしてすぐに戻ることを期待して破れた画用紙数枚。その代わりに、彼は故郷から遠く離れた場所で生活を立て直さなければならなくなった。</p><p>彼は家だけでなく、仕事や生計を立てるために頼っていた道具や資材も失いました。</p><p>ポートスーダンでは、彫刻、デザイン、装飾のスキルを活かしてお金を稼ごうと考えていました。それ以来、彼はユネスコと提携してアハリナ文化グループが主催するワーゼルフェスティバルでの演劇公演に参加し、文化団体との伝統芸術ワークショップを主導しました。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Port Sudan, Sudan – Awad Haroun, 45, a visual artist and theatre director, fled his home in Al-Halfaya, Khartoum North, after war destroyed a life he had worked hard to build in the capital.</p><p>He moved to Port Sudan with his wife and son, leaving behind his home, artistic workspace and the tools he needed to work, shortly after fighting erupted between the Sudanese Armed Forces (SAF) and Rapid Support Forces (RSF) paramilitary in April 2023.</p><p>When he fled, he carried little: Two shirts, two pairs of trousers, two books and a few torn drawing papers, expecting to return soon. Instead, he has been forced to rebuild his life far from home.</p><p>He lost not only his home but also the tools and materials he relied on to work and make a living.</p><p>In Port Sudan, he looked to use his skills in sculpture, design and decoration for some money. He has since participated in theatrical performances at Wasel Festival, organised by Ahalina Cultural Group in partnership with UNESCO, and led traditional arts workshops with cultural groups.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/features/2026/10/31/studios-destroyed-traditions-saved-artists-fight-to-save-sudans-culture?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-11-01";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
