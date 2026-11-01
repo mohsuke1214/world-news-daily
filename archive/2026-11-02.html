@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年11月2日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">3</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">3</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/02 00:40</span>
+    </div>
+
+    
+    <p class="title-ja">イタリアの崖で立ち往生した登山者をヘリコプターによる劇的な救助で救う</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/1/dramatic-helicopter-rescue-saves-climbers-stranded-on-italian-cliff?traffic_source=rss" target="_blank" rel="noopener">Dramatic helicopter rescue saves climbers stranded on Italian cliff</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イタリアの崖で立ち往生した登山者をヘリコプターによる劇的な救助で救う</p><p>イタリアの急峻な岩壁に取り残された登山者を救うため、消防士らがヘリコプターによる救助活動を実施した。ビデオには、ヘリコプターがそびえ立つ石灰岩の崖の近くで危険なほどホバリングし、救助隊が登山者に到達するために活動する劇的な場面が映っている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Dramatic helicopter rescue saves climbers stranded on Italian cliff</p><p>Firefighters carried out a helicopter rescue operation to save climbers stranded on a steep rock face in Italy. Video shows dramatic scenes of the helicopter hovering dangerously close to a towering limestone cliff as rescuers work to reach the climbers.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/1/dramatic-helicopter-rescue-saves-climbers-stranded-on-italian-cliff?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/01 23:56</span>
+    </div>
+
+    
+    <p class="title-ja">オレシキ住民がウクライナに帰国</p>
+    <p class="title-en"><a href="https://www.france24.com/en/oleshky-residents-return-to-ukraine" target="_blank" rel="noopener">Oleshky residents return to Ukraine</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ロシア占領下のオレシキから避難した住民が、珍しい地元での停戦を経て、ウクライナ占領地に到着した。彼らは何年にもわたる孤立、食糧不足、定期的な砲撃について語り、生き残るために草や犬を食べることを余儀なくされたと語る人もいた。 2022年の侵攻初期にロシア軍に制圧されたこの都市は、一方の側をドニプロ川、もう一方の側をロシア軍が隔てたままとなっている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Residents evacuated from Russian-occupied Oleshky have reached Ukrainian-held territory following a rare local truce. They described years of isolation, food shortages and regular shelling, with some saying they were forced to eat grass and dogs to survive. Seized by Russian forces in the early days of the 2022 invasion, the city remains cut off by the Dnipro River on one side and Russian troops on the other.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/oleshky-residents-return-to-ukraine" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/01 20:57</span>
+    </div>
+
+    
+    <p class="title-ja">ドイツの生活費削減デモが暴徒化し、店舗が略奪される</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cqj34gnd3n30o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Shops looted as German cost-of-living protests turn violent</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ドイツの各都市で生活費をめぐって衝突が勃発する中、土曜遅くに暴徒らがフランクフルト中心部の店舗を略奪した。</p><p>ドイツの金融の中心地であるフランクフルト以外にも、ベルリン、ケルン、ハンブルクでも暴力事件が発生しており、警察は、花火や石、瓶で緊急作業員を狙っていたデモ参加者を解散させるために放水銃を使用したと発表した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>その日の早い時間には、数千人がほぼ平和的なデモに参加した。これらは、学校への資金不足、高額な生活費、公共支出の削減、兵役に抗議するために、キャンペーングループ「Gen Z regelt」（「Z世代が責任を負う」という意味）によって組織された。</p><p>ドイツの暴動は、フランスでも同様の若者主導の大規模抗議活動に続き、土曜日には32万人以上がデモを行った。</p><p>日曜日、ドイツのアレクサンダー・ドブリント内務大臣はビルト紙に対し、夜間警察がここ数週間「パリで見られたような暴力」を阻止したと述べ、暴徒や略奪者に対する「厳しい処罰」を求めた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Rioters looted shops in central Frankfurt late on Saturday as clashes erupted in German cities over the cost of living.</p><p>Besides Frankfurt - Germany's financial hub - there were incidents of violence in Berlin, Cologne and Hamburg, with police saying they used water cannon to disperse protesters who were targeting emergency workers with fireworks, stones and bottles.</p><p>Thousands joined largely peaceful demonstrations earlier in the day. They were organised by the campaign group Gen Z regelt - meaning "Gen Z takes charge" - to protest against underfunding in schools, the high cost of living, public spending cuts and military service.</p><p>The unrest in Germany follows similar youth-led mass protests in France, where more than 320,000 people also demonstrated on Saturday.</p><p>On Sunday, Germany's Interior Minister Alexander Dobrindt told Bild newspaper that overnight police had prevented "violence like that seen in Paris" in recent weeks and called for "harsh punishments" for rioters and looters.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cqj34gnd3n30o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/01 04:49</span>
+    </div>
+
+    
+    <p class="title-ja">ヴチッチ後のセルビア：勝者は忍耐力を失いつつある</p>
+    <p class="title-en"><a href="https://www.dw.com/en/serbia-after-vucic-the-winners-are-losing-patience/a-79817586?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Serbia after Vucic: The winners are losing patience</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>アレクサンダル・ブチッチはスポットライトに慣れている。セルビアの全能の大統領として、忠実なメディアは何年にもわたって彼のあらゆる動きを追跡しました。彼のTikTokでの暴言は夕方のニュースを牽引した。しかし、10月25日の学生名簿選挙で彼は落選し、それ以来、多くのことが変わった。</p><p>ヴチッチ氏は記者会見で、いつもより少ないマイクの前で、勝者が「革命的テロル」を実践していると不満を述べた。同氏は、「もし彼らが、殴打や破壊など、異なる考えを持つ人々に恐怖を与え続け、国家当局が何もしなければ、我々は組織化を余儀なくされるだろう」と脅迫した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ヴチッチ氏は、セルビア国営放送RTSの総局長の即時辞任をこの「テロ」の一例とみなしている。 RTSの上級編集者も解雇された。</p><p>月曜日、少数の抗議者グループがインフォーマーテレビ局に侵入した。インフォーマーはヴチッチ批評家を悪者扱いしているとして、長年にわたり何千件もの苦情が提出されてきた。現在、ジャーナリスト協会はそのライセンスの剥奪を求めている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Aleksandar Vucic is accustomed to the spotlight. As Serbia 's all-powerful president, loyal media outlets followed his every move for years. His TikTok outbursts led the evening news. But on October 25 he lost the election to the Student List, and since then, a lot has changed.</p><p>Vucic complained at a press conference, before fewer microphones than usual, that the winners were practising "revolutionary terror." He threatened: "If they continue to terrorize those who think differently – beatings, destruction and all the rest – and the state authorities do nothing, we will be forced to organize ourselves."</p><p>Vucic regards the immediate resignation of the general director of the Serbian state broadcaster RTS as an example of this "terror." Senior RTS editors have also been dismissed.</p><p>On Monday, a small group of protesters invaded the Informer TV station. Thousands of complaints have been lodged against Informer over the years for its demonization of Vucic critics. Now, journalists' associations are calling for its license to be revoked.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/serbia-after-vucic-the-winners-are-losing-patience/a-79817586?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/02 00:38</span>
+    </div>
+
+    
+    <p class="title-ja">エルサレム毎日：イスラエルはヘブロンで包囲と逮捕を継続</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/1/jerusalem-daily-israel-continues-siege-and-arrests-in-hebron?traffic_source=rss" target="_blank" rel="noopener">JERUSALEM DAILY: Israel continues siege and arrests in Hebron</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>エルサレム毎日：イスラエルはヘブロンで包囲と逮捕を継続</p><p>イスラエルによるヘブロン包囲は10日目となり、ガザへの攻撃は続いている。一方、テルアビブと西エルサレムのイスラエルの抗議活動参加者はネタニヤフ首相の座を奪うよう求めている。アルジャジーラのハラ・アル・シャミには最新情報が掲載されています。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>JERUSALEM DAILY: Israel continues siege and arrests in Hebron</p><p>Israel’s siege on Hebron is on its 10th day and its attacks on Gaza continue. Meanwhile, Israeli protesters in Tel Aviv and West Jerusalem are pushing to unseat Netanyahu. Al Jazeera’s Hala Al Shami has the latest.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/1/jerusalem-daily-israel-continues-siege-and-arrests-in-hebron?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/01 23:16</span>
+    </div>
+
+    
+    <p class="title-ja">イスラエルの選挙:いつ政府が樹立され、誰が主導するのか?</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/1/israel-election-when-will-government-be-formed-who-will-lead-it?traffic_source=rss" target="_blank" rel="noopener">Israel election: When will government be formed, who will lead it?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イスラエルのベンヤミン・ネタニヤフ首相は、10月27日の議会選挙の後、連立政権の議会過半数を失った。</p><p>しかし、ネタニヤフ首相に反対するユダヤ系政党のブロックも120議席のクネセトで過半数を獲得できず、イスラエルは新政権への明確な道筋を失ったままになっている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>今後は数週間にわたる政治的論争が予想され、イスラエルの異なる派閥が、対立する派閥を結集させる統一政府や外部の支援に依存する少数派政府など、統治体制の可能性を検討している。合意に達しなければ、イスラエルは再び投票に戻る可能性がある。</p><p>親ネタニヤフ連合は53議席を獲得した。</p><p>ネタニヤフに反対するユダヤ系政党のブロックが48議席を獲得した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Israeli Prime Minister Benjamin Netanyahu has lost his coalition’s parliamentary majority following legislative elections on October 27.</p><p>But a bloc of Jewish parties opposing Netanyahu also failed to win a majority in the 120-seat Knesset, leaving Israel without a clear path to a new government.</p><p>What’s ahead is likely weeks of political wrangling as Israel’s disparate factions weigh possible governing arrangements, including a unity government bringing rival factions together or a minority government reliant on outside support. If they fail to reach an agreement, Israel could head back to the polls.</p><p>The pro-Netanyahu coalition won 53 seats:</p><p>A bloc of Jewish parties opposing Netanyahu won 48 seats:</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/1/israel-election-when-will-government-be-formed-who-will-lead-it?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/01 23:10</span>
+    </div>
+
+    
+    <p class="title-ja">イスラエルのガザ攻撃で少なくとも9人死亡</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/1/israeli-attacks-on-gaza-kill-at-least-nine-people?traffic_source=rss" target="_blank" rel="noopener">Israeli attacks on Gaza kill at least nine people</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イスラエルのガザ攻撃で少なくとも9人死亡</p><p>日曜日、ガザ市とハーンユニスに対するイスラエルの攻撃により、少なくとも9人が死亡した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Israeli attacks on Gaza kill at least nine people</p><p>Israeli attacks on Gaza City and Khan Younis killed at least nine people on Sunday.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/1/israeli-attacks-on-gaza-kill-at-least-nine-people?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/01 23:46</span>
+    </div>
+
+    
+    <p class="title-ja">写真：選挙区長に対するインドの野党集会に数千人が参加</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/gallery/2026/11/1/photos-indian-opposition-rallies-against-elections-chief?traffic_source=rss" target="_blank" rel="noopener">Photos: Thousands join India’s opposition rally against election chief</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>野党がナレンドラ・モディ首相の与党に有利だと主張する有権者名簿の変更を巡り、インドの選挙管理委員長の辞任を求めて数千人がニューデリーを行進した。</p><p>インド国民会議のラーフル・ガンジー氏は日曜日の抗議活動を主導したが、これは選挙人名簿の偏った改訂を監督したとしてギャネーシュ・クマール首席選挙管理委員長を非難する1か月以上にわたるデモの最新のものである。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>野党指導者らは、1億3000万人以上の名前の削除はイスラム教徒やその他の少数派に不当な影響を与えており、彼らはモディ首相のヒンズー教民族主義者インド人民党（BJP）を支持する可能性が低いと主張している。</p><p>選挙管理委員会はいかなる政党にも有利であることを否定し、名前が誤って削除された有権者は再登録できるとしている。</p><p>インド人民党は、野党が合法的な手続きに異議を唱え、民主主義を損なっていると非難した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Thousands have marched through New Delhi demanding the resignation of India’s chief election commissioner over changes to voter lists that opposition parties say favour Prime Minister Narendra Modi’s ruling party.</p><p>Rahul Gandhi of the Indian National Congress led Sunday’s protest , the latest in more than a month of demonstrations accusing Chief Election Commissioner Gyanesh Kumar of overseeing a biased revision of electoral rolls.</p><p>Opposition leaders say the removal of more than 130 million names disproportionately affected Muslims and other minorities, who are less likely to back Modi’s Hindu nationalist Bharatiya Janata Party (BJP).</p><p>The Election Commission has denied favouring any party and says voters whose names were wrongly deleted can re-register.</p><p>The BJP has accused the opposition of undermining democracy by challenging legitimate procedures.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/gallery/2026/11/1/photos-indian-opposition-rallies-against-elections-chief?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/01 22:11</span>
+    </div>
+
+    
+    <p class="title-ja">仮想通貨企業バイナンス、63億ドルのハッキング被害の90％を補償</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/ckpdg3ql4169o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Crypto firm Binance covers 90% of losses after $6.3bn hack</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>世界最大の仮想通貨取引所バイナンスは、木曜日のハッキングで盗まれた63億ドル（47億ポンド）の資産の90％をカバーしたと発表した。</p><p>残りの10％については、必要な量を調達するのにさらに時間がかかる可能性があると同社は付け加えた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>バイナンスは、仮想通貨史上最大のハッキングとされる事件による損失を100％補償すると一貫して約束しており、そのために63億4000万ドル以上の社内資金を確保したと述べた。</p><p>同社は土曜日の声明で、「バイナンスはユーザーではなく、これらの盗まれた資金による財務的影響を吸収する」と述べた。</p><p>バイナンスは日曜の更新で、ハッキングを受けて一時停止されていた同社のネットワークのいくつかで引き出しが復活したと発表した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Binance, the world's largest cryptocurrency exchange, says it has covered 90% of the $6.3bn (Â£4.7bn) assets stolen in a hack on Thursday.</p><p>The remaining 10% may take longer to source in the required amounts, the company added.</p><p>Binance has consistently pledged to cover 100% of the losses from what is suspected to be crypto's biggest hack on record and said it has set aside more than $6.34bn in company funds to do so.</p><p>"Binance will absorb the financial impact of these stolen funds, not our users," the company said in a statement on Saturday.</p><p>In an update on Sunday, Binance said withdrawals had been restored on several of its networks, after they were suspended following the hack.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/ckpdg3ql4169o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/01 20:54</span>
+    </div>
+
+    
+    <p class="title-ja">バイナンス、記録的な63億ドル規模のハッキング後、顧客の出金を再開</p>
+    <p class="title-en"><a href="https://www.theguardian.com/business/2026/nov/01/binance-losses-covered-hack-fbi-north-korea-cryptocurrency" target="_blank" rel="noopener">Binance resumes customer withdrawals after record $6.3bn hack</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>仮想通貨取引所、FBIが北朝鮮政府支援団体TraderTraitorを非難、損失の90％をカバーと発表</p><p>仮想通貨取引所バイナンスは、記録的な63億ドル（47億ポンド）のハッキングからの回復に伴い、顧客がプラットフォームから資金を引き出すことを許可し始めた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>同取引所は木曜日に窃盗事件に見舞われ、以来史上最大の強盗と言われており、専門家らは犯人の可能性が高いのは北朝鮮だと特定している。</p><p>バイナンスは当初、漏洩を調査するため出金を凍結していたが、日曜日、シンガポール時間の午後2時以降に段階的に再開を開始したと発表した。</p><p>第1段階では、イーサリアムブロックチェーン上でイーサリアム、USDT、USDCトークンを保有している人々は資金を引き出すことができ、またBNBスマートチェーンブロックチェーン上に保有している一部の人々も同様に資金を引き出すことができた。日曜後半、ドージコインとアバランチ通貨の取引がそれぞれのプラットフォームで再開された。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Cryptocurrency exchange says 90% of losses covered as FBI blames North Korean state-sponsored group TraderTraitor</p><p>The cryptocurrency exchange Binance has started to allow its customers to withdraw their funds from the platform, as it recovers from a record $6.3bn (£4.7bn) hack.</p><p>The exchange was hit by the theft on Thursday, which has since been described as the biggest heist in history, with experts identifying North Korea as the likely culprit.</p><p>Binance initially froze withdrawals as it investigated the breach, but on Sunday announced that it had began a phased reopening after 2pm Singapore time.</p><p>In the first phase people holding the ethereum, USDT and USDC tokens on the ethereum blockchain were able to withdraw their funds, as well as some others held on the BNB Smart Chain blockchain. Later on Sunday, dealing in the Dogecoin and Avalanche currencies resumed on their own platforms.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/business/2026/nov/01/binance-losses-covered-hack-fbi-north-korea-cryptocurrency" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/01 16:33</span>
+    </div>
+
+    
+    <p class="title-ja">FBI、バイナンスの仮想通貨盗難60億ドルに北朝鮮が関与していると発表</p>
+    <p class="title-en"><a href="https://www.dw.com/en/fbi-says-north-korea-behind-6-billion-binance-crypto-theft/a-79819998?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">FBI says North Korea behind $6 billion Binance crypto theft</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>FBIは土曜日、仮想通貨取引所バイナンスから60億ドル（53億6000万ユーロ）以上の仮想資産が盗まれた背後には北朝鮮が関与していると発表した。</p><p>「朝鮮民主主義人民共和国（北朝鮮）は、2026年10月29日頃、仮想通貨取引所バイナンスから60億ドル以上の仮想資産を盗んだ責任がある」と米国法執行機関は声明で述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>この盗難は数分以内に発生し、史上最大の暗号通貨強盗と考えられている。</p><p>盗まれた資産には、ビットコイン、イーサリアム、テザーやUSDコインなどのステーブルコインが含まれており、その価値は従来の通貨に固定されていました。</p><p>サイバー攻撃のニュースにより、金曜日にはほとんどの主要仮想通貨の価格が下落した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The FBI said Saturday that North Korea was behind the theft of more than $6 billion (€5.36 billion) in virtual assets from the cryptocurrency exchange Binance.</p><p>"The Democratic People's Republic of Korea (North Korea) was responsible for the theft of more than $6 billion USD in virtual assets from cryptocurrency exchange Binance, on or about October 29, 2026," the US law enforcement agency said in a statement.</p><p>The theft, which happened within a matter of minutes, is believed to be the biggest cryptocurrency heist in history.</p><p>The stolen assets included bitcoin, ethereum and stablecoins such as tether and USD Coin, whose values are pegged to traditional currencies.</p><p>News of the cyberattack caused the prices of most major cryptocurrencies to slump on Friday.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/fbi-says-north-korea-behind-6-billion-binance-crypto-theft/a-79819998?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/02 00:50</span>
+    </div>
+
+    
+    <p class="title-ja">トランプ大統領、元弁護士と恩赦された銀行家の家族との5000万ドルの取引を非難</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/1/trump-slams-ex-lawyers-50m-deal-with-pardoned-bankers-family?traffic_source=rss" target="_blank" rel="noopener">Trump slams ex-lawyer’s $50m deal with pardoned banker’s family</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ドナルド・トランプ米大統領は、後にトランプ大統領が恩赦したベネズエラ人の銀行家の家族と5000万ドル以上の契約を結んだとして元弁護士の一人を批判した。</p><p>伝えられるところによると、アリーナ・ハバ・ミルドンは連邦検察官として勤務中にこの有利な契約に署名し、その後米国司法省の顧問として雇用されながら銀行家の家族のために働き始めた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>トランプ大統領は土曜日、フロリダ州のクラブ「マール・ア・ラーゴ」で記者団に対し、「全く不快で法外な行為だと思った。容認できない」と語った。</p><p>ニューヨーク・タイムズ紙によると、ハッバ・ミルドン氏は2025年10月、大統領恩赦を求めていたベネズエラの銀行家フリオ・エレーラ・ヴェルティーニ氏の家族が所有する会社と4年契約を結んだ。</p><p>エレーラ氏は、自身の銀行を調査していた金融規制当局の解任と引き換えに、元プエルトリコ知事のワンダ・バスケス・ガルセド氏に賄賂を贈った疑いで告発されている。同氏は2025年8月に検察当局と司法取引に至るまで、米国で連邦贈収賄容疑で起訴されていた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>US President Donald Trump has criticised one of his former lawyers for signing a contract worth more than $50 million with the family of a Venezuelan banker whom Trump later pardoned.</p><p>Alina Habba Mildon reportedly signed the lucrative deal while working as a federal prosecutor and later began working for the banker’s family while still being employed as an adviser to the US Department of Justice.</p><p>“I thought it was totally obnoxious and outrageous, and it’s not acceptable,” Trump told reporters at his Mar-a-Lago club in Florida on Saturday.</p><p>According to The New York Times, Habba Mildon signed a four-year contract in October 2025 with a company owned by the family of Julio Herrera Velutini, a Venezuelan banker who was seeking a presidential pardon.</p><p>Herrera was accused of bribing former Puerto Rico Governor Wanda Vazquez Garced in exchange for removing a financial regulator who was investigating his bank. He was facing federal bribery charges in the US before reaching a plea deal with prosecutors in August 2025.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/1/trump-slams-ex-lawyers-50m-deal-with-pardoned-bankers-family?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/01 22:56</span>
+    </div>
+
+    
+    <p class="title-ja">米国中間選挙：民主党は左傾化に直面</p>
+    <p class="title-en"><a href="https://www.france24.com/en/us-midterms-democrats-face-leftward-surge" target="_blank" rel="noopener">US Midterms: Democrats face leftward surge</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>民主党が議会の主導権を取り戻そうとする中、党内の今後の方向性を巡って分裂が生じている。進歩的な候補者の新たな波は、優先順位をさらに左に移そうとしており、政治における企業の資金に挑戦し、国民皆保険、気候変動対策、警察による暴力の終結を訴えている。モンテ・フランシスが報じた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>As Democrats seek to regain control of Congress, divisions within the party are emerging over its future direction. A new wave of progressive candidates is pushing to shift priorities further to the left, challenging corporate money in politics and calling for universal healthcare, climate action and an end to police violence. Monte Francis reports.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/us-midterms-democrats-face-leftward-surge" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/01 21:00</span>
+    </div>
+
+    
+    <p class="title-ja">米中貿易戦争は沈静化したようだが、その平穏感は誤解を招く</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/nov/01/us-china-trade-war-trump-xi" target="_blank" rel="noopener">The US-China trade war seems to have subsided – but the sense of calm is misleading</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>停戦により貿易紛争は沈静化したが、両国とも新たな敵対行為の勃発を制限するために何もしていない</p><p>ドナルド・トランプの貿易戦争はほとんど見出しから消えた。米国大統領が常軌を逸した場合、たとえば連邦準備理事会が利下げしなければ赤字国との貿易を停止すると脅すなど、新たな関税への懸念が時折高まる。しかし、世界の二大経済大国があからさまな経済大混乱に突き進んでいるという感覚は、トランプがアメリカの民主主義を終わらせる、AIが私たち全員を殺す、などといった他のより顕著な恐怖よりも後回しになっている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>穏やかな感覚は誤解を招きます。世界は人知れず、潜在的に壮大な規模の経済戦争に向かって進んでおり、歴史が示唆するように、それは現実に波及する可能性が十分にあります。</p><p>激化する貿易摩擦で米中両国が昨年合意した停戦は来年1月まで延長され、両国間の熱意が和らぎ、報復関税の激化に終止符が打たれ、未確定の将来の貿易協定の一部への扉が開かれた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A truce has cooled the trade conflict, but neither country has done anything to limit the outbreak of new hostilities</p><p>Donald Trump ’s trade wars have largely fallen off the headlines. Fears of new tariffs flare up from time to time when the US president goes off the rails – for instance, threatening to end US trade with countries with which it has a deficit unless the Federal Reserve cuts interest rates. But the sense that the world’s two largest economies are plowing ahead into an overt economic conflagration has taken a back seat to other, more salient fears, about Trump ending American democracy, AI killing us all and stuff like that.</p><p>The sense of calm is misleading. Under the radar, the world is marching toward an economic war of potentially epic proportions, one that, history suggests, could well spill over into the real thing.</p><p>The truce reached by Washington and Beijing last year in their escalating trade conflict, which has been extended until next January, lowered the heat between the two – putting an end to the escalation of tit-for-tat tariffs and opening a door to some as yet undefined future trade deal.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/nov/01/us-china-trade-war-trump-xi" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/01 17:11</span>
+    </div>
+
+    
+    <p class="title-ja">セルビアとブラジルの選挙後、ドナルド・トランプ氏は同盟者を失う</p>
+    <p class="title-en"><a href="https://www.dw.com/en/donald-trump-loses-allies-after-elections-in-serbia-and-brazil/a-79812075?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Donald Trump loses allies after elections in Serbia and Brazil</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米国では中間選挙が目前に迫っています。11 月 3 日火曜日、米国の有権者は米国議会の代表を選出します。ドナルド・トランプ大統領率いる右派・保守党の共和党は現在、両院で過半数を占めている。</p><p>しかし、世界の他の地域ではすでに選挙結果が出ている。セルビアとブラジルの有権者の大多数は左翼政党に投票している。これらの結果は米国の中間選挙に影響を与えることはないが、セルビアの学生リストの勝利とブラジルの現職大統領ルイス・イナシオ・“ルーラ”・ダ・シルバの勝利は、やはりトランプにとって悪いニュースだ。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>セルビアでは、退任するアレクサンダー・ヴチッチ大統領というヨーロッパの重要な同盟国を失った。そしてブラジルでは、トランプ陣営はフラビオ・ボルソナロ氏の勝利を期待していた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The midterm elections in the United States are just around the corner: On Tuesday, November 3, American voters will choose their representatives to the US Congress. The right-wing-conservative Republican party of President Donald Trump currently has a majority in both chambers.</p><p>But in other parts of the world election results are already in. The majority of voters in both Serbia and Brazil cast their ballots for left-wing parties. Those results will not influence the midterms in the US, but the victories of the Student List in Serbia and the incumbent president, Luiz Inacio "Lula" da Silva , in Brazil are bad news for Trump all the same.</p><p>In Serbia, he has lost an important European ally in outgoing president Aleksandar Vucic . And in Brazil, the Trump camp had been hoping Flavio Bolsonaro would triumph.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/donald-trump-loses-allies-after-elections-in-serbia-and-brazil/a-79812075?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/01 23:26</span>
+    </div>
+
+    
+    <p class="title-ja">なぜモロッコは西サハラに関する国連決議の敗北を祝っているのでしょうか?</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/1/why-is-morocco-celebrating-the-defeat-of-a-un-resolution-on-western-sahara?traffic_source=rss" target="_blank" rel="noopener">Why is Morocco celebrating the defeat of a UN resolution on Western Sahara?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>モロッコは、係争中の西サハラにおける国連任務の延長を求める米国起草の決議案が否決されたことを歓迎している。</p><p>国連西サハラ住民投票ミッション（MINURSO）の任務は土曜日、ロシアによる拒否権の後期限切れとなり、平和維持ミッションの将来は宙に浮いたままとなった。 1991年、国連は停戦を監視し、領土の将来に関する住民投票を準備するためにMINURSOを設立した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>モロッコは、英国とほぼ同じ広さのアフリカ北西部の砂漠地帯からスペインが撤退した1975年以来、西サハラを独自の領土とみなしている。アルジェリアが支援するポリサリオ戦線は、サハラウィ共和国と呼ばれる独立国家の樹立を目指している。</p><p>では、なぜモロッコは国連決議の失敗を祝っているのでしょうか?それは紛争地域の将来にとって何を意味するのでしょうか？</p><p>金曜日、国連安全保障理事会の常任理事国である米国は、係争中の西サハラでの自決の原則を支持する決議案を提案した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Morocco has welcomed the defeat of a US-drafted resolution which sought to extend the mandate of the UN mission in the disputed Western Sahara.</p><p>The mandate of the United Nations Mission for the Referendum in Western Sahara (MINURSO) expired on Saturday after a veto by Russia, leaving the future of the peacekeeping mission in limbo. In 1991, the UN established MINURSO to monitor a ceasefire and prepare a referendum on the territory’s future.</p><p>Morocco has considered Western Sahara its own territory since 1975, when Spain withdrew from the desert region in northwest Africa which is roughly the size of Britain. The Algeria-backed Polisario Front seeks to establish an independent state called the Sahrawi Republic.</p><p>So, why is Morocco celebrating the failed UN resolution? What does it mean for the future of the disputed region?</p><p>On Friday, the US, which is a permanent member of the UN Security Council, proposed a resolution to support the principle of self-determination in the disputed Western Sahara.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/1/why-is-morocco-celebrating-the-defeat-of-a-un-resolution-on-western-sahara?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/01 20:14</span>
+    </div>
+
+    
+    <p class="title-ja">ユースオリンピック競技大会が始まるセネガルの祝賀日</p>
+    <p class="title-en"><a href="https://www.france24.com/en/tv-shows/sports/20261101-a-day-of-celebration-in-senegal-as-the-youth-olympic-games-get-underway" target="_blank" rel="noopener">A day of celebration in Senegal as the Youth Olympic Games get underway</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>アフリカとセネガルにとって歴史的な日です。史上初めて、アフリカの地でオリンピック競技が開催される。土曜日、セネガルのダカール地方でユースオリンピック競技大会が正式に開幕し、開会式には3万人が出席した。 14歳から17歳までの2,700人のアスリートが集まるこの大会には、セネガルの3つの都市で25の競技がプログラムに参加して開催される。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>It is a historic day for Africa and Senegal. For the first time ever, an Olympic competition is being held on African soil. The Youth Olympic Games officially got underway in Senegal in the Dakar region on Saturday, with an opening ceremony attended by 30,000 people. The competition, which brings together 2,700 athletes aged between 14 and 17, will take place across three Senegalese cities, with 25 sports on the programme.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/tv-shows/sports/20261101-a-day-of-celebration-in-senegal-as-the-youth-olympic-games-get-underway" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/01 00:16</span>
+    </div>
+
+    
+    <p class="title-ja">コンゴ民主共和国で最悪の流行でエボラ出血熱で5,000人以上死亡</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cj5ynryyep2yo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">More than 5,000 die from Ebola in DR Congo's deadliest outbreak</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>政府のデータによると、コンゴ民主共和国で進行中のエボラ出血熱の流行により、5,000人以上が死亡した。</p><p>現在26州中8州が影響を受けており、感染者数は1万300人を超えている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>公衆衛生当局者らによると、5月に始まった流行は8月には同国史上最悪の死者数となった。現在の致死率は48.6%です。</p><p>保健省は最新の最新情報で、感染の震源地は依然として紛争地帯である同国北東部のイトゥリ県であり、ウイルスの封じ込めは困難になっていると述べた。</p><p>ケニア、ナイジェリア、ウガンダでも感染者が確認されている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>More than 5,000 people have died from an ongoing Ebola outbreak in the Democratic Republic of Congo, government data shows.</p><p>Eight of 26 provinces are now affected, with more than 10,300 confirmed cases.</p><p>The outbreak, which started in May, became the country's deadliest in its history in August, public health officials said. The current case fatality rate is 48.6%.</p><p>In its latest update, the health ministry said the epicentre of the epidemic remains in the Ituri province, in the north-east of the country, which is a conflict zone, making it harder to contain the virus.</p><p>Cases have also been confirmed in Kenya, Nigeria and Uganda.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cj5ynryyep2yo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-11-02";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
