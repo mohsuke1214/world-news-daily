@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年11月5日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/05 01:51</span>
+    </div>
+
+    
+    <p class="title-ja">米国の中間選挙は少数派が重要な選挙で勝利し、歴史的初の波をもたらす</p>
+    <p class="title-en"><a href="https://www.france24.com/en/us-midterms-bring-a-wave-of-historic-firsts-as-minorities-win-key-races" target="_blank" rel="noopener">US midterms bring a wave of historic firsts as minorities win key races</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米国の中間選挙では、重要な選挙でマイノリティーが勝利し、歴史的初の波が押し寄せている。ミネソタ州では初のネイティブ・アメリカン女性上院議員、ニューハンプシャー州では初の同性愛者であることを公にした男性上院議員、ミシガン州では初のイスラム教徒上院議員、そしてジョージア州では初の黒人女性知事が誕生した。 FRANCE 24のエリッツァ・ガデヴァはさらに多くのことを持っています。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>US midterms bring a wave of historic firsts as minorities win key races: The first Native American female senator in Minnesota, the first openly gay male senator in New Hampshire, the first Muslim senator in Michigan and the country's first Black female governor in Georgia. FRANCE 24's Elitsa Gadeva has more.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/us-midterms-bring-a-wave-of-historic-firsts-as-minorities-win-key-races" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/05 01:26</span>
+    </div>
+
+    
+    <p class="title-ja">犯人に関する理論が渦巻く中、フランスの血液保管所が冷凍庫ハッキングの影響を受ける</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c8vgxyvz6y9ro?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">French blood storage impacted by freezer hacks as theories swirl about culprits</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ロシアの2つのハクティビストグループは、ヨーロッパのスーパーマーケットに影響を与えた冷凍庫ハッキングの波に協力したと主張した。</p><p>Noname057(16) と Z-Pentest Alliance は Telegram に自分たちの責任であると投稿し、「高いレベルのスキルと精度を再び証明した」と自慢しました。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>しかし、彼らの投稿とチャンネルは現在削除されており、彼らの主張は一部懐疑的に受け止められている。</p><p>複数の企業のサイバーセキュリティ研究者らは、冷凍庫ハッキングの波の背後に誰がいるのかを解明する手がかりを提供するために、いわゆる「ハニーポット」から集めた証拠を大量に集めている。</p><p>ロシアのグループの可能性は排除されていないが、専門家らは、イランのハクティビストや国家ハッカー、さらにはいたずらをする十代の若者も犯人である可能性があると述べている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Two Russian hacktivist groups have claimed they worked together on the waves of freezer hacks which have affected European supermarkets.</p><p>Noname057(16) and Z-Pentest Alliance posted on Telegram that they were responsible, bragging that they had "once again demonstrated a high level of skill and precision".</p><p>But their posts and channels have now been deleted and their claims are being met with some scepticism.</p><p>Cyber-security researchers at multiple firms are pouring over evidence gathered from so-called "honeypots" to provide clues as to who is behind the waves of freezer hacks.</p><p>While Russian groups are not being ruled out, experts say Iranian hacktivists or nation state hackers - or even teenagers pulling pranks - could also be the culprits.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c8vgxyvz6y9ro?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/05 01:20</span>
+    </div>
+
+    
+    <p class="title-ja">ウクライナ空爆、ロシア・ベルゴロド州で3人死亡</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/4/ukrainian-strikes-kill-three-in-russias-belgorod-region?traffic_source=rss" target="_blank" rel="noopener">Ukrainian strikes kill three in Russia’s Belgorod region</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ウクライナの無人機攻撃により、ロシアのベルゴロド地域で3人が死亡し、攻撃によりウクライナの複数の都市とロシア占領下のクリミアの一部で停電が発生したと当局者が報告した。</p><p>ウクライナと国境を接するベルゴロドの地元ロシア当局は水曜日、３人の死亡を発表した。ウクライナでは、ヴォロディミル・ゼレンスキー大統領が、ロシアによる夜間攻撃により9地域の発電施設と変電所が損傷し、多くの都市で緊急停止が発生したと述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ロシア国防省は、ウクライナのキエフとジトームィル地域にある２つの発電所が攻撃されたことをテレグラムで確認した。ウクライナは、冬を前に気温が低下する中、ロシア政府が自国のエネルギー網をターゲットにしていると繰り返し述べてきた。</p><p>一夜にして重要インフラに対するロシアの攻撃により、キエフとその周辺地域で数時間にわたる停電と断水が発生した。</p><p>首都の住民は公共の飲料水飲み場を使用するよう促され、最も被害が大きかった地域には温かいお茶と機器を充電するための電源ポイントを提供する緊急センターが設置された。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Ukrainian drone strikes have killed three people in Russia’s Belgorod region, while attacks cut power to multiple cities in Ukraine and parts of Russian-occupied Crimea, officials reported.</p><p>Local Russian authorities in Belgorod, which borders Ukraine, announced the three deaths on Wednesday. In Ukraine, President Volodymyr Zelenskyy said Russia’s overnight attacks damaged power generation facilities and substations in nine regions leaving emergency outages in many cities.</p><p>Russia’s Defence Ministry confirmed on Telegram that it hit two power stations in Ukraine’s Kyiv and Zhytomyr regions. Ukraine has repeatedly said Moscow is targeting its energy grid as temperatures drop before winter.</p><p>Overnight, Russian attacks on critical infrastructure caused hours-long power and water outages across Kyiv and surrounding regions.</p><p>Residents in the capital were urged to use public drinking water fountains, and emergency centres offering hot tea and power points to charge devices were set up in the worst-hit areas.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/4/ukrainian-strikes-kill-three-in-russias-belgorod-region?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/04 07:08</span>
+    </div>
+
+    
+    <p class="title-ja">カナダでハイイログマ襲撃容疑で1人死亡、1人行方不明</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/nov/03/grizzly-bear-attack-canada" target="_blank" rel="noopener">One dead and another missing in suspected grizzly bear attack in Canada</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>この事件は、昨年11月にハイイログマが学童のグループを襲ったのと同じ州で起きた。</p><p>カナダ西部では、今年初めに学童の集団がクマに襲われたのと同じ地域でハイイログマの襲撃の疑いがあり、母親が死亡、娘が行方不明となっている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ブリティッシュコロンビア州自然保護官局は火曜日、ソーシャルメディアへの投稿で、週末に行方不明者2人の捜索を開始し、日曜の捜索中に警察官が母親の遺体を発見したと発表した。 19歳の娘の捜索が続いている。</p><p>ジェフ・タイヤ警部はオンラインに投稿されたビデオで、「この悲劇的な時期に犠牲者の家族に思いを馳せている」と述べた。</p><p>アートセラピストのジェニー・バルカラスさんと娘が週末に行方不明になったと親戚から通報された。家族がフェイスブックに彼らについて投稿し、保護団体が攻撃の疑いを発表した後に更新し、彼らの車がブリティッシュコロンビア州ベラクーラ近くの登山口で発見されたことを示した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The incident took place in the same province where a grizzly attacked a group of schoolchildren last November</p><p>A mother is dead and her daughter is missing in western Canada after a suspected grizzly bear attack in the same community where a bear attacked a group of schoolchildren earlier in the year.</p><p>On Tuesday, the British Columbia conservation officer service said in a social media post that it had launched a search for the two missing people on the weekend, and that during the search on Sunday an officer found the mother’s body. The search for her 19-year-old daughter is ongoing.</p><p>“Our thoughts are with the families of the victims during this tragic time,” Inspector Jeff Tyre said in a video posted online.</p><p>Jenny Balcarras, an art therapist, and her daughter were reported missing by relatives over the weekend. A family member posted on Facebook about them, later updating it after the conservation service announced the suspected attack to indicate that their vehicle had been found at a trailhead near Bella Coola, British Columbia.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/nov/03/grizzly-bear-attack-canada" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/05 02:18</span>
+    </div>
+
+    
+    <p class="title-ja">大統領候補のバンス氏、世論調査の大失敗を受けてイラン戦争に疑問を呈しているようだ</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/4/presidential-hopeful-vance-appears-to-question-iran-war-after-polls-debacle?traffic_source=rss" target="_blank" rel="noopener">Presidential hopeful Vance appears to question Iran war after polls debacle</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>Ｊ・Ｄ・バンス副大統領は、中間選挙での同党の惨敗はイラン戦争のせいだと非難し、この紛争は民主党に米議会の主導権を譲る価値がなかったかもしれないと示唆した。</p><p>「我々が負けた理由は戦争だ。昨夜大統領自身がそう言った」と同氏はXに関する長文の投稿で書いた。「その価値があったと主張したいなら、今後6年間上院を失う価値があったと主張したいなら、そうしてください。」</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「我々が負けた理由は誰もが知っている。そして、我々がこれからどこへ向かうのかについての正直な会話は、そこから始まらなければならない。」</p><p>2028年の大統領候補となる可能性が高いバンス氏は、トランプ大統領の「Make America Great Again」運動の後継者と目されており、両国が経済を打撃し、世界の燃料価格を押し上げている紛争からの脱出方法を模索する中、イランとの主要な交渉者となっている。</p><p>イランに関する同氏の発言は他の政権主要メンバーの発言に比べてハト派的であり、選挙後のメモは、戦争が続く中共和党を悩ませそうな問題に関して、これまで公の場で上司との乖離に最も近づいていることを示しているようだ。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Vice President JD Vance has blamed the war on Iran for his party’s withering midterms defeat, suggesting that the conflict may not have been worth ceding control of the US Congress to Democrats.</p><p>“The reason we lost is the war. The president himself said so last night,” he wrote in a lengthy post on X. “If you’d like to argue it was worth it, that losing the Senate for the next 6 years was worth it, then do so.”</p><p>“Everyone knows why we lost. And any honest conversation about where we go from here must start there.”</p><p>Vance, a likely 2028 presidential candidate and heir apparent to Trump’s Make America Great Again movement, has been a key negotiator with Iran as the two countries search for a way out of the conflict, which has dented their economies and pushed global fuel prices up.</p><p>His statements on Tehran have been more dovish than those of other key members of the administration, and his post-election note appears to mark the closest he has yet come to publicly diverging from his boss on an issue that looks set to dog Republicans as the war continues.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/4/presidential-hopeful-vance-appears-to-question-iran-war-after-polls-debacle?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/05 01:59</span>
+    </div>
+
+    
+    <p class="title-ja">イランの首席交渉官、アメリカ国民は「戦争にノー」の投票をしたと語る</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c6d934npl9y8o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Iran's chief negotiator says Americans voted 'no to war'</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米国との交渉におけるイランの首席交渉官は、ドナルド・トランプ大統領率いる共和党が中間選挙で惨敗したことを受けて、米国人は「戦争に反対」に投票したと述べた。</p><p>「私たちはこのメッセージを支持します」と議会議長モハメド・バガー・ガリバフはXに書いた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「もし米国[政府]が国際的な資金管理者や脅迫者に奉仕するという国民の意志を裏切れば、我々のNOには悪夢が伴うことを知ることになるだろう」と彼は警告した。</p><p>トランプ大統領は火曜日、共和党議会候補者の低調な結果は戦争とそれに関連したガソリン価格の高騰が一因であることを認めた。しかし同氏は、2月にイスラエルとイランに対する共同攻撃を開始したことを後悔していないと主張した。</p><p>トランプ大統領はFOXニュースとのインタビューで、中間結果について「その一部はイランにあったと思う」と語った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Iran's chief negotiator in talks with the US has said that Americans voted "NO TO WAR", after President Donald Trump's Republican Party suffered a stunning defeat in the midterm elections.</p><p>"We endorse this message," parliament speaker Mohammed Bagher Ghalibaf wrote on X.</p><p>"If the US [government] betrays their public will to serve international paymasters and blackmailers, it will learn our NO comes with a Nightmare," he warned.</p><p>Trump acknowledged on Tuesday that the poor results for Republican congressional candidates were partly due to the war and the related surge in petrol prices. But he insisted that he did not regret launching a joint attack with Israel on Iran in February.</p><p>In an interview with Fox News, Trump said of the midterm results: "I think a part of it was Iran".</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c6d934npl9y8o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/04 22:38</span>
+    </div>
+
+    
+    <p class="title-ja">アブドゥル・エルサイード氏、トランプ大統領のイスラエル援助削減計画を歓迎、武器売却の停止を呼びかけ</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/04/nx-s1-6028702/abdul-el-sayed-michigan-senate-israel-aid" target="_blank" rel="noopener">Abdul El-Sayed welcomes Trump's plan to cut Israel aid, calls for end to arms sales</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>民主党のアブドゥル・エルサイード氏がミシガン州で歴史を作り、共和党のマイク・ロジャーズ氏を破り、イスラム教徒として初めて米国上院議員に選出され、同党が議会の支配権を取り戻した。</p><p>42歳の元公衆衛生当局者は、コスト削減、国民皆保険、企業資金の政治からの排除などを訴えた。ロジャーズ氏はトランプ大統領の支援を受けて、エルサイード氏のイスラム教信仰と米国の対イスラエル軍事援助への反対を理由に繰り返し攻撃した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>しかし、イスラエルとガザでの戦争は、このレースにおける決定的な断層となった。エルサイード氏が民主党予備選で敗れたヘイリー・スティーブンス氏は、イスラエルを巡る激しい論争のさなか、選挙の数日前にロジャーズ氏を支持した。</p><p>イスラエルをめぐる激しい意見の相違を特徴とする選挙戦を経て、エルサイード氏は現在、問題に関してトランプ氏と同じ側に立っていることに気づいた。</p><p>大統領はイスラエルへの年間約40億ドルの軍事援助を年末までに終了する計画を発表したが、削減がどのように機能するかについては詳細を明らかにしなかった。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Democrat Abdul El-Sayed made history in Michigan, defeating Republican Mike Rogers to become the first Muslim elected to the U.S. Senate as his party reclaimed control of Congress.</p><p>The 42-year-old former public health official campaigned on lowering costs, Medicare for All and getting corporate money out of politics. Rogers, backed by President Trump, repeatedly attacked El-Sayed over his Muslim faith and opposition to U.S. military aid to Israel.</p><p>But Israel and the war in Gaza became a defining fault line in the race. Haley Stevens, whom El-Sayed defeated in the Democratic primary, endorsed Rogers just days before the election amid a bitter dispute over Israel.</p><p>After a campaign marked by heated disagreements over Israel, El-Sayed now finds himself on the same side of an issue as Trump.</p><p>The president announced plans to end roughly $4 billion in annual military aid to Israel by the end of the year, though he offered no details on how the cuts would work.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/04/nx-s1-6028702/abdul-el-sayed-michigan-senate-israel-aid" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/04 17:52</span>
+    </div>
+
+    
+    <p class="title-ja">米国の中間選挙がウクライナ、イラン、その他の国々にとって何を意味するか</p>
+    <p class="title-en"><a href="https://www.dw.com/en/what-us-midterm-elections-mean-for-ukraine-iran-and-elsewhere/a-79836423?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">What US midterm elections mean for Ukraine, Iran and elsewhere</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>中間選挙の結果は長年にわたる米国の政策を形成し、世界中に影響を与えることになる。ワシントンで下された決定は、イランなどの米国の敵対国と、米国のさらなる支援を求めているウクライナなどの国の両方に影響を与える。</p><p>ドナルド・トランプ大統領は、米国がどこで戦争をするか、どの国が財政援助や軍事援助を受けるかを決定する際に最終決定権を持っていない。大統領はドイツのような議会制民主主義国家よりも米国でより大きな権力を行使しているが、たとえ機会に恵まれた国であっても、大統領は単独で統治するわけではない。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>火曜日に民主党が明確な過半数を確保した下院と上院の両院は、大きな影響力を行使している。彼らは法律や政府支出を決定し、大統領や情報機関をチェックする役割も果たしている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The outcome of the midterm election will shape policy in the United States for years and have repercussions around the globe. Decisions made in Washington affect both US adversaries such as Iran and countries such as Ukraine , which is seeking more US support.</p><p>President Donald Trump does not have the final say when it comes to deciding where the United States goes to war or which countries get financial or military aid. While the president wields more power in the US than in parliamentary democracies such as Germany, he does not govern alone — even in the land of opportunity.</p><p>The House of Representatives and the Senate, the two chambers of Congress in which the Democratic Party secured a clear majority on Tuesday, wield considerable influence. They decide on legislation and government spending and also serve as a check on the president and the intelligence agencies.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/what-us-midterm-elections-mean-for-ukraine-iran-and-elsewhere/a-79836423?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/04 21:52</span>
+    </div>
+
+    
+    <p class="title-ja">インドネシア、盗聴疑惑を受けてジャカルタに軍隊を派遣</p>
+    <p class="title-en"><a href="https://www.dw.com/en/indonesia-deploys-troops-to-jakarta-after-wiretapping-allegations/a-79853779?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Indonesia deploys troops to Jakarta after wiretapping allegations</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>プラボウォ・スビアント大統領を狙った盗聴疑惑について当局が捜査を開始したことを受け、インドネシア軍は首都ジャカルタに２万人以上の兵員と人員を派遣した。</p><p>大統領首席補佐官のスキャンダルが現在捜査されている中、ジャカルタには約２万人の軍隊が派遣されている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>これまでに警察幹部３人が拘束された。彼らは大統領、ジャーナリスト、政治家、実業家の電話を不法に盗聴した疑いで告発されている。</p><p>拘束された者の中には、大統領とは関係のないリストヨ・シギット・プラボウォ氏も含まれており、同氏は先月大統領首席補佐官に就任する前は国家警察署長を務めていた。</p><p>大統領官邸は、スビアント大統領を狙った盗聴疑惑は「反逆罪に​​つながる」行為とみなされる可能性があると主張している。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Indonesia's military deployed more than 20,000 troops and personnel to the capital city Jakarta after authorities launched an investigation into an alleged wiretapping operation targeting the President Prabowo Subianto.</p><p>Some 20,000 troops have been deployed in Jakarta amid the scandal with the president's chief of staff is currently being investigated.</p><p>So far, three senior police generals have been detained. They are being accused of illegally tapping the phones of the president, journalists, politicians and business people.</p><p>Among those detained is Listyo Sigit Prabowo — not related to the president — who was the national police chief before becoming the president's chief of staff last month.</p><p>The presidential palace claims the alleged wiretapping targeting President Subianto could be regarded as an act "tending towards treason."</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/indonesia-deploys-troops-to-jakarta-after-wiretapping-allegations/a-79853779?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/04 16:39</span>
+    </div>
+
+    
+    <p class="title-ja">花火規制が施行され、ディワリを前にデリーの大気質が悪化</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c699z8792n7ro?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Delhi air quality worsens ahead of Diwali as firework restrictions enter force</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>冬の到来により、インドの首都ではおなじみの大気質の悪化が見られ、デリーは再び大気汚染の悪化と闘っている。</p><p>肺を詰まらせる可能性のある微小粒子状物質であるPM2.5を測定する同市の大気質指数（AQI）は300を超え、「非常に悪い」カテゴリーに入り、何百万人もの住民に健康上の懸念を引き起こしている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>このような汚染された空気を長期間呼吸すると、呼吸器疾患を引き起こしたり、既存の病気を悪化させたりする可能性があり、子供や高齢者は特に危険にさらされます。</p><p>当局は段階的対応行動計画（GRAP）の第2段階を発動し、粉塵、自動車の排気ガス、その他の汚染源を抑制する措置を導入することで対応した。</p><p>GRAP は、汚染レベルが上昇するにつれて徐々に厳しくなる一連の緊急措置です。最新の規制には、より集中的な道路清掃、自家用車の使用を抑制するための駐車料金の値上げ、公共交通サービスの増加などが含まれる。デリー地下鉄は平日に20本の追加列車運行を導入する一方、当局は交通渋滞を緩和するために政府機関の運行時間をずらすよう指示されている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Delhi is once again battling worsening air pollution as the onset of winter brings a familiar deterioration in air quality to India's capital.</p><p>The city's air quality index (AQI) - which measures PM2.5, fine particulate matter that can clog lungs - has crossed 300, entering the "very poor" category and raising health concerns for millions of residents.</p><p>Breathing such polluted air over prolonged periods can cause respiratory problems and worsen existing illnesses, with children and older people particularly vulnerable.</p><p>Authorities have responded by invoking Stage II of the Graded Response Action Plan (GRAP), introducing measures to curb dust, vehicle emissions and other sources of pollution.</p><p>GRAP is a set of emergency measures that become progressively stricter as pollution levels rise. The latest restrictions include more intensive road cleaning, higher parking charges to discourage private vehicle use and increased public transport services. Delhi Metro has introduced 20 additional weekday train trips, while authorities have been directed to stagger government office timings to ease traffic congestion.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c699z8792n7ro?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/04 07:25</span>
+    </div>
+
+    
+    <p class="title-ja">核保有隣国からの共同圧力の中で日本は外交的ジレンマに直面している</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/03/nx-s1-6012016/japan-faces-diplomatic-dilemma-amid-joint-pressure-from-nuclear-neighbors" target="_blank" rel="noopener">Japan faces diplomatic dilemma amid joint pressure from nuclear neighbors</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ウクライナ戦争が激化する中、ロシアと隣国の日本の関係はここ数十年で最悪の状態にある。日本政府はワシントンからのさらなる支援を望んでいるが、一部の日本人はそれが得られないのではないかと懸念している。</p><p>NPR プログラミングのトランスクリプトの精度と可用性は異なる場合があります。トランスクリプト テキストは、エラーを修正したり、音声の更新に一致させるために改訂される場合もあります。音声は、元の放送または出版後に編集される場合があります。 NPR の番組の信頼できる記録は音声記録です。 NPR のプラットフォームと製品には、サードパーティによって作成されたプログラムも含まれていることに注意してください。 NPR はそのコンテンツのトランスクリプトを保証できず、一部のトランスクリプトは自動ツールまたはその他のツールを使用して作成される場合があります。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>NPR は、取材やインタビューに対して金銭を提供したり受け取ったりしません。そのような申し出や要求を行う者は、NPR の従業員ではなく、NPR を代表するものでもありません。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>As the Ukraine war grinds on, ties between Russia and neighboring Japan are at their worst in decades. Tokyo wants more support from Washington, but some Japanese are concerned they may not get it.</p><p>Accuracy and availability of transcripts for NPR programming may vary. Transcript text may also be revised to correct errors or match updates to audio. Audio may be edited after its original broadcast or publication. The authoritative record of NPR’s programming is the audio record. Please note that NPR platforms and products also include some programming produced by third parties; NPR cannot guarantee transcripts for that content and some transcripts may be produced using automated or other tools.</p><p>NPR does not offer or accept money for coverage or interviews. Anyone who makes such an offer or request is not an NPR employee and does not represent NPR.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/03/nx-s1-6012016/japan-faces-diplomatic-dilemma-amid-joint-pressure-from-nuclear-neighbors" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/03 22:13</span>
+    </div>
+
+    
+    <p class="title-ja">トランプ大統領のイラン問題は中国への扉を開く可能性がある</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/nov/03/trump-iran-middle-east-china-gulf-hormuz-xi-jinping" target="_blank" rel="noopener">Trump’s troubles with Iran could open the door to China</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>中国政府、湾岸諸国の指導者らを説得し、この地域での影響力を強化するために外交一斉射撃を開始</p><p>中国は中東における外交努力を強化していることを示すため、湾岸諸国の指導者との会談を相次いで開催している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>この外交一斉射撃は、11月18日と19日に中国の深センで開催されるAPEC会議に米国大統領が出席すると予想されているドナルド・トランプ大統領と習近平氏の待望の会談を前に行われる。</p><p>習氏は月曜日、歴史的な国賓として北京を訪問し、オマーン国王ハイサム・ビン・タリク氏と会談した。</p><p>習主席の王毅外相は、サウジアラビア国家安全保障担当補佐官ムサード・ビン・モハメド・アル・アイバン氏、イラン国家安全保障会議の副書記アリ・バゲリ・カーニ氏と会談した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Beijing launches diplomatic salvo to woo Gulf leaders and bolster its influence in the region</p><p>China has held a flurry of meetings with Gulf leaders in a sign that Beijing is stepping up its diplomatic efforts in the Middle East.</p><p>The diplomatic salvo comes before a highly anticipated meeting between Donald Trump and Xi Jinping when the US president is expected to attend the Apec conference in Shenzhen, China, on 18 and 19 November.</p><p>Xi held talks with Haitham bin Tariq , Oman’s sultan, in a historic state visit to Beijing on Monday.</p><p>President Xi’s foreign minister, Wang Yi, met Saudi Arabia’s national security adviser, Musaad bin Mohammed Al Aiban, and the deputy secretary of Iran’s national security council, Ali Bagheri Kani.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/nov/03/trump-iran-middle-east-china-gulf-hormuz-xi-jinping" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/05 02:02</span>
+    </div>
+
+    
+    <p class="title-ja">米国の中間決算、関税軽減を期待するカナダ人が「勝利」</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cqev3mw3e0kdo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">US midterm results a 'victory' for Canadians hopeful of tariff relief</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>これはカナダの多くの人が期待していた中間結果、つまり民主党の圧勝であったが、その一部には、緊密な通商同盟国に対するドナルド・トランプ大統領の関税に対するアメリカの有権者による否認も含まれていた。</p><p>オンタリオ州のダグ・フォード首相は水曜日の朝、「路上で側転をしていた」と述べ、これを「カナダの勝利」と呼んだ。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>火曜日夜の結果により、カナダがすぐにこれらの関税から解放される可能性は低いが、断続的な通商協議が再開された今、政治的変化によりオタワが最良の合意を得るためにより有利な環境が生まれるのではないかと期待されている。</p><p>米国の有権者は中間選挙に向けた主な懸念として手頃な価格を挙げており、9月にケイトー研究所が実施した調査では、約75％が関税によって価格が上昇したと考えていることが外部から示唆されている。</p><p>メイン州やミシガン州などの州では、関税が激戦のレースで重要な役割を果たした。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>It was the midterm result that many in Canada had hoped for - a Democratic sweep that was in part a repudiation by American voters of Donald Trump's tariff on close trade allies.</p><p>"I was doing cartwheels down the street," said Ontario Premier Doug Ford on Wednesday morning, calling it "a victory for Canada".</p><p>Tuesday night's result is unlikely to grant Canada relief from those tariffs any time soon, but there is anticipation that the political shifts could create a more favourable environment for Ottawa to get the best deal now that on-again-off-again trade talks are back on.</p><p>US voters cited affordability as a main concern heading into the midterms and a survey by the Cato Institute in September , external suggested that about 75% believe the tariffs have raised prices.</p><p>In states like Maine and Michigan, tariffs played a significant role in the hard-fought races.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cqev3mw3e0kdo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/05 02:00</span>
+    </div>
+
+    
+    <p class="title-ja">欧州首脳、米中間選挙で民主党の勝利を歓迎</p>
+    <p class="title-en"><a href="https://www.france24.com/en/european-leaders-welcome-democrats-us-midterms-election-win" target="_blank" rel="noopener">European leaders welcome Democrats' US midterms election win</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>有権者が中間選挙でドナルド・トランプ大統領とその共和党に大敗を喫したことを受け、11月4日水曜日、欧州の指導者らは米国との関係修復への期待を表明した。 FRANCE 24 の Dave Keating はさらに多くのことを語っています。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>European leaders voiced hopes for a reset with the United States on Wednesday, November 4, after voters delivered a huge midterm election defeat to President Donald Trump and his Republican party. FRANCE 24's Dave Keating has more.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/european-leaders-welcome-democrats-us-midterms-election-win" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/05 00:32</span>
+    </div>
+
+    
+    <p class="title-ja">「私たちはまだ赤です」フロリダ州初の黒人知事が勝利を受けて</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/4/we-are-still-red-floridas-first-black-governor-upon-win?traffic_source=rss" target="_blank" rel="noopener">‘We are still red,’ Florida’s first Black governor upon win</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>フロリダ州初の黒人知事、勝利で「我々はまだ赤だ」</p><p>米国共和党のバイロン・ドナルド氏は、フロリダ州初の黒人知事に選出された後、ドナルド・トランプ大統領への支持を改めて表明した。 48歳の彼は、選挙戦が決まった後にトランプ大統領に電話をかけた際、支持に感謝した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>'We are still red,' Florida’s first Black governor upon win</p><p>US Republican Byron Donalds reiterated his support for President Donald Trump, after being elected Florida’s first Black governor. The 48-year-old thanked Trump for his support when he called him after the race was decided.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/4/we-are-still-red-floridas-first-black-governor-upon-win?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/04 21:18</span>
+    </div>
+
+    
+    <p class="title-ja">民主党が議会の完全な支配権を掌握。そして、昨夜歴史に名を残した候補者は誰だったのか</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/04/g-s1-151745/up-first-newsletter-midterms-democrats-congress-control" target="_blank" rel="noopener">Democrats seize full control of Congress. And, which candidates made history last night</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>民主党は2023年以来初めて議会の完全支配権を獲得し、真っ赤な州での大幅な勝利で下院と上院の両方をひっくり返した。アブドゥル・エルサイード氏はミシガン州でマイク・ロジャース氏を破り、トロイ・ジャクソン氏はメイン州でスーザン・コリンズ氏を破り、注目されていた両州の上院議席を獲得した。テキサス州では民主党のジーナ・イノホサ氏が共和党のグレッグ・アボット知事を破り、30年以上にわたる共和党の支配に終止符を打ち、民主党のジェームズ・タラリコ州下院議員が上院議員選挙で勝利した。カンザス州ではアダム・ハミルトンがほぼ1世紀ぶりに民主党上院議員として選出された。アメリカ民主社会主義者が支持した記録的な数の候補者が下院に選出され、国会議事堂での同組織の存在感が高まった。 9 つの州も知事選で歴史を作りました。主要な層がどのように投票したかを見てみましょう。</p><p>NPR の上級政治特派員ドメニコ・モンタナロ氏からの 6 つの中間点を以下に示します。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>2026年6月3日、国会議事堂の電柱の後ろに見える米国議会議事堂。クリフ・オーウェン/AP キャプションを隠す</p><p>選挙の夜に向けて、あらゆる兆候は民主党の方向を示していた。しかし、このレベルのはしゃぎっぷりを示すものは何もなかった。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Democrats have gained full control of Congress for the first time since 2023 , flipping both the House and Senate with significant wins in deep red states. Abdul El-Sayed defeated Mike Rogers in Michigan, and Troy Jackson defeated Susan Collins in Maine, winning their states' closely watched Senate seats. In Texas, Democrat Gina Hinojosa defeated Republican Gov. Greg Abbott, ending more than 30 years of Republican control, while Democratic state Rep. James Talarico won the U.S. Senate race. In Kansas, Adam Hamilton became the first Democratic senator elected in nearly a century. A record number of candidates endorsed by the Democratic Socialists of America were elected to the House, growing the organization's presence on Capitol Hill. Nine states also made history with their gubernatorial picks . Take a look at how key demographics voted .</p><p>Here are 6 midterm takeaways from NPR's senior political correspondent Domenico Montanaro :</p><p>The U.S. Capitol is seen behind a light pole, on Capitol Hill on June 3, 2026. Cliff Owen/AP hide caption</p><p>All the signs were pointing in Democrats' direction heading into election night. But nothing indicated quite this level of a romp.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/04/g-s1-151745/up-first-newsletter-midterms-democrats-congress-control" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/05 00:18</span>
+    </div>
+
+    
+    <p class="title-ja">世界の麻薬取引におけるアフリカの役割の変化</p>
+    <p class="title-en"><a href="https://www.dw.com/en/africa-s-shifting-role-in-the-global-drug-trade/a-79847720?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Africa's shifting role in the global drug trade</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>長年にわたり、アフリカは主に国際的な麻薬密売ネットワークの中継地として知られていました。</p><p>しかし、最近の麻薬押収や研究所での発見は、違法薬物がもはやアフリカ諸国だけを通過しているわけではなく、アフリカ諸国で製造されることが増えていることを示している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ナイジェリア、南アフリカ、ケニア、モザンビークなどの国々でメタンフェタミン研究所が最近発見されたことにより、アフリカが合成麻薬の重要な生産拠点になりつつあるという懸念が高まっている。</p><p>国連薬物犯罪事務所（UNODC）によると、合成麻薬の生産には、国境を越えた犯罪ネットワークや、国内市場と国際市場の両方に供給できる秘密研究所がますます関与しているという。</p><p>ナイジェリア国家麻薬法執行局（NDLEA）が、同局が国内でこれまでに発見した最大のメタンフェタミン秘密研究所と称する施設を解体したことを受け、今年、この議論は新たな緊急性を増した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>For years, Africa was primarily known as a transit point for international drug trafficking networks.</p><p>But recent drug seizures and laboratory discoveries show that illicit drugs are no longer only passing through African countries — they are increasingly being manufactured there.</p><p>Recent discoveries of methamphetamine laboratories in countries such as Nigeria , South Africa , Kenya and Mozambique have fueled concerns that Africa is becoming a significant production hub for synthetic drugs.</p><p>According to the UN Office on Drugs and Crime (UNODC), synthetic drug production increasingly involves transnational criminal networks and clandestine laboratories capable of supplying both local and international markets.</p><p>The debate gained new urgency this year after Nigeria's National Drug Law Enforcement Agency (NDLEA) dismantled what the agency described as the largest clandestine methamphetamine laboratory ever uncovered in the country.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/africa-s-shifting-role-in-the-global-drug-trade/a-79847720?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/04 23:50</span>
+    </div>
+
+    
+    <p class="title-ja">南アフリカ国民が地方選挙で投票する中、ＡＮＣはサービスの悪さに怒りに直面している</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/nov/04/anc-south-africa-local-elections-water-outages-power-cuts" target="_blank" rel="noopener">ANC faces anger over poor services as South Africans vote in local elections</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>断水や停電に対する不満のなか、同党の得票率は3分の1未満と予想される</p><p>断水や停電、インフラの崩壊に対する深い不満の中で有権者が投票所に向かう中、水曜日に行われる南アフリカの地方選挙でアフリカ民族会議は痛ましい結果を招く見通しとなっている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>アパルトヘイト崩壊後の1994年に南アフリカ初の黒人大統領としてネルソン・マンデラが政権を握った旧解放運動は、依然として最大政党となる可能性が高い。しかし、世論調査によると、得票率は3分の1にも満たず、2021年の前回地方選挙の45.6％、2024年の国政選挙の40.2％から減少した。</p><p>ここ数週間断水と停電が繰り返し発生している多様性に富んだヨハネスブルグ郊外のケンジントンでは、有権者は変化を望んでいると述べた。同市は現在、ダダ・モレロＡＮＣ市長が極左の経済自由戦士団（ＥＦＦ）や右派ポピュリスト愛国同盟（ＰＡ）と連立して主導している。</p><p>コールセンターで働くツェピソ・マコツェさん（26）は「サービスの提供は悪く、ひどいものだ」と語った。 「水、電気、基本的にはすべてです。」</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Party expected to get less than a third of the vote amid frustration over water outages and power cuts</p><p>The African National Congress is on course for a bruising result in South Africa’s local elections on Wednesday as voters go to the polls amid deep discontent over water outages, power cuts and crumbling infrastructure.</p><p>The former liberation movement, which Nelson Mandela led to power in 1994 at the end of apartheid as South Africa’s first black president, is still likely to be the largest party. However, polls showed it getting less than a third of the vote, down from 45.6% at the last municipal elections in 2021 and 40.2% in 2024’s national elections .</p><p>In Kensington, a diverse Johannesburg suburb that has sustained repeated water and power outages in recent weeks, voters said they wanted to see change. The city is currently led by Dada Morero, the ANC mayor, in coalition with the far-left Economic Freedom Fighters (EFF) and the rightwing populist Patriotic Alliance (PA).</p><p>“Service delivery is bad, it’s horrible,” said Tshepiso Makotse, 26, a call centre worker. “Water, electricity – everything, basically.”</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/nov/04/anc-south-africa-local-elections-water-outages-power-cuts" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-11-05";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
