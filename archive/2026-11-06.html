@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年11月6日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/06 02:05</span>
+    </div>
+
+    
+    <p class="title-ja">🔴 ライブ: 内務省はフランス全土で60万人の抗議活動があると発表、労働組合は「160万人近く」と主張している</p>
+    <p class="title-en"><a href="https://www.france24.com/en/france/20261105-live-france-nationwide-strikes-living-costs" target="_blank" rel="noopener">🔴 Live: Interior ministry says 600,000 protest across France as unions claim 'close to 1.6 million'</a></p>
+    
+
+    
+
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/france/20261105-live-france-nationwide-strikes-living-costs" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/06 02:00</span>
+    </div>
+
+    
+    <p class="title-ja">学生リストの地滑り的な勝利の後、セルビアの司法は、何年にもわたって停滞し未解決の事件と捜査を経て活気を取り戻した</p>
+    <p class="title-en"><a href="https://www.dw.com/en/after-the-landslide-victory-of-the-students-list-serbia-s-judiciary-springs-into-life-after-years-of-stalled-and-unresolved-cases-and-investigations/a-79868652?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">After the landslide victory of the Students' List, Serbia's judiciary springs into life after years of stalled and unresolved cases and investigations</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>11月3日、ベオグラード発モスクワ行きセルビア航空JU134便は、乗務員がセルビアの首都に戻るよう指示を受けたとき、すでにリトアニア領空の奥深くにいた。</p><p>乗客の中には、アレクサンダル・ヴチッチ前大統領政権の高官3名が含まれていた。アレクサンダル・ヴーリン元国防・内務大臣、元セルビア安全保障情報局（BIA）長官、ドゥシャン・バヤトビッチ氏、長年国営ガス会社スルビハガス取締役を務めたドゥシャン・バヤトビッチ氏、そしてネナド・ポポビッチ氏（無職大臣）である。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>3人はいずれもモスクワとの密接な関係や、汚職や公職乱用の疑惑などの論争でセルビアではよく知られている。</p><p>複数のメディアが発表した非公式報道によると、同機は保安違反のため引き返しを命じられたという。ヴーリン容疑者は義務付けられている保安検査を受けずに搭乗したとされる。</p><p>2023年以来、ヴーリン氏は、ワシントンが「西バルカン半島の法の支配を損なう汚職と不安定化をもたらす活動に従事している」と述べた行為を理由に米国の制裁を受けている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Air Serbia flight JU134 from Belgrade to Moscow on November 3 was already deep in Lithuanian airspace when the crew received instructions to return to the Serbian capital.</p><p>Among the passengers were three senior figures from the regime of former President Aleksandar Vucic : Aleksandar Vulin, former defense and interior minister and former head of Serbia's Security Intelligence Agency (BIA), Dusan Bajatovic, long-serving director of state-owned gas company Srbijagas, and Nenad Popovic, a minister without portfolio.</p><p>All three are well known in Serbia for their close ties to Moscow and for controversies, including allegations of corruption and abuse of public office.</p><p>According to unofficial reports published by several media outlets, the plane was ordered back because of a security breach: Vulin had allegedly boarded without undergoing the mandatory security screening.</p><p>Since 2023, Vulin has been under US sanctions over what Washington described as "engaging in corrupt and destabilizing activities that undermine the rule of law in the Western Balkans."</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/after-the-landslide-victory-of-the-students-list-serbia-s-judiciary-springs-into-life-after-years-of-stalled-and-unresolved-cases-and-investigations/a-79868652?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/06 01:12</span>
+    </div>
+
+    
+    <p class="title-ja">写真：スペイン、ピッチ内衝突で死亡したヘスス・デ・ミゲルを追悼</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/gallery/2026/11/5/photos-spain-mourns-jesus-de-miguel-who-died-after-on-pitch-collision?traffic_source=rss" target="_blank" rel="noopener">Photos: Spain mourns Jesus de Miguel, who died after on-pitch collision</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>サッカーのスペイン代表チーム監督でレアル・マドリードの会長は木曜日、今週初めにフィールド内での衝突事故で亡くなったテネリフェ島の選手、ヘスス・デ・ミゲルの葬儀に家族、友人、チームメートらとともに参列した。</p><p>追悼式はスペイン中部にある人口約3,000人の町ナバエルモサで行われ、デ・ミゲルの両親はそこで生まれたと伝えられている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>花で覆われた霊柩車が教会に向かってゆっくりと進み、ろうそくを持った数十人の会葬者が後ろを歩きました。市庁舎は半旗を掲げて３日間の服喪を宣言した。</p><p>De Miguel, 30, suffered cardiac arrest after colliding with Andorra goalkeeper Jesus Owono while challenging for a high ball during a second‑division match on Monday.彼は翌日病院で死亡した。</p><p>葬儀にはスペイン代表監督のルイス・デ・ラ・フエンテ氏とレアル・マドリードのフロレンティーノ・ペレス会長が参列し、デ・ラ・フエンテ氏は悲しみの中でサッカー界は「団結している」と述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Spain’s national football team coach and the president of Real Madrid joined family, friends and teammates on Thursday at the funeral of Jesus de Miguel , the Tenerife player who died after an on‑field collision earlier this week.</p><p>The service was held in Navahermosa, a town of about 3,000 people in central Spain, where De Miguel’s parents were reportedly born.</p><p>A hearse covered in flowers moved slowly towards the church as dozens of mourners, some carrying candles, walked behind. The town hall declared three days of mourning, with flags at half-staff.</p><p>De Miguel, 30, suffered cardiac arrest after colliding with Andorra goalkeeper Jesus Owono while challenging for a high ball during a second‑division match on Monday. He died in hospital the following day.</p><p>Spain coach Luis de la Fuente and Real Madrid President Florentino Perez attended the funeral, with De la Fuente saying the game’s community “stands united” in grief.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/gallery/2026/11/5/photos-spain-mourns-jesus-de-miguel-who-died-after-on-pitch-collision?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/06 00:43</span>
+    </div>
+
+    
+    <p class="title-ja">フランス、労働組合が即時回答を求める中、新たなストライキと抗議活動を実施</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/ckx2qzv835pgo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">France holds new strikes and protests as unions demand immediate answers</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>5つの労働組合が全国的なストライキ行動を開始したことを受け、フランス全土で抗議活動が起きており、高校生や生活費の高騰を批判するデモ参加者らも参加している。</p><p>木曜日の13時（グリニッジ標準時12時）までに、約70の町や都市で25万人以上が街頭に繰り出したが、これは「始まりにすぎない」とCGT労働組合のソフィー・ビネ氏は語った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>それ以来、それらは労働者や高価格に反対するいわゆる「イエローベスト」運動にまで広がりました。</p><p>ローラン・ヌアンエス内務大臣は、7万人の警察が出動していると述べ、暴力の発生の可能性に対しては「極めて断固とした対応」をすると誓った。</p><p>リヨンとレンヌの都市では暴動が発生していると報告されている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Protests are taking place across France after five unions launched a national day of strike action, joining high school students and demonstrators criticising the rising cost of living.</p><p>More than 250,000 people had taken to the streets in almost 70 towns and cities by 13:00 (12:00 GMT) on Thursday, and that was "just the start", said Sophie Binet of the CGT union.</p><p>They have since spread to include workers and the so-called "yellow-vest" movement against high prices.</p><p>Interior Minister Laurent NuÃ±ez said 70,000 police were being deployed, vowing "an extremely firm response" to any potential outbreaks of violence.</p><p>Some unrest has been reported in the cities of Lyon and Rennes.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/ckx2qzv835pgo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/06 01:46</span>
+    </div>
+
+    
+    <p class="title-ja">ガザ、1,000人以上の死亡選手を讃えるトーナメント決勝開催</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/5/gaza-holds-final-of-tournament-honouring-more-than-1000-slain-athletes?traffic_source=rss" target="_blank" rel="noopener">Gaza holds final of tournament honouring more than 1,000 slain athletes</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ガザ、1,000人以上の死亡選手を讃えるトーナメント決勝開催</p><p>ガザの「千人殉教者カップ」の決勝戦は、3年近くにわたる戦争を経て、組織化されたサッカーが復活したことを記念するものである。このトーナメントは、2023年10月以来亡くなった1,000人以上のパレスチナ選手を讃えるもので、選手たちは広範囲にわたる破壊の中で競技を行い、ファンはまれな喜びの瞬間を見つける。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Gaza holds final of tournament honouring more than 1,000 slain athletes</p><p>The final of Gaza’s ‘Thousand Martyrs’ Cup marks the return of organised football after nearly three years of war. The tournament honours more than 1,000 Palestinian athletes killed since October 2023, as players compete amid widespread destruction and fans find a rare moment of joy.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/5/gaza-holds-final-of-tournament-honouring-more-than-1000-slain-athletes?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/06 00:04</span>
+    </div>
+
+    
+    <p class="title-ja">イラン、米国の中間投票後に満足感と懐疑の姿勢を示唆</p>
+    <p class="title-en"><a href="https://www.dw.com/en/iran-signals-satisfaction-skepticism-after-us-midterm-vote/a-79867149?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Iran signals satisfaction, skepticism after US midterm vote</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イラン指導部は、米国中間選挙における共和党の挫折の重要性を軽視し、民主党による議会乗っ取りによってイスラム共和国に対する米国政府の政策が変わる可能性は低いと主張した。</p><p>最高指導者のモジタバ・ハメネイ師は投票後の声明で、「譲歩や米国の政治体制の党派的変革によって米国を説得してイラン国家に対する敵対心を放棄させることができると信じている人がまだいるとすれば、彼らは重大な間違いだ」と述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ハメネイ師はまた、イラン政府は今後の米国の軍事行動に対してより強力に対応すると警告した。</p><p>この選挙は、テヘランとワシントンの間の数カ月間にわたる軍事衝突の後に行われた。この軍事衝突は世界のエネルギー市場を混乱させ、より広範な地域紛争の懸念を引き起こした。</p><p>このビデオを表示するには、JavaScript を有効にし、HTML5 ビデオをサポートする Web ブラウザへのアップグレードを検討してください。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Iran's leadership has downplayed the significance of Republican setbacks in the US midterm elections , insisting that the Democratic takeover of Congress is unlikely to alter Washington's policy toward the Islamic Republic .</p><p>"If there are still those who believe that America can be persuaded to abandon its hostility toward the Iranian nation through concessions or partisan changes in the US political system, they are gravely mistaken," Supreme Leader Mojtaba Khamenei said in a statement after the vote.</p><p>Khamenei also warned that Tehran would respond more forcefully to any future US military action.</p><p>The elections took place after months of military confrontation between Tehran and Washington , which disrupted global energy markets and raised fears of a broader regional conflict .</p><p>To view this video please enable JavaScript, and consider upgrading to a web browser that supports HTML5 video</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/iran-signals-satisfaction-skepticism-after-us-midterm-vote/a-79867149?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/05 23:43</span>
+    </div>
+
+    
+    <p class="title-ja">ネタニヤフ首相が超正統派の支持を失う中、イスラエルのアラブ人名簿がアイゼンコット氏を支持</p>
+    <p class="title-en"><a href="https://www.france24.com/en/middle-east/20261105-israel-main-arab-list-backs-eisenkot-to-form-government-after-election" target="_blank" rel="noopener">Israel's Arab list backs Eisenkot as Netanyahu loses ultra-Orthodox support</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イスラエル最大のアラブ政党グループは木曜日、野党指導者のガディ・アイゼンコット氏に次期政権樹立を推奨すると発表、先週の総選挙でアラブ系多数派が記録的な19議席を獲得し、ベンヤミン・ネタニヤフ首相が同盟宗教政党の支持を失ったことを受けて、同氏の立候補を強化する可能性がある。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Israel's largest Arab party grouping said Thursday it would recommend opposition leader Gadi Eisenkot to form the next government, potentially bolstering his bid after Arab-majority lists won a record 19 seats in last week's election and Prime Minister Benjamin Netanyahu lost the support of an allied religious party.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/middle-east/20261105-israel-main-arab-list-backs-eisenkot-to-form-government-after-election" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/05 12:47</span>
+    </div>
+
+    
+    <p class="title-ja">ヴァンス氏、イラン戦争を非難する痛烈な選挙批判でトランプ氏に綱渡り</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/crz98zqkz7z0o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Vance walks Trump tightrope with scathing election critique blaming Iran war</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>JDバンス副大統領は水曜日、同党の中間期敗北をイラン戦争のせいだと真っ向から非難し、ワシントン中に衝撃を与えたが、これは2028年のホワイトハウス出馬の可能性を前に、ドナルド・トランプ大統領から距離を置こうとしたものと広く解釈されている。</p><p>Xに関する慎重に調整された600語の声明の中で、副大統領は、2024年のトランプ大統領の有権者が中間選挙で共和党から離れたことを認めた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「我々が負けた理由は戦争だ」と彼は書いた。 「昨夜、大統領自身がそう言いました。」</p><p>火曜深夜と水曜のインタビューで、トランプ氏は戦争を擁護したが、それが民主党が米上下院の支配権をひっくり返す要因となったことを認めた。</p><p>イラン戦争に関するヴァンスの見解はワシントンでは公然の秘密だ。米国とイスラエルが2月にテヘランを攻撃して以来、同氏は繰り返し紛争を支持してきたが、伝えられるところによると、政権当局者らとの非公式会談では反対を表明している。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Vice-President JD Vance sent shockwaves through Washington on Wednesday by blaming his party's midterm defeat squarely on the Iran war, in what was widely interpreted as an effort to distance himself from President Donald Trump ahead of a potential 2028 White House run.</p><p>In a carefully calibrated, 600-word statement on X, the vice-president acknowledged that Trump's 2024 voters had deserted Republicans in the midterm election .</p><p>"The reason we lost is the war," he wrote. "The president himself said so last night."</p><p>In interviews late Tuesday night and Wednesday, Trump had defended the war but acknowledged that it played a factor in Democrats flipping control of the US House of Representatives and the Senate .</p><p>Vance's view on the war in Iran is an open secret in Washington. While he has repeatedly backed the conflict since the US and Israel attacked Tehran in February, he has reportedly expressed opposition in private meetings with administration officials.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/crz98zqkz7z0o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/06 02:34</span>
+    </div>
+
+    
+    <p class="title-ja">サセックス公爵夫人の別居異母弟、児童性的虐待捜査の「要注意人物」に</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/nov/05/meghan-sussex-thomas-markle-jr-philippines-child-sexual-abuse-inquiry" target="_blank" rel="noopener">Duchess of Sussex’s estranged half-brother ‘person of interest’ in child sexual abuse inquiry</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>フィリピン当局者は「トーマス・マークル・ジュニアの犯罪関与を示す兆候」があるが、まだ容疑者として扱われていないと述べた</p><p>サセックス公爵夫人の別居中の異母弟、トーマス・マークル・ジュニアが、父親のトーマス・マークル・シニアに対する児童性的虐待画像疑惑に対するフィリピン当局の捜査で「要注意人物」に指名された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>同国の内務・地方政府長官ジョンビック・レムラ氏はマニラでの記者会見で、「息子も犯罪に関与していることを示す兆候」があると述べた。</p><p>同氏は、父親の持ち物から見つけた画像を地元警察とFBIに通報した60歳のマークル・ジュニアはまだ容疑者として扱われていないと付け加えた。彼の関与疑惑は、彼が警察に渡した資料と直接関係があるとは考えられていない。</p><p>レムラ氏によると、アジア系、ラテン系、ヨーロッパ系の未成年の男女を含む7,000枚以上の写真と1本のビデオが発見されたという。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Philippine official says there are ‘signs that point to Thomas Markle Jr’s involvement in crime’, but he’s not yet being treated as a suspect</p><p>The Duchess of Sussex’s estranged half-brother, Thomas Markle Jr, has been named as a “person of interest” in the Philippine authorities’ inquiry into child sexual abuse image allegations made against her father, Thomas Markle Sr.</p><p>The country’s interior and local government secretary, Jonvic Remulla, told a press conference in Manila there were “signs that point that the son is involved in the crime as well”.</p><p>He added that Markle Jr, 60, who alerted local police and the FBI to images he found in his father’s belongings, was not yet being treated as a suspect. His alleged involvement is not thought to be directly linked to the material he handed to the police.</p><p>More than 7,000 photos and one video – all of under-age males and females of Asian, Latin and European descent, with some as young as 10 and 11 – were uncovered, Remulla said.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/nov/05/meghan-sussex-thomas-markle-jr-philippines-child-sexual-abuse-inquiry" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/06 02:08</span>
+    </div>
+
+    
+    <p class="title-ja">アンマンで刺殺事件でヨルダン将校死亡</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/5/jordanian-officer-killed-in-stabbing-attack-in-amman?traffic_source=rss" target="_blank" rel="noopener">Jordanian officer killed in stabbing attack in Amman</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>アンマンで刺殺事件でヨルダン将校死亡</p><p>アンマンのスリランカ大使館付近でヨルダン治安職員１人が死亡、もう１人が負傷し、当局はテロ攻撃だったと発表した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Jordanian officer killed in stabbing attack in Amman</p><p>A Jordanian security officer has been killed and another one wounded near the Sri Lankan embassy in Amman, in what authorities say was a terror attack.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/5/jordanian-officer-killed-in-stabbing-attack-in-amman?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/05 22:51</span>
+    </div>
+
+    
+    <p class="title-ja">香港の民主化運動の顔、ジョシュア・ウォン氏に懲役10年</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cwp9g3rlp8jlo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Joshua Wong, face of Hong Kong's pro-democracy protests, jailed for 10 years</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>かつて香港の民主化運動の顔だったジョシュア・ウォン氏は、同市の広範な国家安全維持法に基づき、外国勢力と共謀した罪で懲役10年の判決を受けた。</p><p>ウォン氏は、中国政府による支配拡大に対する爆発的な民主化運動を受けて2020年に施行された同法に基づいて逮捕された数百人の運動家や一般香港人の中に含まれている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>批評家らは、この広範な法律が反対意見を黙らせていると主張しているが、当局は安定を維持するために法律が必要であると主張し、この法律が市の大切な自治を弱体化させたことを否定している。</p><p>すでに過去6年間を刑務所で過ごしており、1月に釈放される予定だったウォン氏は、今後さらに10年間を刑務所で過ごすことになる。</p><p>沈黙され消去された香港の10年間の抗議活動は今や反抗的な記憶となった</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Joshua Wong, once the face of Hong Kong's democracy movement, has been sentenced to 10 years in jail for colluding with foreign forces under the city's sweeping national security law.</p><p>Wong is among hundreds of campaigners and ordinary Hongkongers arrested under the law, which was imposed in 2020 following explosive pro-democracy protests against Beijing's growing control.</p><p>Critics say the far-reaching law has silenced dissent, but authorities argue that it is needed to maintain stability and deny it has weakened the city's cherished autonomy.</p><p>Having already spent the last six years in jail, Wong, who was due to be freed in January, will now spend another decade behind bars.</p><p>Silenced and erased, Hong Kong's decade of protest is now a defiant memory</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cwp9g3rlp8jlo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/05 22:34</span>
+    </div>
+
+    
+    <p class="title-ja">トランプ氏の中間選挙での敗北は緊張する米印関係に何を意味するのか？</p>
+    <p class="title-en"><a href="https://www.dw.com/en/what-does-trump-s-midterm-elections-loss-mean-for-strained-us-india-ties/a-79865777?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">What does Trump's midterm elections loss mean for strained US-India ties?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米国民主党が中間選挙で大勝し、上下両院を制したことで、ドナルド・トランプ率いる共和党政権はトランプの任期が終わるまで新たなレベルの監視を受けることになる。</p><p>トランプ大統領は、米国が同盟国の大半を疎外させ、中東での不人気な戦争に再び巻き込まれるという物議を醸した外交政策への反発に直面する可能性が高い。同時に、トランプ政権は、インドとの一連の対立を含め、あまり目立たないが依然として大きな物議を醸す動きを世界舞台で数多く講じている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>米国が2026年3月に石油禁輸免除を認め、トランプ大統領が10月にロシア制裁の一部を発動したにもかかわらず、貿易協定の行き詰まり、入国制限、インドによるロシアの石油と兵器の購入をめぐる意見の相違などにより、ニューデリーとワシントンの関係は依然として緊張している。</p><p>そして、新しい米国議会は関税や移民などの問題に関してトランプ大統領に圧力をかけることを選択できるが、大統領は依然として外交政策に関して大きな権限を行使している。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>With the US Democrats scoring a resounding midterm victory and taking control of both chambers of Congress, the Republican administration led by Donald Trump is set for a new level of scrutiny until the end of Trump's term.</p><p>Trump is likely to face pushback on his controversial foreign policy, which saw the US alienate most of its allies and get entangled in yet another unpopular war in the Middle East. At the same time, the Trump administration has also taken a slew of less conspicuous but still highly controversial moves on the global stage, including a series of confrontations with India .</p><p>The ties between New Delhi and Washington are still strained by a stalled trade agreement , restrictions on immigration , and disagreement over India buying Russian oil and weapons , despite the US granting an oil ban waiver in March 2026 and Trump waving some of the Russia sanctions in October.</p><p>And while the new US Congress can choose to pressure Trump over issues such as tariffs and immigration , the president still wields significant authority on foreign policy.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/what-does-trump-s-midterm-elections-loss-mean-for-strained-us-india-ties/a-79865777?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/06 02:40</span>
+    </div>
+
+    
+    <p class="title-ja">パラグアイのサンティアゴ・ペーニャ大統領、銀行破綻を受け辞任</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c6p9g39vln3yo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Paraguay President Santiago Peña resigns after bank collapse</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>パラグアイのサンティアゴ・ペーニャ大統領は、自身と関係のある銀行の破綻に端を発した政治危機を受けて辞任を発表した。</p><p>同氏はソーシャルメディア上のビデオメッセージで「もし失敗したなら国民に謝罪したい」と述べた。 「あなたが私に寄せてくれた信頼を裏切るつもりは決してありませんでした。」</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>上野銀行が破産手続きに入り、すべての業務が凍結された後に危機が勃発した。議員らは、昨年まで銀行を所有する会社の株主だったペニャ氏を利益相反と違法行為で告発した。</p><p>ペーナ氏は不正の疑いを否定した。同氏の辞任は、パラグアイ下院が弾劾裁判の続行に賛成票を投じたことを受けて行われた。</p><p>Xに投稿されたビデオメッセージの中で、ペニャ氏は自身の辞任は安定、社会平和、民主主義制度を守るためだと述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Paraguay's President Santiago PeÃ±a has announced his resignation following a political crisis sparked by the collapse of a bank linked to him.</p><p>"I want to apologise to the people if at any point I failed," he said in a video message on social media. "It was never my intention to betray the trust you placed in me."</p><p>The crisis erupted after Ueno Bank entered an insolvency process, which froze all operations. Lawmakers accused PeÃ±a, who was a shareholder until last year in the company that owned the bank, of conflicts of interest and misconduct.</p><p>PeÃ±a has rejected suggestions of impropriety. His resignation comes after Paraguay's lower house of congress voted in favour of pursuing an impeachment trial.</p><p>In his video message posted on X, PeÃ±a said his resignation was to protect stability, social peace and democratic institutions.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c6p9g39vln3yo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/06 02:08</span>
+    </div>
+
+    
+    <p class="title-ja">K-POPグループNewJeansの契約には「睡眠と自由な選択」の権利が省略されていた – 報道</p>
+    <p class="title-en"><a href="https://www.theguardian.com/music/2026/nov/05/k-pop-group-newjeans-contract" target="_blank" rel="noopener">K-pop group NewJeans’s contract omitted rights to ‘sleep and free choice’ – report</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>新しい報告書は、レコードレーベルのアドールが未成年のときにグループ契約から児童の保護を剥奪したことを明らかにした</p><p>スーパースター K-POP グループ NewJeans は、「睡眠、休息、自由な選択」の権利を放棄するという制限的なレコードレーベル契約を締結しました。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ニューヨーク・タイムズ紙の新たな報道によると、記録破りのガールズグループのメンバーが14歳から17歳の時に契約が締結されたことが判明した。</p><p>契約では、出演者が「不誠実な態度」をとったり、「不適切な恋愛関係」をしたりすることを禁じていた。彼らはまた、グループメンバーの教育を受ける権利を含む「基本的人権」を保護する標準的な児童保護文言にも違反した。</p><p>レコードレーベルAdor（人気グループBTSとKatseyeの本拠地であるHybeの子会社）との契約では、さらにレーベルが「未成年の出演者に過度の身体的露出や過度に性的挑発的な表現を要求してはならない」と規定する韓国政府のK-POP契約書のテンプレートの一部が除外されていた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>New report finds that record label Ador stripped child protections from group’s contracts when they were minors</p><p>The superstar K-pop group NewJeans signed restrictive record label contracts that waived their right to “sleep, rest and free choice”.</p><p>A new report from the New York Times found that the contracts were signed when the members of the record-breaking girl group were aged 14 to 17.</p><p>The contracts banned the performers from having an “insincere attitude” and engaging in “inappropriate romantic relationships”. They also struck standard child protection language which protected “basic human rights” including the group members’ right to education.</p><p>The contracts from record label Ador (a subsidiary of Hybe, home of popular groups BTS and Katseye ) additionally excluded portions of the Korean government’s K-pop contract template stipulating that the label “shall not demand that a performer who is a minor engage in excessive physical exposure or overly sexually suggestive expression”.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/music/2026/nov/05/k-pop-group-newjeans-contract" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/06 01:12</span>
+    </div>
+
+    
+    <p class="title-ja">ナビ・ピレイ: 正義をもって暴力と闘う</p>
+    <p class="title-en"><a href="https://www.france24.com/en/navi-pillay-fighting-violence-with-justice" target="_blank" rel="noopener">Navi Pillay: Fighting violence with justice</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>国際刑事裁判所から世界司法制度におけるアフリカの地位まで、賭け金は高い。ノーベル平和賞受賞者のナビ・ピレー氏が独占インタビューで国際正義について語ります。彼女は、ドナルド・トランプがICCを標的にしているので、政治権力の人質にされるべきではないと主張する。この対決はアフリカにとって何を意味するのでしょうか？</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>From the International Criminal Court to Africa’s place in the global justice system, the stakes are high. In an exclusive interview, Nobel Peace Prize winner, Navi Pillay will discuss international justice . She says it it must not be held hostage to political power, as Donald Trump targets the ICC. What does this showdown mean for Africa?</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/navi-pillay-fighting-violence-with-justice" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/06 01:12</span>
+    </div>
+
+    
+    <p class="title-ja">バンス氏、2028年をリセット、米中間選挙惨敗を受け共和党は方針転換を検討</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/5/vance-eyes-2028-reset-as-republicans-mull-pivot-after-us-midterms-drubbing?traffic_source=rss" target="_blank" rel="noopener">Vance eyes 2028 reset, as Republicans mull pivot after US midterms drubbing</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>今週の中間選挙で共和党が議会の上院と下院の両方で支配力を失ったことが結果で確認されてから数時間後、共和党幹部らは何がひどく間違ったのか、そして今後は大幅な軌道修正が必要なのかについて頭を悩ませていた。</p><p>テキサス州のようなかつて共和党の拠点が敵の手に落ちたとき、米国副大統領JDバンスはXを相手に「我々が負けた本当の理由はほぼ誰の目にも明らかだ」と宣言した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「我々が負けた理由は戦争だ。昨夜、大統領自身がそう言った。その価値があった、今後6年間上院を失うことに価値があったと主張したいなら、そうすればいい。支払う価値のある代償だったと主張してください。同意するか反対するかは、少なくとも正直なことです」とバンス氏は語った。</p><p>元トランプ大統領に投票していた人々は、イラン戦争と米国とイスラエルの関係をめぐって寝返ったという。</p><p>「私はこの国に希望を持ち続けている。腹を立てて『私がそう言った』と言いたがる人々へ。あなたは正しい、あなたは私たちにそう言ったのです。そのエネルギーをあなたの世界観を共有する共和党員の選出に使ってください」と彼は書いた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Hours after results confirmed that the Republican Party had lost control of both the Senate and the House of Representatives in the United States Congress in the midterm elections this week, senior Republicans were hand-wringing over what had gone so badly wrong and whether a major course correction would now be required.</p><p>As once-Republican strongholds like Texas fell to the enemy, US Vice President JD Vance took to X to declare that the “real reason we lost is obvious to almost everyone”.</p><p>“The reason we lost is the war. The president himself said so last night. If you’d like to argue it was worth it, that losing the Senate for the next 6 years was worth it, then do so. Argue it was a worthwhile cost to pay. Agree or disagree, that’s at least honest,” Vance said.</p><p>Former Trump voters had switched sides, he said, over the Iran war and the US ties to Israel.</p><p>“I remain hopeful about our country. To the people who are pissed off and want to say, ‘I told you so’: you’re right, you did tell us so. Take that energy into electing Republicans who share your worldview,” he wrote.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/5/vance-eyes-2028-reset-as-republicans-mull-pivot-after-us-midterms-drubbing?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/05 22:34</span>
+    </div>
+
+    
+    <p class="title-ja">南アフリカのスター、ゾラニ・マホラ：シャキーラとの「ワカ・ワカ」から「ピープル・パワー」まで</p>
+    <p class="title-en"><a href="https://www.france24.com/en/tv-shows/arts24/20261105-south-african-star-zolani-mahola-from-waka-waka-with-shakira-to-people-power" target="_blank" rel="noopener">South African star Zolani Mahola: From 'Waka Waka' with Shakira to 'People Power'</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>「ワカ・ワカ」の世界的な成功から、近日発売予定のセカンド・ソロ・アルバム「ピープル・パワー」まで、南アフリカのゾラニ・マホラは、人々を結びつける音楽の力を中心にキャリアを築いてきました。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>From the global success of "Waka Waka" to her forthcoming second solo album "People Power", South Africa's Zolani Mahola has built a career around the power of music to bring people together.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/tv-shows/arts24/20261105-south-african-star-zolani-mahola-from-waka-waka-with-shakira-to-people-power" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/05 00:18</span>
+    </div>
+
+    
+    <p class="title-ja">世界の麻薬取引におけるアフリカの役割の変化</p>
+    <p class="title-en"><a href="https://www.dw.com/en/africa-s-shifting-role-in-the-global-drug-trade/a-79847720?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Africa's shifting role in the global drug trade</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>長年にわたり、アフリカは主に国際的な麻薬密売ネットワークの中継地として知られていました。</p><p>しかし、最近の麻薬押収や研究所での発見は、違法薬物がもはやアフリカ諸国だけを通過しているわけではなく、アフリカ諸国で製造されることが増えていることを示している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ナイジェリア、南アフリカ、ケニア、モザンビークなどの国々でメタンフェタミン研究所が最近発見されたことにより、アフリカが合成麻薬の重要な生産拠点になりつつあるという懸念が高まっている。</p><p>国連薬物犯罪事務所（UNODC）によると、合成麻薬の生産には、国境を越えた犯罪ネットワークや、国内市場と国際市場の両方に供給できる秘密研究所がますます関与しているという。</p><p>ナイジェリア国家麻薬法執行局（NDLEA）が、同局が国内でこれまでに発見した最大のメタンフェタミン秘密研究所と称する施設を解体したことを受け、今年、この議論は新たな緊急性を増した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>For years, Africa was primarily known as a transit point for international drug trafficking networks.</p><p>But recent drug seizures and laboratory discoveries show that illicit drugs are no longer only passing through African countries — they are increasingly being manufactured there.</p><p>Recent discoveries of methamphetamine laboratories in countries such as Nigeria , South Africa , Kenya and Mozambique have fueled concerns that Africa is becoming a significant production hub for synthetic drugs.</p><p>According to the UN Office on Drugs and Crime (UNODC), synthetic drug production increasingly involves transnational criminal networks and clandestine laboratories capable of supplying both local and international markets.</p><p>The debate gained new urgency this year after Nigeria's National Drug Law Enforcement Agency (NDLEA) dismantled what the agency described as the largest clandestine methamphetamine laboratory ever uncovered in the country.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/africa-s-shifting-role-in-the-global-drug-trade/a-79847720?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-11-06";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
