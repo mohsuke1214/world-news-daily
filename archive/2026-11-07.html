@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年11月7日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/07 01:45</span>
+    </div>
+
+    
+    <p class="title-ja">英国コメディアンのラッセル・ブランド、強姦と3件の性的暴行で有罪判決</p>
+    <p class="title-en"><a href="https://www.france24.com/en/video/20261106-british-comedian-russell-brand-found-guilty-of-rape-and-three-sexual-assaults" target="_blank" rel="noopener">British comedian Russell Brand found guilty of rape and three sexual assaults</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>英国のコメディアン、ラッセル・ブランドは11月5日木曜日、ロンドンの陪審により強姦と16歳の少女を含む3件の性的暴行の罪で有罪判決を受けた。裁判官によると、彼は現在「重大な」懲役刑に処せられているという。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>British comedian Russell Brand was on Thursday, November 5, found guilty of rape and three sexual assaults by a London jury, including a 16-year-old girl. He now faces "significant" prison time, according to the judge.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261106-british-comedian-russell-brand-found-guilty-of-rape-and-three-sexual-assaults" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/07 01:04</span>
+    </div>
+
+    
+    <p class="title-ja">欧州軍、停戦後のウクライナ派遣の可能性に備え準備</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/6/france-ukraine-postwar-military-drills?traffic_source=rss" target="_blank" rel="noopener">European troops prepare for possible post-ceasefire deployment to Ukraine</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>欧州軍、停戦後のウクライナ派遣の可能性に備え準備</p><p>ポーランドで行われるフランスと英国主導の軍事演習は、停戦が成立した場合に欧州10カ国の2,800人の軍隊がどれだけ早くウクライナに展開できるかを試すことになる。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>European troops prepare for possible post-ceasefire deployment to Ukraine</p><p>French- and British-led military drills in Poland will test how quickly 2,800 troops from 10 European countries could deploy to Ukraine if a ceasefire is reached.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/6/france-ukraine-postwar-military-drills?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/07 00:48</span>
+    </div>
+
+    
+    <p class="title-ja">民主党の中間選挙勝利後のAI減速懸念で世界株が急落</p>
+    <p class="title-en"><a href="https://www.theguardian.com/business/2026/nov/06/global-stocks-plunge-amid-ai-slowdown-fears-after-democrats-midterm-triumph" target="_blank" rel="noopener">Global stocks plunge amid AI slowdown fears after Democrats’ midterm triumph</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>アジアとヨーロッパの市場もウォール街に追随し、FTSEは1.9%下落し急落した</p><p>民主党の中間選挙勝利でAI産業の減速懸念が高まり、米国ハイテク株の暴落が大西洋に広がり、欧州株式市場は急落した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>木曜日のウォール街の下落に続き、金曜日のアジア株式市場は急落した。その後、投資家心理はロンドンにも伝わり、市場は一時、３月以来最悪の日を迎える局面があった。</p><p>ロンドン上場の優良株を対象とするFTSE100指数は午前半ばの取引で207ポイント（1.9％）安の1万0575ポイントとなった。しかし、ウォール街が再開した際の米国株の小反発に助けられ、午後半ばまでに1.5％下落まで回復した。</p><p>午後の取引でドイツのダックス指数は2.3％下落し、フランスのCac40指数は1.3％下落し、スペインのアイベックス指数は1.1％下落した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Asian and European markets follow Wall Street with sharp fall as FTSE is down 1.9%</p><p>European stock markets have fallen sharply as a rout in US tech stocks spread across the Atlantic, after the Democrats’ midterms victory sparked fears of a slowdown in the AI industry.</p><p>A sell-off on Wall Street on Thursday was followed by sharp falls in Asian stocks markets on Friday. The investor sentiment then reached London, where the market was, at one stage, poised for its worst day since March.</p><p>The FTSE 100 index, which tracks blue-chip shares listed in London, was down 207 points, or 1.9%, at 10,575 points in mid-morning trading. But by mid-afternoon it had recovered to a 1.5% fall, helped by a small bounce in US stocks when Wall Street reopened.</p><p>Germany’s Dax index was down 2.3% in afternoon trading, France’s Cac 40 dropped by 1.3% and Spain’s Ibex lost 1.1%.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/business/2026/nov/06/global-stocks-plunge-amid-ai-slowdown-fears-after-democrats-midterm-triumph" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/07 00:33</span>
+    </div>
+
+    
+    <p class="title-ja">フランスでバス事故、2人死亡 当局発表</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cmly00l4p3lwo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Two dead after bus crashes in France, officials say</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>フランス東部でバスが衝突し、少女と18歳の男性が死亡したと地元当局が発表した。</p><p>バスはリヨンとブール・アン・ブレス間を走行中、現地時間金曜午前7時ごろレントの町で衝突した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ブール・アン・ブレス検察庁によると、バスには子供15人を含む乗客43人が乗っていた。 3人が重体で、少なくとも13人が軽傷を負っている。</p><p>フランスのエマニュエル・マクロン大統領は、犠牲者、負傷者、そしてその家族に思いを馳せていると述べた。</p><p>同氏はXへの投稿で、国民は彼らの側に立ち、参加した救助チームに感謝の意を表したと述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A young girl and an 18-year-old man have died after a bus crashed in eastern France, local authorities have said.</p><p>The bus was travelling between Lyon and Bourg-en-Bresse when it crashed at around 07:00 local time on Friday in the town of Lent.</p><p>The bus was carrying 43 passengers, including 15 children, the Bourg-en-Bresse prosecutor's office said. Three people are in a critical condition and at least 13 others have sustained minor injuries.</p><p>French President Emmanuel Macron said his thoughts were with the victims, the injured, and their families.</p><p>In a post on X, he said the nation stood by their side and thanked the rescue teams involved.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cmly00l4p3lwo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/07 01:21</span>
+    </div>
+
+    
+    <p class="title-ja">エルサレム日報：アラブ政党はネタニヤフに対してアイゼンコットを支持</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/6/jerusalem-daily-arab-parties-back-eisenkot-against-netanyahu?traffic_source=rss" target="_blank" rel="noopener">Jerusalem Daily: Arab parties back Eisenkot against Netanyahu</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>エルサレム日報：アラブ政党はネタニヤフに対してアイゼンコットを支持</p><p>イスラエルのアラブ人多数派政党、共同リストとラームはネタニヤフ首相のライバルであるガディ・アイゼンコット氏の政権樹立を支持しており、同氏がクネセトの過半数を獲得する可能性がある。イスラエルは、物議を醸しているE1不法入植地に道を譲るため、パレスチナ人のベドウィンコミュニティを破壊した。アルジャジーラのマラ・ラヤンが最新情報を伝えている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Jerusalem Daily: Arab parties back Eisenkot against Netanyahu</p><p>Arab-majority parties in Israel, the Joint List and Ra’am, have backed Netanyahu’s rival Gadi Eisenkot to form a government, potentially giving him a Knesset majority. Israel destroys a Palestinian Bedouin community to make way for the controversial E1 illegal settlement. Al Jazeera’s Marah Rayan has the latest.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/6/jerusalem-daily-arab-parties-back-eisenkot-against-netanyahu?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/07 00:36</span>
+    </div>
+
+    
+    <p class="title-ja">気候変動の脅威が高まる中、トルコはCOP31で「電動​​化」推進を推進</p>
+    <p class="title-en"><a href="https://www.france24.com/en/environment/20261106-turkey-to-push-for-electrification-drive-at-cop31-as-climate-threats-mount" target="_blank" rel="noopener">Turkey to push for 'electrification' drive at COP31 as climate threats mount</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>COP31の主催国であるトルコは、月曜日にアンタルヤで国連気候変動会議が開幕する中、世界的な電力需要に応えるため「電化」推進を推し進める構えだ。毎年恒例のサミットは、今年は中東戦争によって引き起こされた生活費危機の影の下で開催される。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>COP31 host Turkey is set to push for a "electrification" drive to help meet global elergy demand as the UN climate conference kicks off in Antalya on Monday. The annual summit takes place this year under the shadow of a cost-of-living crisis fuelled by the war in the Middle East.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/environment/20261106-turkey-to-push-for-electrification-drive-at-cop31-as-climate-threats-mount" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/06 21:56</span>
+    </div>
+
+    
+    <p class="title-ja">イランの人々にとって、絶え間ない戦争の脅威と情報不足</p>
+    <p class="title-en"><a href="https://www.dw.com/en/for-people-in-iran-a-constant-threat-of-war-and-dearth-of-information/a-79875438?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">For people in Iran, a constant threat of war and dearth of information</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>「空気中には常に恐怖感が漂っている」とテヘラン在住の37歳の母親はDWに語った。 「大きな音が聞こえるたびに、私はひるみます。ドアがバタンと閉まるときでさえ、爆弾が落ちてくるのではないかと思って飛び跳ねます。」</p><p>今では、戦争が始まった最初の数か月間とは異なり、彼女の子供たちは学校に戻っています。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「私は働いていませんが、恐怖から子供たちを家に留めておくのは解決策ではありません」と彼女は言う。 「彼らは私たちの小さなアパートで大騒ぎするでしょう。」</p><p>米国とイスラエルとの軍事的対立にもかかわらず、イラン全土で学校は開校し続けている。しかし、子供が私立学校に通っている親の中には、新たな戦争やその他の緊急事態が発生した場合に何をすべきかを説明するメッセージを学校から受け取った人もいる。</p><p>多くの保護者がソーシャルメディアでそのようなメッセージを共有している。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>"There is a constant sense of fear in the air," a 37-year-old mother in Tehran told DW. "Every time I hear a loud noise, I flinch. Even when a door slams, I jump — thinking that bombs are falling."</p><p>Now, unlike in the opening months of the war , her children are back at school.</p><p>"I don't work, but keeping the children at home out of fear is not a solution," she said. "They would go stir-crazy in our small apartment."</p><p>Schools remain open across Iran despite the military standoff with the US and Israel . However, some parents whose children attend private schools have received messages from those schools explaining what to do in the event of a renewed war or other emergency.</p><p>Numerous parents have shared such messages on social media.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/for-people-in-iran-a-constant-threat-of-war-and-dearth-of-information/a-79875438?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/06 16:33</span>
+    </div>
+
+    
+    <p class="title-ja">イランのミサイル基地近くで大規模な建設が進行中、衛星写真が示唆</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/ckjrwx1r2d5ro?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Major construction ongoing near Iran missile bases, satellite images suggest</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>衛星画像の分析によると、イランは主要なミサイル基地の少なくとも2か所の近くで大規模な新たな建設を進めており、数カ月にわたる米国とイスラエルの空爆で損傷した基地の修復を行っているようだ。</p><p>首都テヘラン近郊のカラジにあるガルムダレ軍事基地と北部のシャフルード基地で11月に撮影された衛星写真には、掘削と新しい建物の証拠が見られると、写真を精査した英国情報会社MAIARのアナリストがBBCベリファイに語った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ミサイル複合施設や空軍基地を含む他の少なくとも12の軍事施設には修復の兆候が見られる。イラクとの国境に近いイラン西部のケルマーンシャー・ミサイル基地では、破壊された建物に新しい屋根が建てられている一方、首都の東にあるパルチン軍事複合施設では損傷した建物や瓦礫が撤去されており、空爆が続いているにもかかわらず繰り返し修復されている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Iran appears to be undertaking significant new construction near at least two of its major missile sites and repairing bases damaged by months of US and Israeli air strikes, analysis of satellite images suggests.</p><p>Evidence of digging and new buildings are visible in satellite imagery taken in November at the Garmdareh military base in Karaj near the capital Tehran and the Shahroud base in the north, analysts at British intelligence company MAIAR, who reviewed the photos, told BBC Verify.</p><p>At least 12 other military sites, including missile complexes and air bases, appear to show signs of repairs. New roofs have been built on destroyed buildings at the Kermanshah missile base in western Iran, near the border with Iraq, while damaged buildings and debris have been cleared at the Parchin military complex - which has been repeatedly repaired despite a succession of air strikes - east of the capital.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/ckjrwx1r2d5ro?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/07 00:03</span>
+    </div>
+
+    
+    <p class="title-ja">中国は米国の中期改革を注視している</p>
+    <p class="title-en"><a href="https://www.france24.com/en/tv-shows/access-asia/20261106-china-keeps-a-close-eye-on-us-midterm-shake-up" target="_blank" rel="noopener">China keeps a close eye on US midterm shake-up</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米国の中間選挙の結果、民主党が米国議会の両院を制し、ドナルド・トランプ氏は残りの任期はレームダック大統領として残ることになった。 SOAS中国研究所のスティーブ・ツァン教授はフランス24に対し、トランプ氏の弱体化により中国政府の交渉立場が強化される可能性があるが、中国指導部は外交政策に関して議会の影響力が比較的小さいことを認識しており、両大統領間の温かい個人的な関係を維持することに熱心であると語った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The US midterm elections have resulted in the Democratic Party taking control of both chambers of the US Congress, leaving Donald Trump as a lame duck president for the remainder of his term. Professor Steve Tsang of the SOAS China Institute tells FRANCE 24 that, while a weakened Trump could strengthen Beijing's negotiating position, the Chinese leadership is aware that Congress has relatively little sway over foreign policy and is keen to maintain warm personal ties between the two presidents.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/tv-shows/access-asia/20261106-china-keeps-a-close-eye-on-us-midterm-shake-up" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/06 23:15</span>
+    </div>
+
+    
+    <p class="title-ja">青い波に乗った女たち</p>
+    <p class="title-en"><a href="https://www.france24.com/en/tv-shows/the-51/20261106-the-women-who-rode-the-blue-wave" target="_blank" rel="noopener">The women who rode the blue wave</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>この版では、民主党が大幅な勝利を収めた米国の中間選挙が、女性にとって一連の歴史的初の出来事となったことについて報告します。また、タイの首都の最先端の私立クリニックに支援を求めて何千人もの外国人患者が集まるバンコクの急成長する不妊治療産業の暗い側面もある。さらに、かつてはギャングの暴力に悩まされ立入禁止区域だったエルサルバドルの貧しい地域が、女性たちによってストリートアートの活気に満ちたキャンバスにどのように変えられているかについても説明します。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>In this edition, we report on how the US midterms, which saw the Democrats make massive gains, also marked a series of historic firsts for women. Also the dark side to Bangkok's booming fertility industry, which attracts thousands of foreign patients seeking assistance from the Thai capital's state-of-the-art private clinics. Plus how an impoverished neighbourhood in El Salvador, once a no-go zone plagued by gang violence, is being transformed by women into a vibrant canvas for street art.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/tv-shows/the-51/20261106-the-women-who-rode-the-blue-wave" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/06 21:05</span>
+    </div>
+
+    
+    <p class="title-ja">「耐えるしかない」：デリーの容赦ない大気汚染危機</p>
+    <p class="title-en"><a href="https://www.dw.com/en/no-choice-but-to-bear-it-delhi-s-unrelenting-air-pollution-crisis/a-79873124?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">'No choice but to bear it': Delhi's unrelenting air pollution crisis</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ニューデリーの少し肌寒く、明らかにスモッグがかった朝、クシュブー・アローラさんは、市の大気質がさらに悪化する前に、基礎疾患のある母親のために別の空気清浄機を探していました。</p><p>「すでに、頭痛が繰り返し起こるようになりました」と彼女は言いました。 「最近、朝起きてもすっきりしません。日が経つにつれて、頭が重く、目がかゆみ、喉が常にカラカラになっているように感じます。」</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>少し前まで、ウールの開梱がデリーの冬の到来を告げていました。今、部屋の隅にある空気清浄機の軽い音が聞こえます。</p><p>アローラさんは、公園でヨガをしたり、朝の散歩をしたりするのをすでにやめたと語った。彼女はまた、汚染レベルを下げるために、家を空気浄化植物で満たし、家の中に水ミストを噴霧し始めました。</p><p>「両親は私が気が狂ったような目で見ています。しかし、人々は状況の重大さを理解していないと感じます」と彼女は語った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>On a slightly chilly and distinctly smoggy morning in New Delhi, Khushboo Arora was looking for another air purifier for her mother, who has underlying health complications, before the city's air quality deteriorated further.</p><p>"Already, I am starting to get a recurring headache," she said. "These days when I wake up, I don't feel fresh. As the day progresses, I feel a heaviness in my head, itching in my eye and a constantly parched throat."</p><p>Not long ago, the unpacking of woolens announced the advent of winter in Delhi. Now, it's the light hum of an air purifier in the corner.</p><p>Arora said she has already stopped doing yoga in the park and taking her morning walks. She has also filled her house with air-purifying plants and started spraying water mist inside the house to bring down the level of pollution .</p><p>"My parents look at me like I have gone mad. But I feel people are not realizing the gravity of the situation," she said.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/no-choice-but-to-bear-it-delhi-s-unrelenting-air-pollution-crisis/a-79873124?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/06 02:37</span>
+    </div>
+
+    
+    <p class="title-ja">サセックス公爵夫人の別居異母弟、児童性的虐待捜査の「要注意人物」に</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/nov/05/meghan-sussex-thomas-markle-jr-philippines-child-sexual-abuse-inquiry" target="_blank" rel="noopener">Duchess of Sussex’s estranged half-brother ‘person of interest’ in child sexual abuse inquiry</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>フィリピン当局者は「トーマス・マークル・ジュニアの犯罪関与を示す兆候」があるが、まだ容疑者として扱われていないと述べた</p><p>サセックス公爵夫人の別居中の異母弟、トーマス・マークル・ジュニアが、父親のトーマス・マークル・シニアに対する児童性的虐待画像疑惑に対するフィリピン当局の捜査で「要注意人物」に指名された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>同国の内務・地方政府長官ジョンビック・レムラ氏はマニラでの記者会見で、「息子も犯罪に関与していることを示す兆候」があると述べた。</p><p>同氏は、父親の持ち物から見つけた画像を地元警察とFBIに通報した60歳のマークル・ジュニアはまだ容疑者として扱われていないと付け加えた。彼の関与疑惑は、彼が警察に渡した資料と直接関係があるとは考えられていない。</p><p>レムラ氏によると、アジア系、ラテン系、ヨーロッパ系の未成年の男女を含む7,000枚以上の写真と1本のビデオが発見されたという。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Philippine official says there are ‘signs that point to Thomas Markle Jr’s involvement in crime’, but he’s not yet being treated as a suspect</p><p>The Duchess of Sussex’s estranged half-brother, Thomas Markle Jr, has been named as a “person of interest” in the Philippine authorities’ inquiry into child sexual abuse image allegations made against her father, Thomas Markle Sr.</p><p>The country’s interior and local government secretary, Jonvic Remulla, told a press conference in Manila there were “signs that point that the son is involved in the crime as well”.</p><p>He added that Markle Jr, 60, who alerted local police and the FBI to images he found in his father’s belongings, was not yet being treated as a suspect. His alleged involvement is not thought to be directly linked to the material he handed to the police.</p><p>More than 7,000 photos and one video – all of under-age males and females of Asian, Latin and European descent, with some as young as 10 and 11 – were uncovered, Remulla said.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/nov/05/meghan-sussex-thomas-markle-jr-philippines-child-sexual-abuse-inquiry" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/07 01:45</span>
+    </div>
+
+    
+    <p class="title-ja">共和党選挙敗退を受け、ヘグセス米国防長官への圧力高まる</p>
+    <p class="title-en"><a href="https://www.france24.com/en/video/20261106-pressure-mounts-on-us-defence-chief-hegseth-after-republican-election-rout" target="_blank" rel="noopener">Pressure mounts on US Defence chief Hegseth after Republican election rout</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ピート・ヘグセス米国防長官への圧力は高まっており、勝利した民主党は議会で彼を標的にする計画を立てており、共和党は大統領が支持したイラン戦争が選挙での敗北の原因だと非難している。ドナルド・トランプ大統領はこれまでのところヘグセス氏を支持し、同氏が「非常に良い仕事をしている」と主張している。しかし、トランプ氏とJ.D.バンス副大統領はともに、中間選挙での敗北はイラン戦争のせいだと主張しており、ヘグセス氏はイラン戦争の主要な支持者であり報道官でもある。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>US Defence Secretary Pete Hegseth is under growing pressure, with victorious Democrats planning to target him in Congress and Republicans blaming the Iran war he championed for their election losses. President Donald Trump has stood by Hegseth so far, insisting he's doing "a very good job". But Trump and Vice President JD Vance have both blamed midterm election losses on the Iran war, for which Hegseth is a key advocate and spokesman.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261106-pressure-mounts-on-us-defence-chief-hegseth-after-republican-election-rout" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/07 01:11</span>
+    </div>
+
+    
+    <p class="title-ja">米国の中間選挙で共和党は何を失ったのでしょうか?</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/by-the-numbers-3/2026/11/6/what-did-the-republicans-lose-in-the-us-midterms?traffic_source=rss" target="_blank" rel="noopener">What did the Republicans lose in the US midterms?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米国の中間選挙で共和党は何を失ったのでしょうか?</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>What did the Republicans lose in the US midterms?</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/by-the-numbers-3/2026/11/6/what-did-the-republicans-lose-in-the-us-midterms?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/06 22:03</span>
+    </div>
+
+    
+    <p class="title-ja">フラヴィオ・ボルソナロ氏はマール・ア・ラーゴでの右翼会議で講演し、注目を集め続けるために奮闘する</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/nov/06/flavio-bolsonaro-upbeat-brazil-election-us" target="_blank" rel="noopener">Flávio Bolsonaro battles to remain relevant as he speaks at rightwing conference at Mar-a-Lago</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>極右政治家が保守党政治活動会議で演説し、選挙不正について根拠のない主張をする</p><p>先月のブラジル大統領選挙で敗北した極右政治家のフラビオ・ボルソナロ氏は、米国に亡命した後、政治的存在感を維持するために奮闘しているが、自身の敗北は「ブラジルの終わり」ではないと主張した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ボルソナロ氏は10月25日の選挙で左翼現職のルイス・イナシオ・ルーラ・ダ・シルバ氏に400万票以上の差で敗れた直後、先週初めに逃亡した。</p><p>木曜夜、ボルソナロ氏は米国到着後初めて公の場に主要な姿を現し、ドナルド・トランプ氏の所有地マール・ア・ラーゴで開かれた右翼の集会で講演し、「素晴らしいこと」はまだこれからだと主張した。</p><p>45歳のボルソナロ氏は、保守政治行動会議（CPAC）の4日間にわたる「先見者の集い」イベントのガラディナーで、「これがブラジルの終わりではなかったし、アメリカの終わりでもないことは分かっている」と語った。同イベントではリズ・トラス元英国首相も講演する予定だ。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Far-right politician addresses Conservative Political Action Conference and makes unsubstantiated claims about election fraud</p><p>Flávio Bolsonaro, the far-right politician who lost Brazil’s presidential election last month, has insisted his defeat is not “the end for Brazil” as he battles to maintain political relevance after fleeing to the US.</p><p>Bolsonaro absconded early last week shortly after losing the 25 October election to the leftwing incumbent Luiz Inácio Lula da Silva by more than 4m votes.</p><p>On Thursday night Bolsonaro made his first major public appearance since arriving in the US, speaking at a rightwing gathering at Donald Trump’s Mar-a-Lago property where he claimed “great things” were still to come.</p><p>“I know this wasn’t the end for Brazil and I know it wasn’t the end for America,” Bolsonaro, 45, told a gala dinner at the Conservative Political Action Conference (CPAC)’s four-day “gathering of visionaries” event, where the former British prime minister Liz Truss is also due to speak.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/nov/06/flavio-bolsonaro-upbeat-brazil-election-us" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/06 21:24</span>
+    </div>
+
+    
+    <p class="title-ja">判事がトランプ大統領のアーチの建設を中止。そして労働省は雇用統計を発表する予定</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/06/g-s1-152213/up-first-newsletter-job-market-trump-arch-school-enrollment-harmeet-dhillon" target="_blank" rel="noopener">Judge halts construction of Trump's arch. And, Labor Department to release jobs report</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>今週の中間選挙では物価上昇と賃金の停滞が不満を煽り、有権者が投票所で不満を表明した。同様に、昨日の株式市場は下落しました。 AIを規制する民主党議会への懸念により、ハイテク株の多いナスダックは5％以上下落し、2兆ドル以上の時価総額が吹き飛んだ。この下落は、中間選挙で議会の運命が明確になったことで投資家が安心し、株価が上昇した水曜日から続いた。対照的に、雇用市場の変動は少なく、今日労働省は最新の雇用報告を発表する予定だ。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Rising prices and stagnant wages fueled frustration during this week's midterm elections , prompting voters to express their discontent at the ballot box. Similarly, the stock market experienced a downturn yesterday. Concerns about a Democratic Congress regulating AI led to a more than 5% drop in the tech-heavy Nasdaq , wiping out more than $2 trillion in market value. This decline followed from Wednesday when shares rose as investors were relieved that the midterms had made Congress's fate clear. In contrast, there has been less volatility in the job market, and today the Labor Department is set to release the latest jobs report.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/06/g-s1-152213/up-first-newsletter-job-market-trump-arch-school-enrollment-harmeet-dhillon" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/07 01:10</span>
+    </div>
+
+    
+    <p class="title-ja">スーダン戦争から逃れる数百万人が資金不足で避難場所を失う危険性があると国連が警告</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/6/millions-fleeing-sudans-war-risk-losing-shelter-as-funds-run-low-un-warns?traffic_source=rss" target="_blank" rel="noopener">Millions fleeing Sudan’s war risk losing shelter as funds run low, UN warns</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>国連難民機関と国際移住機関によると、スーダンでは内戦により避難を強いられた何百万人もの人々が、資金不足と援助物資の枯渇により、緊急避難所を失って取り残される危険がある。</p><p>スーダン全土で推計1,540万人が緊急避難所や基本的な家庭用品を緊急に必要としているが、資金不足により人道機関が支援を優先できるのは必要としている人々の約10パーセントのみであると国連の2機関は金曜日の共同声明で述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「IOMとUNHCRは、共有の供給パイプラインを維持し、優先地域に緊急備蓄を事前に配置し、ニーズが最も大きいところに援助を届けるために、引き続き地元の人道団体や他のパートナーと協力することに尽力する」と声明で述べた。 「しかし、これらの取り組みは、予測可能で柔軟な資金がなければ維持できません。」</p><p>声明によると、これまでに支援を受けている人はわずか93万6,000人で、ニーズと利用可能な資源の間には大きなギャップが残されている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Millions of people in Sudan who have been displaced by the country’s civil war risk being left ⁠without emergency shelter due to funding shortages and depleting aid stocks, according to the United Nations refugee agency and the International Organization for Migration.</p><p>An ⁠estimated 15.4 million people across Sudan urgently need emergency shelter and basic household items, but funding shortages mean humanitarian agencies can prioritise assistance for only approximately 10 percent of those in need, the two UN agencies said in a joint statement on Friday.</p><p>“IOM and UNHCR remain committed to working with local humanitarian organisations and other partners to maintain shared supply pipelines, pre-position emergency stocks in priority areas and deliver assistance where needs are greatest,” the statement said. “But these efforts cannot be sustained without predictable and flexible funding.”</p><p>So far, only 936,000 people have received assistance, leaving a large ‌gap between needs and available resources, according to the statement.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/6/millions-fleeing-sudans-war-risk-losing-shelter-as-funds-run-low-un-warns?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/07 00:08</span>
+    </div>
+
+    
+    <p class="title-ja">ケニア終末宗派指導者、児童190人殺害で懲役200年</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/nov/06/kenyan-doomsday-sect-leader-jailed-murders-paul-mackenzie" target="_blank" rel="noopener">Kenyan doomsday sect leader jailed for 200 years for murder of 190 children</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ポール・マッケンジー、信奉者らに自身とその家族を餓死させるよう命じられ、子供と大人1人の死亡で有罪判決</p><p>近年史上最悪のカルト災害の一つで、子供190人と大人1人を殺害したケニアの終末宗派の指導者に懲役200年の判決が言い渡された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>この判決は、飢餓による殺人に対しては100年、直接殺人に対しては100年で構成され、ケニアの沿岸都市モンバサの裁判所がカルト指導者に有罪判決を下してから2週間後に言い渡された。</p><p>検察当局は、ポール・マッケンジー氏と彼のグッドニュース・インターナショナル教会がキリスト教終末宗派を運営しており、その信者は世界が終わる前に天国に行くために自分自身と子供たちを餓死させるよう命じられたと述べた。</p><p>彼の共犯者らは、被害者が彼の命令に従うことを保証するために、被害者を脅したり殴ったりした。衰弱した遺体は浅い墓に散在し、トイレに捨てられていた。生き埋めにされた人もいた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Paul Mackenzie convicted over deaths of children and one adult after followers were ordered to starve themselves and their families</p><p>The leader of a Kenyan doomsday sect has been sentenced to 200 years in prison for the murders of 190 children and one adult in one of the world’s worst cult disasters in recent history.</p><p>The sentence, comprising 100 years for murder by starvation and 100 years by direct homicide, came two weeks after the court in Kenya’s coastal city of Mombasa found the cult leader guilty of the crimes.</p><p>Prosecutors said Paul Mackenzie and his Good News International church ran ​a Christian doomsday sect whose members were ordered to starve themselves and their children to death to go to heaven before the world ended.</p><p>His accomplices threatened and beat victims to ensure they followed his orders. The emaciated bodies were found scattered in shallow graves and dumped in latrines. Some had been buried alive.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/nov/06/kenyan-doomsday-sect-leader-jailed-murders-paul-mackenzie" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-11-07";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
