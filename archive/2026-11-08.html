@@ -1,0 +1,914 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年11月8日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/08 00:26</span>
+    </div>
+
+    
+    <p class="title-ja">🔴 クラクフでの銃撃で少なくとも5人が死亡、ポーランド警察発表 ⤵️</p>
+    <p class="title-en"><a href="https://www.france24.com/en/europe/20261107-at-least-three-people-killed-shooting-in-polish-city-of-krakow-police-say" target="_blank" rel="noopener">🔴 At least five people killed in shooting in Krakow, Polish police say ⤵️</a></p>
+    
+
+    
+
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/europe/20261107-at-least-three-people-killed-shooting-in-polish-city-of-krakow-police-say" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/07 22:35</span>
+    </div>
+
+    
+    <p class="title-ja">「急進派」か「英雄」か：フランス、左翼候補ジャン＝リュック・メランション氏を討論</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/7/radical-or-hero-france-debates-leftist-candidate-jean-luc-melenchon?traffic_source=rss" target="_blank" rel="noopener">‘Radical’ or ‘hero’?: France debates leftist candidate Jean-Luc Melenchon</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>フランスの極左党指導者ジャン＝リュック・メランションは、右翼反対派からは「急進主義者」、かつての同盟者からは「専制君主」、そして全国的な抗議活動で街頭に出た一部の学生からは「英雄」と評されている。</p><p>フランス不屈党（LFI）の党首は、左翼の最有力候補として浮上しており、来年の大統領選挙では極右国民集会党首マリーヌ・ルペン氏に対する潜在的な挑戦者となる可能性がある。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>オンラインで公開された翌日の土曜日、メランション氏はパリ北部ル・ブルジェの集会で自身のプログラムを発表している。</p><p>同氏の提案の中には、退職年齢を60歳に引き下げ、最低賃金を月額1,700ユーロ（約1,900ドル）に引き上げることが含まれている。フランスをNATOから離脱させ、経済の一部を再国有化する。</p><p>同氏は、欧州中央銀行に対し、フランスが保有する債務の返済を停止し、実質的に債務を永久無利子融資に変更することを望んでおり、これにより政府に支出の余地が与えられることを期待している。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Hard-left French leader Jean-Luc Melenchon has been described as a “radical” by right-wing opponents, a “despot” by former allies and a “hero” by some of the students who have taken to the streets in nationwide protests .</p><p>The leader of the France Unbowed (LFI) party has emerged as the strongest contender on the left and potential challenger to far-right National Rally leader Marine Le Pen in next year’s presidential election.</p><p>On Saturday, Melenchon is presenting his programme at a rally in Le Bourget, north of Paris, a day after it was published online.</p><p>Among his proposals, he wants to lower the retirement age to 60 and raise the minimum wage to 1,700 euro ($1,900) a month; pull France out of NATO and renationalise parts of the economy.</p><p>He wants the European Central Bank to stop France repaying the debt it holds, effectively transforming the debt instead to a permanent interest-free loan – a move he hopes would give the government more room to spend.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/7/radical-or-hero-france-debates-leftist-candidate-jean-luc-melenchon?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/07 21:49</span>
+    </div>
+
+    
+    <p class="title-ja">ロシアの空爆で9人負傷、交渉前にウクライナの電力網にダメージ</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cm4g1nq8158po?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Russian strikes wound nine and damage Ukraine's power network ahead of talks</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ヴォロディミル・ゼレンスキーハス大統領は、夜間の無人機と弾道ミサイルの攻撃によりウクライナのエネルギーインフラが損傷し、停電や給水の中断が発生したと述べた。</p><p>ゼレンスキー大統領は、ウクライナの12の地域が攻撃を受けており、首都キエフが最も大きな被害を受けたと述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>30発以上の弾道ミサイルと170機以上の無人機による一連の攻撃により、全国で子供1人を含む9人が負傷したと報告されている。</p><p>この攻撃は、ウクライナとロシアの代表団が来週アブダビで行われる三者協議に参加する予定である前に行われた。</p><p>ゼレンスキー大統領はテレグラム社外に、モスクワがウクライナの「重要インフラ」への攻撃を開始して会談の準備をしていると書いた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Overnight drone and ballistic missile attacks damaged Ukrainian energy infrastructure, President Volodymyr Zelenskyhas said, causing blackouts and disrupting water supplies.</p><p>Zelensky said 12 Ukrainian regions came under attack with the capital Kyiv hit hardest.</p><p>Nine people are reported to have been hurt across the country, including one child, in the wave of attacks that consisted of more than 30 ballistic missiles and over 170 drones.</p><p>The attacks come before Ukrainian and Russian delegations are due to take part in trilateral talks in Abu Dhabi next week.</p><p>Zelensky wrote on Telegram , external that Moscow was preparing for the talks by launching attacks on Ukraine's "critical infrastructure".</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cm4g1nq8158po?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/07 17:16</span>
+    </div>
+
+    
+    <p class="title-ja">抗議活動の最中、フランスの債務コスト上昇が安定を脅かす</p>
+    <p class="title-en"><a href="https://www.dw.com/en/amid-protests-france-s-rising-debt-costs-threaten-stability/a-79865654?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Amid protests, France's rising debt costs threaten stability</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>多額の負債を抱え、政治的には両極端の対立に陥っており、議会の過半数を持たない政府によって主導されている。これらがフランスの現在の苦境の決定的な特徴である。</p><p>全国的な抗議活動に応えて、政府が2030年までに学校改修に40億ユーロ（44億8000万ドル）の低利融資を提供し、2029年までにさらに10億ユーロを大学に割り当てる計画であれば、州がまったく持っていない資金を約束していることになる。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>フランスの公的債務は国内総生産（ＧＤＰ）の約１２０％に達している。これと比較すると、インフラと防衛に6,000億ユーロの投資計画を立てているにもかかわらず、ドイツの債務対GDP比は約65％である。</p><p>ドイツは依然として最高の AAA 信用格付けを享受しています。対照的に、フランスは信用調査機関に応じて、AA、A+、または Aa3 に格付けされます。ドイツの見通しは一貫して安定的と評価されているが、いくつかの政府機関はフランスの見通しを否定的としている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Deeply indebted, politically trapped in a standoff between extremes and led by a government without a parliamentary majority: These are the defining features of France's current predicament.</p><p>If, in response to nationwide protests , the government plans to provide €4 billion ($4.48 billion) in low-interest loans to renovate schools by 2030 and allocate a further €1 billion to universities by 2029, it is promising money the state simply does not have.</p><p>France's public debt stands at around 120% of gross domestic product (GDP). By comparison, Germany's debt-to-GDP ratio is roughly 65%, despite its €600 billion investment package for infrastructure and defense.</p><p>Germany still enjoys the highest possible AAA credit rating . France, by contrast, is rated AA, A+ or Aa3, depending on the credit agency. While Germany's outlook is consistently rated as stable, several agencies have assigned France a negative outlook.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/amid-protests-france-s-rising-debt-costs-threaten-stability/a-79865654?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/08 00:34</span>
+    </div>
+
+    
+    <p class="title-ja">イランの革命防衛隊は、武器生産と保管のための地下施設を建設すると発表</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/7/irans-irgc-says-building-underground-sites-for-weapons-production-storage?traffic_source=rss" target="_blank" rel="noopener">Iran’s IRGC says building underground sites for weapons production, storage</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>同国のイスラム革命防衛隊（IRGC）によると、イランは激しい爆撃下でも武器の生産と保管を維持できる地下軍事複合施設を建設している。</p><p>イランメディアによると、革命防衛隊報道官ホセイン・モヘビ氏は土曜日、テヘランでの記者会見で軍の能力について一連の発表を行った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>リストされた成果の中には、公開予定の「地下ミサイル都市」も含まれていたと、半官営タスニム通信が報じた。</p><p>モヘビ氏は、革命防衛隊がミサイルとドローンの生産ラインを地上から地下施設に急速に移管したと述べた。これにより、敵対者がイランの備蓄が減少していると想定している間、イランはミサイルの生産を続けることが可能になると同氏は説明した。</p><p>広報担当者はステルス技術の進歩についても概説した。同氏は、こうした改良により、イランのミサイルや無人機が防空システムを突破し、米国やイスラエルとのこれまでの戦闘中に標的を正確に攻撃できるようになったと主張した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Iran is building underground military complexes able to sustain weapons production and storage even under heavy bombardment, according to the country’s Islamic Revolutionary Guards Corps (IRGC) .</p><p>IRGC spokesperson Hossein Mohebbi made a series of announcements on Saturday about the military’s capabilities during a news conference in Tehran, Iranian media reported.</p><p>Among the achievements listed were an “underground missile city” set to be unveiled, the semi-official Tasnim news agency reported.</p><p>Mohebbi said the IRGC had rapidly transferred its missile and drone production lines from the surface to underground facilities. This allows Iran to continue producing missiles while its adversaries assumed its stockpiles were dwindling, he explained.</p><p>The spokesperson also outlined advances in stealth technology. He maintained that such improvements had allowed Iran’s missiles and drones to pierce air defence systems and accurately strike targets during previous rounds of fighting with the United States and Israel.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/7/irans-irgc-says-building-underground-sites-for-weapons-production-storage?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/07 23:38</span>
+    </div>
+
+    
+    <p class="title-ja">イランのシャーの息子がフランクフルトで「自由賞」を受賞</p>
+    <p class="title-en"><a href="https://www.dw.com/en/son-of-iran-s-shah-receives-freedom-prize-in-frankfurt/a-79885661?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Son of Iran's shah receives 'Freedom Prize' in Frankfurt</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イラン野党指導者レザー・パフラヴィー氏は土曜日、ドイツ中部ヘッセン州のフランクフルトで「自由賞」を受賞した。</p><p>警察の発表によると、約1万8000人がレザー・パフラヴィ氏への支持を表明するために結集した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>イベントはセントポール教会で開催されました。この建物は、1848 年から 1849 年にかけて、フランクフルト議会として知られるドイツ初の選挙による議会を開催しました。</p><p>パフラヴィー氏は、1979年の革命で追放された後亡命した独裁者、イラン最後のシャー、モハメッド・レザー・パフラヴィー氏の息子である。</p><p>1979 年の革命に続いて、イランはイスラム共和国に移行し、シーア派イスラム教聖職者を中心に権力が強化されました。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Iranian opposition leader Reza Pahlavi on Saturday received a "Freedom Prize" in Frankfurt in the central German state of Hesse .</p><p>Some 18,000 people rallied to show support for Reza Pahlavi , according to a police statement.</p><p>The event was held at St Paul's Church. The building hosted the Germany's first-ever elected parliament in 1848-1849 , known as the Frankfurt Assembly.</p><p>Pahlavi is the son of the last shah of Iran, Mohammed Reza Pahlavi , an autocrat who fled into exile after being deposed in a 1979 revolution.</p><p>The 1979 revolution was followed by the transformation of Iran into an Islamic republic and the consolidation of power around the Shiite Muslim clergy.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/son-of-iran-s-shah-receives-freedom-prize-in-frankfurt/a-79885661?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/07 21:12</span>
+    </div>
+
+    
+    <p class="title-ja">イスラエル連立交渉が勢いづく</p>
+    <p class="title-en"><a href="https://www.france24.com/en/israel-coalition-talks-gain-momentum" target="_blank" rel="noopener">Israel coalition talks gain momentum</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イスラエルの選挙結果が決着がつかなかったことを受け、アイザック・ヘルツォーク大統領が最初の候補者を指名する準備を進めている中、野党候補のガディ・アイゼンコット氏は政権樹立の権限を確保することに自信を持っていると述べた。アイゼンコット氏は、長年務めたベンヤミン・ネタニヤフ首相の追放に向けた取り組みが進展していると主張している。ノーガ・タルノポルスキーがエルサレムから報告する。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Following inconclusive elections in Israel, opposition candidate Gadi Eisenkot says he is confident of securing the mandate to form a government, as President Isaac Herzog prepares to nominate the first candidate. Eisenkot claims he is making progress in efforts to oust long-serving Prime Minister Benjamin Netanyahu. Noga Tarnopolsky reports from Jerusalem.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/israel-coalition-talks-gain-momentum" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/07 05:42</span>
+    </div>
+
+    
+    <p class="title-ja">決着のつかない選挙の後、イスラエルのアラブ主導政党が注目される</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/06/g-s1-152138/israel-election-palestinian-arab-parties" target="_blank" rel="noopener">Israel's Arab-led parties in spotlight after inconclusive election</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>2026年10月27日、イスラエル、ウム・アル・ファムの投票所で総選挙に投票するイスラエルのパレスチナ国民 マフムード・イリアン/AP キャプションを隠す</p><p>クフル・カシム（イスラエル）―近年、イスラエルの多くのパレスチナ国民は、定期的にコミュニティを疎外し、ヨルダン川西岸やガザの同胞パレスチナ人を抑圧している国家の政治に参加しても得るものはほとんどないと信じて、選挙を忌避している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>しかし先月、イスラエル在住のパレスチナ系アラブ人が記録的な数で投票所に集まり、ベンヤミン・ネタニヤフ首相率いるイスラエル史上最も極右の政権から多数派の座を剥奪することに貢献し、アラブ主導の政党にイスラエル政治の強力な勢力となるために必要な票を与えた。</p><p>「我々はネタニヤフ政権の継続を阻止した」とイスラエルのパレスチナ国民を代表する主要統括機関である高度フォローアップ委員会のジャマル・ザハルカ委員長は述べた。 「これは歴史的な偉業です。私たちのコミュニティはその強さを発見したと思います。」</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A Palestinian citizen of Israel casts her ballot in the country's general election at a polling station in Umm al-Fahm, Israel, Oct. 27, 2026 Mahmoud Illean/AP hide caption</p><p>KUFR QASIM, Israel — In recent years many Palestinian citizens of Israel shunned elections, believing there was little to gain from participating in the politics of a state which, they say, regularly marginalizes their communities and oppresses their fellow Palestinians in the West Bank and Gaza.</p><p>But last month, Palestinian Arabs in Israel came to the ballot boxes in record numbers, helping strip Prime Minister Benjamin Netanyahu's most far-right government in Israel's history of its majority, and giving Arab-led parties the votes they needed to become a powerful force in Israeli politics.</p><p>"We blocked the government of Netanyahu from continuing," said Jamal Zahalka, chairman of the High Follow-Up Committee, the main umbrella body representing Palestinian citizens of Israel. "It's a historical achievement. I think our community found its strength."</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/06/g-s1-152138/israel-election-palestinian-arab-parties" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/08 00:56</span>
+    </div>
+
+    
+    <p class="title-ja">接戦のニュージーランド総選挙後、明確な勝者なし</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c3ewev11g1e0o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">No clear winner after tight New Zealand general election</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>土曜日にニュージーランドの総選挙が行われ、二大政党の党首が連立政権樹立に向けた交渉を準備しているため、明確な勝者は出なかった。</p><p>暫定結果によると、クリストファー・ルクソン首相率いる中道右派の国民党は42議席を獲得したが、最大政党であるにもかかわらず、政権樹立に必要な単純過半数には19議席足りなかった。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>連立相手のＡＣＴとニュージーランド・ファーストと合わせると、合意に達すれば左派諸国に対して僅差でリードすることになる。</p><p>しかし、労働党が３６議席を獲得した野党指導者のクリス・ヒプキンス氏は、「次期政権の形」は「しばらくは」不透明なままだと述べ、譲歩する気配はなかった。</p><p>生活費と失業によって形作られたキャンペーンの結果、厳しい結果となった。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>There was no clear winner following New Zealand's election on Saturday, as the leaders of its two major parties preparing for negotiations to form a coalition government.</p><p>Prime Minister Christopher Luxon's centre-right National Party won 42 seats but was 19 short of the simple majority needed to form a government, despite being the largest party, preliminary results show.</p><p>Combined with their coalition partners ACT and New Zealand First, they would have a slim lead over the left-leaning bloc if a deal could be reached.</p><p>But opposition leader Chris Hipkins, whose Labour Party won 36 seats, showed no signs of conceding, saying the "shape of the next government" will remain uncertain "for a while".</p><p>The tight result followed a campaign shaped by the cost of living and unemployment.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c3ewev11g1e0o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/07 23:03</span>
+    </div>
+
+    
+    <p class="title-ja">ニュージーランド首相、選挙は「近すぎて判断できない」と発言</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/7/new-zealands-prime-minister-says-election-is-too-close-to?traffic_source=rss" target="_blank" rel="noopener">New Zealand’s prime minister says election is ‘too close to call’</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ニュージーランド首相、選挙は「近すぎて判断できない」と発言</p><p>ニュージーランドのクリストファー・ルクソン首相は、次期政権樹立への道筋があると述べた。初期の結果では、国民党が一般投票で労働党を僅差で上回っていることが示された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>New Zealand’s prime minister says election is ‘too close to call’</p><p>New Zealand prime minister Christopher Luxon says he has a pathway to form the next government. Early results show his National Party narrowly ahead of Labour in the popular vote.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/7/new-zealands-prime-minister-says-election-is-too-close-to?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/07 22:12</span>
+    </div>
+
+    
+    <p class="title-ja">ニュージーランドの選挙連合協議はおそらく数週間かかるだろう – たまたまだった</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/live/2026/nov/07/nz-general-election-2026-live-updates-results-new-zealand-polls" target="_blank" rel="noopener">New Zealand election coalition talks will likely take weeks – as it happened</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>今夜もブログをご覧いただきありがとうございます。選挙は明確な勝者がいないまま終了した。ここ数十年でニュージーランドで最も接戦となった選挙の一つとして語り継がれるこの選挙のトップニュースを紹介する。</p><p>クリストファー・ラクソン氏率いる国民党とその右派連立パートナーは、政権復帰を可能にするかぎりぎりの過半数を獲得する瀬戸際にある。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>労働党のクリス・ヒプキンス氏率いる左翼ブロックは過半数に届かなかった。</p><p>ルクソンもヒプキンスも勝利を宣言せず、敗北を認めなかった。両氏は、連立政権の交渉が完了するまでに予想される待ち時間を認めた。</p><p>中道派の新人であるオポチュニティー党が議会に参入し、得票率は5%を超えた。彼らは連立政権のキングメーカーになる可能性がある。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Thanks for following the blog tonight. The election has ended without a clear winner. Here are the top news lines from what will go down as one of New Zealand’s closest elections in many decades .</p><p>Christopher Luxon’s National party and its right-leaning coalition partners are on the brink of a wafer-thin majority that could allow it to eke out a return to power.</p><p>The left-wing bloc, led by Labour’s Chris Hipkins, fell short of a majority .</p><p>Neither Luxon or Hipkins claimed victory or conceded defeat . Both acknowledged an expected wait before a governing coalition is negotiated.</p><p>A centrist newcomer, the Opportunity party, have entered parliament, polling above the 5% threshold . They could potentially be a kingmaker in a coalition.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/live/2026/nov/07/nz-general-election-2026-live-updates-results-new-zealand-polls" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/07 16:33</span>
+    </div>
+
+    
+    <p class="title-ja">米国：中国産のジャイアントパンダがアトランタ動物園で一般公開される</p>
+    <p class="title-en"><a href="https://www.dw.com/en/us-giant-pandas-from-china-make-public-debut-at-atlanta-zoo/a-79883388?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">US: Giant pandas from China make public debut at Atlanta zoo</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米国アトランタ市の動物園で、クマを見るために列をなす来園者の列の中、中国から来た2頭のジャイアントパンダが初めて公の場に姿を現した。</p><p>金曜日、アトランタ動物園でピンピンとフーシュアン（それぞれ雄と雌）が、彼らとそのファンへのご褒美として竹をむしゃむしゃ食べる姿が目撃された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>6歳のパンダは9月27日に中国の成都から到着した。</p><p>彼らが乗ったフェデックス便は「パンダ・エクスプレス」と名付けられた。</p><p>パンダのコンビはここ数週間を生息地に慣れるのに費やしていた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Two giant pandas from China have made their first public appearance at a zoo in the US city of Atlanta as a queue of visitors lined up to see the bears.</p><p>In a treat for them and their fans, Ping Ping and Fu Shuang — male and female, respectively — were seen munching on bamboo at Zoo Atlanta on Friday.</p><p>The six-year-old pandas arrived from China's Chengdu on September 27 .</p><p>The FedEx flight they traveled on was dubbed the "Panda Express."</p><p>The panda duo had spent the last few weeks getting acclimated to their habitat.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/us-giant-pandas-from-china-make-public-debut-at-atlanta-zoo/a-79883388?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/08 00:29</span>
+    </div>
+
+    
+    <p class="title-ja">トランプ大統領の新首席補佐官スティーブン・ミラー氏、「アメリカを救った」と発言</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/7/7-11-sv-trump-stephen-miller-loyalty-pledge?traffic_source=rss" target="_blank" rel="noopener">Trump’s new chief of staff Stephen Miller says he ‘saved America’</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>トランプ大統領の新首席補佐官スティーブン・ミラー氏、「アメリカを救った」と発言</p><p>ドナルド・トランプ米大統領の次期首席補佐官スティーブン・ミラー氏は、大統領が米国を救い、揺るぎない忠誠を誓ったことを称賛している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Trump’s new chief of staff Stephen Miller says he ‘saved America’</p><p>Stephen Miller, US President Donald Trump’s incoming chief of staff, praises the president, crediting him with saving America and pledging unwavering loyalty.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/7/7-11-sv-trump-stephen-miller-loyalty-pledge?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/07 23:59</span>
+    </div>
+
+    
+    <p class="title-ja">レオ教皇、ウルグアイのカトリック教徒に「橋を架ける人」になるよう呼びかけ</p>
+    <p class="title-en"><a href="https://www.france24.com/en/pope-leo-calls-on-uruguay-catholics-bridge-builders" target="_blank" rel="noopener">Pope Leo calls on Uruguay's Catholics to be 'bridge builders'</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>教皇レオ14世は、ウルグアイ、アルゼンチン、ペルーを巡る12日間の歴訪の2日目、ウルグアイのカトリック教徒に対し、信仰と友愛の橋を架けるよう呼び掛けた。法王の３カ国歴訪は、法王が肺がんの手術を受けてからわずか３週間後に行われた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Pope Leo XIV urged Catholics in Uruguay to build bridges of faith and fraternity on the second day of his 12-day tour of Uruguay, Argentina and Peru. The pope's three-country tour comes just three weeks after he underwent surgery for lung cancer.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/pope-leo-calls-on-uruguay-catholics-bridge-builders" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/07 23:15</span>
+    </div>
+
+    
+    <p class="title-ja">中間選挙で勝利した後、米国民主党は次に何をするのでしょうか?</p>
+    <p class="title-en"><a href="https://www.dw.com/en/after-victory-in-the-midterms-what-next-for-us-democrats/a-79884957?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">After victory in the midterms, what next for US Democrats?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>「青い波」が全米に押し寄せた。 「青い津波」と呼ぶ人もいる。民主党は11月3日の中間選挙で決定的な勝利を収め、米国上下両院でドナルド・トランプ大統領率いる共和党から過半数を奪った。彼らはテキサス州などかつての共和党の地盤でも知事選挙に勝利した。</p><p>火曜日夕方の写真には、全米の民主党の政治家や支持者たちが祝賀し、抱き合ったり、喜びのあまり泣いたりしている様子が映っている。しかし、ホワイトハウスが選挙翌日のXへの投稿でアメリカ国民に「トランプはまだあなた方の大統領だ」と念を押した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>トランプ氏には議会が提出した法案に拒否権を発動する権限があり、拒否権は3分の2の多数でのみ覆される。また、過去には時折、議会の決定を単純に無視したこともあった。</p><p>ワシントンDCのアメリカン大学行政・政策学部のパトリック・マローン教授はDWに対し、たとえ民主党が両院で3分の2の多数を占めていないとしても、大統領の拒否権発動が必ずしも問題の終わりではないと語った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A "blue wave" has rolled across the United States. Some are even calling it a "blue tsunami." The Democrats scored a decisive victory in the midterm elections on November 3, wresting the majority from President Donald Trump's Republicans in both the US House of Representatives and the Senate. They also won gubernatorial elections in former Republican strongholds such as Texas.</p><p>Pictures from Tuesday evening show Democrat politicians and supporters across the country celebrating, hugging, even weeping with joy. However, as the White House reminded Americans in a post on X the day after the elections: "Trump is still your president."</p><p>Trump has the power to veto any proposed legislation Congress puts before him, and his veto can only be overruled by a two-thirds majority. Also, in the past he has, on occasion, simply ignored the Congress's decision.</p><p>Patrick Malone, professor at the public administration and policy department at American University in Washington DC, told DW that a presidential veto is not necessarily the end of the matter — even though the Democrats don't have a two-thirds majority in either Congressional chamber.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/after-victory-in-the-midterms-what-next-for-us-democrats/a-79884957?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/07 17:15</span>
+    </div>
+
+    
+    <p class="title-ja">テキサス市長、警察にICEへの協力を制限するよう指示</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c8dx33d22zkro?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Texas mayor instructs police to limit co-operation with ICE</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>テキサス州ヒューストン市長は市警察に対し、連邦移民当局との協力を制限するよう指示した。</p><p>民主党のジョン・ホイットマイヤー氏によるこの動きは、今週の中間選挙でテキサス州で同党が驚異的な勝利を収めたことを受けて行われた。これは再選に敗れた共和党知事グレッグ・アボット氏が定めた政策に反するものだ。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ホイットマイヤーさんは金曜日、「私がこれを行うのは、治癒のプロセスを開始するため」であり、「私たちのコミュニティ全体の恐怖と不安を軽減するため」であると語った。さらに、「私も選挙が重要であることを承知でこの活動を行っている」と付け加えた。</p><p>ヒューストンでは、移民関税執行局（ICE）職員が車で通勤中の男性を射殺した事件を受け、数か月にわたり国民の反発が続いている。</p><p>ヒューストン警察署長のノエ・ディアス氏は金曜日、警察官が今後は、投獄されるべき犯罪で逮捕した人物がICEの行政令状も持っている場合にのみICEに連絡すると述べた。この令状は、ICEが活動する国土安全保障省(DHS)が内部的に発行するものである。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The mayor of Houston, Texas, has directed the city's police to limit co-operation with federal immigration officials.</p><p>The move by John Whitmire, a Democrat, comes on the heels of stunning victories by the party in Texas during this week's midterm elections. It breaks with policy set by Republican Governor Greg Abbott, who lost his re-election bid.</p><p>"I do this to begin a healing process," Whitmire said on Friday, and to "reduce fear and anxiety across our community". He added: "I also do this knowing that elections matter."</p><p>There has been months of public outcry in Houston after an Immigration and Customs Enforcement (ICE) officer fatally shot a man who was driving to work.</p><p>Houston police chief Noe Diaz said on Friday that officers will now only contact ICE if someone they arrest for a jailable offence also has an administrative ICE warrant, which are issued internally by the Department of Homeland Security (DHS), within which ICE operates.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c8dx33d22zkro?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/07 21:10</span>
+    </div>
+
+    
+    <p class="title-ja">ケニアのカルト指導者に懲役200年の判決</p>
+    <p class="title-en"><a href="https://www.france24.com/en/kenyan-cult-leader-sentenced-to-200-years-in-prison-1" target="_blank" rel="noopener">Kenyan cult leader sentenced to 200 years in prison</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ケニアのカルト指導者ポール・マッケンジーは、シャカホラの森で彼の命令により190人の子供を餓死させた罪で懲役200年の判決を受けた。検察側は、犠牲者の中には殴られたり、生き埋めになったり、トイレに捨てられたりする黙示録の前に、信者たちに天国に行くために断食するよう説得していたと述べた。共犯者28人も投獄された。この事件は、2017年に遡る度重なる警告サインに対して当局が行動を起こさなかったことに深刻な疑問を引き起こしており、広範な捜査による死者数は確認された遺体448名と犠牲者と思われる約500名に達している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Kenyan cult leader Paul Mackenzie has been sentenced to 200 years in prison for the deaths of 190 children who were starved to death on his orders in Shakahola Forest. Prosecutors said he had convinced followers to fast to reach heaven before the apocalypse, with some victims beaten, buried alive or dumped in latrines. Twenty-eight accomplices have also been jailed. The case has raised serious questions about the authorities' failure to act on repeated warning signs dating back to 2017, with the death toll from the wider investigation reaching 448 confirmed bodies and around 500 suspected victims.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/kenyan-cult-leader-sentenced-to-200-years-in-prison-1" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/06 22:28</span>
+    </div>
+
+    
+    <p class="title-ja">ザンビア野党、政府再編と人員削減を批判</p>
+    <p class="title-en"><a href="https://www.dw.com/en/zambia-s-opposition-criticizes-government-restructuring-and-layoffs/a-79875892?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Zambia's opposition criticizes government restructuring and layoffs</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ザンビアに住む多くの人々は、伝統的に政府の雇用に伴う安定性と安全性を理由に、公務員へのキャリアを求めています。しかし、いくつかの公的機関における最近の退職、解雇、リストラ演習はその認識を揺るがし、政府による「国益」条項の利用についての全国的な議論を引き起こした。</p><p>影響を受けた者の中には、10月にザンビア警察からの辞職が発表された元広報官ゴッドフリー・チラビ氏も含まれる。チラビ氏は自身の退任をめぐる状況について公には語らないことを選択し、メディアに対し国益のために引退したとだけ語った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「はい、私は国益のために引退しました」とチラビ氏は語った。 「理由は言えませんが、私が引退することは分かっています。」</p><p>チラビ氏の辞任は、ザンビアの公的機関に影響を与える一連の変化の最中に行われた。</p><p>ザンビア警察のチャリティー・ムンガンガ副監察官は解任され、政府監査後の「リセット」の一環としてザンビア医薬品・医療用品庁の職員全員が解雇された。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Many people living in Zambia seek careers in the civil service because of the stability and security traditionally associated with government employment. But recent retirements, dismissals and restructuring exercises across several public institutions have unsettled that perception and sparked a national debate about the government's use of "national interest" provisions.</p><p>Among those affected is former public relations officer Godfrey Chilabi, whose departure from the Zambia Police Service was announced in October. Choosing not to publicly discuss the circumstances surrounding his exit, Chilabi simply told media that he had been retired in the national interest.</p><p>"Yes, I have been retired in national interest," Chilabi said. "I can't give any reason, but know I'm in retirement."</p><p>Chilabi's departure came amid a series of changes affecting public institutions in Zambia .</p><p>Charity Munganga, a Zambia Police Service deputy inspector general, was dismissed, and all staff members at the Zambia Medicines and Medical Supplies Agency were let go as part of a "reset" following a government audit.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/zambia-s-opposition-criticizes-government-restructuring-and-layoffs/a-79875892?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-11-08";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
