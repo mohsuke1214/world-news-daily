@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年11月9日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/09 01:21</span>
+    </div>
+
+    
+    <p class="title-ja">写真で見る一週間: 米国の中間選挙「ブルーウェーブ」、フランスの抗議デモ、ダカールユースオリンピック</p>
+    <p class="title-en"><a href="https://www.france24.com/en/europe/20261108-the-week-in-pictures-trump-midterms-debacle-french-protests-dakar-youth-olympics" target="_blank" rel="noopener">The week in pictures: US midterms 'Blue Wave', French protests and Dakar Youth Olympics</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米国中間選挙での民主党の大勝利から、フランスで進行中の学生主導の抗議活動、そしてアフリカの地で開催された初のオリンピックスポーツイベントまで、FRANCE 24 は今週の最も印象的な映像のいくつかを振り返ります。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>From the Democratic Party's big wins in the US midterm elections to France's ongoing student-led protests and the first Olympic sports event held on African soil, FRANCE 24 looks back at some of the week's most striking images.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/europe/20261108-the-week-in-pictures-trump-midterms-debacle-french-protests-dakar-youth-olympics" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/09 00:07</span>
+    </div>
+
+    
+    <p class="title-ja">ラッセル・ブランド、強姦と性的暴行で有罪判決を受け判決へ</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/08/nx-s1-6033957/russell-brand-learn-sentence-found-guilty-rape-sexual-assault" target="_blank" rel="noopener">Russell Brand to learn sentence after being found guilty of rape and sexual assault</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>コメディアンで俳優のラッセル・ブランドが、2026年11月3日火曜日、ロンドンのサザーク法廷を出廷する。アラステア・グラント/AP キャプションを隠す</p><p>コメディアンのラッセル・ブランドは「重大な」懲役刑に直面しており、ロンドンの裁判所判事は月曜日に判決を下す予定だ。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>木曜日、かつてMTVの司会者からキリスト教徒に転身し、スピリチュアルな影響力を持った人物が、メディアの大注目を集めた4週間の裁判の末、性的暴行3件と強姦1件で有罪判決を受けた。</p><p>ブランドは容疑をすべて否認し、同意なしに性行為をしたことはないと述べた。</p><p>陪審が評決を下した後、ジョエル・ベナサン判事は51歳のブランドに対し、「重大な拘禁期間」に直面していると語った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Comedian and actor Russell Brand leaves Southwark Crown Court in London, Tuesday, Nov. 3, 2026. Alastair Grant/AP hide caption</p><p>Comedian Russell Brand faces a "significant" prison sentence, which a London court judge is set to hand down on Monday.</p><p>On Thursday the one-time MTV host turned Christian and spiritual influencer was found guilty on three counts of sexual assault and one of rape, after a four-week trial that garnered massive media attention.</p><p>Brand had denied all charges and said he never had sex without consent.</p><p>After the jury handed down the verdict, Judge Joel Bennathan told Brand, 51, that he faced a "significant custodial term."</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/08/nx-s1-6033957/russell-brand-learn-sentence-found-guilty-rape-sexual-assault" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/08 23:02</span>
+    </div>
+
+    
+    <p class="title-ja">スポーツ人気が急上昇し、カタールで開催されたパデル・ワールドカップでスペインが優勝</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/8/spain-win-padel-world-cup-in-qatar-as-sports-popularity-soars-2?traffic_source=rss" target="_blank" rel="noopener">Spain win Padel World Cup in Qatar as sport’s popularity soars</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>スポーツ人気が急上昇し、カタールで開催されたパデル・ワールドカップでスペインが優勝</p><p>スペインは別のワールドカップでアルゼンチンを破った。これまで以上に多くの国が参加する中、スペインの男女チームがカタールで開催されたパデル世界選手権で優勝した。アルジャジーラのアンディ・リチャードソンは決勝戦でコートサイドにいた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Spain win Padel World Cup in Qatar as sport’s popularity soars</p><p>Spain has beaten Argentina at another world cup. The Spanish men’s and women’s team swept the Padel World Championships in Qatar, even as more nations competed than ever before. Al Jazeera’s Andy Richardson was courtside at the final.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/8/spain-win-padel-world-cup-in-qatar-as-sports-popularity-soars-2?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/08 21:00</span>
+    </div>
+
+    
+    <p class="title-ja">アフリカの哲学がマンチェスターでの映画祭開催への新しいアプローチにどのように影響を与えたのか</p>
+    <p class="title-en"><a href="https://www.theguardian.com/news/2026/nov/08/african-philosophies-see-my-world-film-festival-manchester" target="_blank" rel="noopener">How African philosophies inspired a new approach to staging film festivals in Manchester</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>See My World は、映画、詩、ダンスを通じて汎アフリカ思想に焦点を当てたイベントで、地元の活動家やクリエイターによって引き起こされた勢いに基づいています。</p><p>過去からの教訓が現在と近い未来をどのように形作ることができるかを探求することを含むアフリカの哲学は、マンチェスターで開催される映画祭にインスピレーションを与えました。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>シー・マイ・ワールドは、イングランド北部のアフリカ各地からの独立したクリエイターに捧げられる日で、11 月 21 日にコンタクト シアターで開催されます。</p><p>このフェスティバルは、汎アフリカの芸術、文化、イベントを紹介するSee My Worldの年間プログラムの一部です。</p><p>これは、昨年の80周年記念式典を経て、戦後の独立運動の著名人たちを解放の共通のビジョンと結びつけた1945年のマンチェスターでの汎アフリカ会議の遺産をさらに発展させようという、マンチェスターのクリエイターや活動家たちの決意を反映している。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>See My World, an event highlighting the pan-African thought via film, poetry and dance, builds on momentum sparked by local activists and creatives</p><p>African philosophies including exploring how lessons from the past can shape the present and near future have inspired a film festival coming to Manchester .</p><p>See My World , a day dedicated to independent creators from across the African diaspora in the north of England, will take place at the Contact theatre on 21 November.</p><p>The festival is part of See My World’s year-round programme showcasing pan-African arts, culture and events.</p><p>It reflects the determination among creatives and activists in Manchester to build on the legacy of the 1945 Pan-African Congress in Manchester – which connected luminaries of postwar independence movements with a shared vision of liberation – after last year’s 80th anniversary commemorations .</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/news/2026/nov/08/african-philosophies-see-my-world-film-festival-manchester" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/09 01:18</span>
+    </div>
+
+    
+    <p class="title-ja">イスラエル軍、パレスチナ人ジャーナリスト、アブー・シャデ氏を釈放</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/8/israeli-forces-release-palestinian-journalist-abou-shhadeh?traffic_source=rss" target="_blank" rel="noopener">Israeli forces release Palestinian journalist Abou Shhadeh</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イスラエル当局は、パレスチナ人ジャーナリスト、アベド・アブー・シャデ氏を5日間拘束した後、不起訴で釈放した。</p><p>アブー・シャデ氏は日曜日、釈放後の講演で、自身の拘留は自身だけでなく「アラブ社会全体を脅迫する」ことを目的とした「政治的措置」の一部であると述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「私の考えでは、最も適切な対応は、私たちが正しい側にいるということ、私たちの道が真実の道であるということを私たち自身の間で再確認することだ」と述べ、ジャーナリストとしての仕事を続けると付け加えた。</p><p>アブー・シャデ氏は火曜日に「外国工作員との接触」の容疑で拘束された後、テルアビブ郊外のペタク・チクヴァにあるシンベト諜報施設に拘束された。</p><p>同氏の弁護団の一員である法的権利団体アダラによると、同氏はイスラエルのアラブ人有権者を支援するために外国筋から資金を受け取った疑いがあるという。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Israeli authorities have released Palestinian journalist Abed Abou Shhadeh after detaining him for five days without charge.</p><p>Speaking after his release, Abou Shhadeh said on Sunday that his detention was part of “political measures” intended not only for him “but to intimidate Arab society as a whole”.</p><p>“In my view, the most appropriate response is to reaffirm among ourselves that we are on the right side, that our path is the path of truth,” he said, adding that he would continue his work as a journalist.</p><p>Abou Shhadeh was held in a Shin Bet intelligence facility in Petah Tikva, on the outskirts of Tel Aviv, after being detained on Tuesday on suspicion of “contact with a foreign agent”.</p><p>He was suspected of receiving money from foreign sources in order to support Israel’s Arab voters, according to the legal rights group Adalah, which is part of his defence team.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/8/israeli-forces-release-palestinian-journalist-abou-shhadeh?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/08 23:22</span>
+    </div>
+
+    
+    <p class="title-ja">イエメンの人道危機が悪化</p>
+    <p class="title-en"><a href="https://www.france24.com/en/yemen-s-humanitarian-crisis-worsens" target="_blank" rel="noopener">Yemen's humanitarian crisis worsens</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イエメン政府がイランと同盟を組むフーシ派に対する攻勢を開始して1カ月が経過したが、紅海沿岸では戦闘が激化し続けている。一方、人道危機は悪化し、数十万人が避難し、国は大惨事の脅威に直面している。ヨルダンのアンマンにあるUNHCRの上級コミュニケーションアドバイザー兼スポークスマンであるルーラ・アミン氏が、さらに詳しい情報を語ります。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>One month into the Yemeni government's offensive against the Iran-aligned Houthis, fighting continues to escalate along the Red Sea coast. Meanwhile, the humanitarian crisis is worsening, with hundreds of thousands of people displaced and the country facing the threat of catastrophe. Rula Amin, Senior Communications Advisor and spokesperson at UNHCR at Amman, in Jordan, shares further details.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/yemen-s-humanitarian-crisis-worsens" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/08 13:03</span>
+    </div>
+
+    
+    <p class="title-ja">フーシ派はサウジ空爆で少なくとも33人死亡と発表</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c65yn1v99ypmo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Houthis say at least 33 killed in Saudi air strike</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イエメンのフーシ派運動に関係するメディアは、サウジアラビアによる空爆で女性や子供を含む少なくとも３３人が死亡したと報じた。</p><p>国際的に認められたイエメン政府を支援するサウジ主導連合からはコメントは出ていない。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>フーシ派が運営するテレビ局アル・マシラのライブ映像には、首都サヌアの東にある町アル・シャリーヤで複数の建物の瓦礫の中から救助隊員が遺体を引き上げる様子が映されている。</p><p>遺跡から掘り出された遺体の中には幼い子供の遺体も見られる。</p><p>テレビ局はまた、多数の負傷者が担架で病院に運ばれる様子を放映した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Media linked to the Houthi movement in Yemen say at least 33 people, including women and children, have been killed in air strikes by Saudi Arabia.</p><p>There has been no comment from the Saudi-led coalition backing the internationally recognised government in Yemen.</p><p>Live video footage on Al Masirah - a television station run by the Houthis - has shown rescuers pulling bodies out of the rubble of several buildings in al-Shariyah, a town to the east of the capital, Sanaa.</p><p>The bodies of young children can be seen among those dug out from the ruins.</p><p>The television station has also shown a number of injured people being carried on stretchers to hospital.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c65yn1v99ypmo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/07 23:38</span>
+    </div>
+
+    
+    <p class="title-ja">イランのシャーの息子がフランクフルトで「自由賞」を受賞</p>
+    <p class="title-en"><a href="https://www.dw.com/en/son-of-iran-s-shah-receives-freedom-prize-in-frankfurt/a-79885661?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Son of Iran's shah receives 'Freedom Prize' in Frankfurt</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イラン野党指導者レザー・パフラヴィー氏は土曜日、ドイツ中部ヘッセン州のフランクフルトで「自由賞」を受賞した。</p><p>警察の発表によると、約1万8000人がレザー・パフラヴィ氏への支持を表明するために結集した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>イベントはセントポール教会で開催されました。この建物は、1848 年から 1849 年にかけて、フランクフルト議会として知られるドイツ初の選挙による議会を開催しました。</p><p>パフラヴィー氏は、1979年の革命で追放された後亡命した独裁者、イラン最後のシャー、モハメッド・レザー・パフラヴィー氏の息子である。</p><p>1979 年の革命に続いて、イランはイスラム共和国に移行し、シーア派イスラム教聖職者を中心に権力が強化されました。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Iranian opposition leader Reza Pahlavi on Saturday received a "Freedom Prize" in Frankfurt in the central German state of Hesse .</p><p>Some 18,000 people rallied to show support for Reza Pahlavi , according to a police statement.</p><p>The event was held at St Paul's Church. The building hosted the Germany's first-ever elected parliament in 1848-1849 , known as the Frankfurt Assembly.</p><p>Pahlavi is the son of the last shah of Iran, Mohammed Reza Pahlavi , an autocrat who fled into exile after being deposed in a 1979 revolution.</p><p>The 1979 revolution was followed by the transformation of Iran into an Islamic republic and the consolidation of power around the Shiite Muslim clergy.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/son-of-iran-s-shah-receives-freedom-prize-in-frankfurt/a-79885661?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/08 23:19</span>
+    </div>
+
+    
+    <p class="title-ja">涙のアレックス・イーラ、香港オープン決勝でクレア・リューにストレート負け</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/sports/2026/11/8/tearful-alex-eala-loses-hong-kong-open-final-to-claire-liu-in-straight-sets?traffic_source=rss" target="_blank" rel="noopener">Tearful Alex Eala loses Hong Kong Open final to Claire Liu in straight sets</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>フィリピン出身のテニスの先駆者アレックス・イーラは、香港でWTAツアー2度目のタイトル獲得に惜しくも及ばず、「人生を変える」シーズンを振り返り涙を流した。</p><p>第2シードの彼女は日曜日、香港オープン決勝でクレア・リューに6-3、6-0で圧勝し、ランキング102位のアメリカ人が日曜日にツアー初タイトルを獲得した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>21歳のイーラが8月にワシントンD.C.で初タイトルを獲得した飛躍の年を経て、イーラはキャリアハイの世界ランキング17位に到達した。</p><p>この勝利により、彼女はWTAツアーのトーナメントで優勝した最初のフィリピン人選手となった。</p><p>来週世界15位に浮上する予定のイーラは、今年のスタートを50位でスタートした。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Tennis trailblazer Alex Eala from the Philippines burst into tears as she reflected on a “life-changing” season after falling agonisingly short of a second WTA Tour title in Hong Kong.</p><p>The second seed was stunned 6-3, 6-0 by Claire Liu in the final of the Hong Kong Open as the American, ranked 102nd, won her first tour title on Sunday.</p><p>Eala is at a career-high 17 in the world after a breakout year in which the 21-year-old clinched her maiden title, in Washington, DC, in August.</p><p>That victory made her the first player from the Philippines to win a tournament on the WTA Tour.</p><p>Eala, set to rise to world number 15 next week, started the year ranked 50th.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/sports/2026/11/8/tearful-alex-eala-loses-hong-kong-open-final-to-claire-liu-in-straight-sets?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/08 19:46</span>
+    </div>
+
+    
+    <p class="title-ja">ディワリ祭：10億人以上が闇に対する光の勝利をマーク</p>
+    <p class="title-en"><a href="https://www.france24.com/en/diwali-over-one-billion-people-mark-victory-of-light-over-darkness" target="_blank" rel="noopener">Diwali: Over one billion people mark victory of light over darkness</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ディワリ祭は日曜日に始まり、ヒンズー教の伝統の中で最も重要な祭りの一つを祝うためにインド全土と世界中のディアスポラの人々が集まりました。祭りの期間中に祝われる神、ラーマ神の誕生の地と考えられているアヨーディヤでは、ヒンドゥー教の叙事詩ラーマーヤナに基づくパフォーマンス、レーザーやライトのショー、生演奏、花火、ドローンの展示などの祭りが行われました。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Diwali celebrations began on Sunday, with people across India and the global diaspora gathering to mark one of the most important festivals in the Hindu tradition. In Ayodhya, believed to be the birthplace of Lord Rama, the deity celebrated during the festival, festivities included performances based on the Hindu epic Ramayana, laser and light shows, live music, fireworks and drone displays.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/diwali-over-one-billion-people-mark-victory-of-light-over-darkness" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/08 12:00</span>
+    </div>
+
+    
+    <p class="title-ja">タイによる国外追放に直面しているウイグル人、中国では「奴隷のようなもの」になると語る</p>
+    <p class="title-en"><a href="https://www.theguardian.com/global-development/2026/nov/08/uyghurs-thailand-china-forced-deportation" target="_blank" rel="noopener">Uyghurs facing deportation by Thailand say they will be ‘like slaves’ in China</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>活動家らは、大半がイスラム教徒の少数民族に対する拷問や人権侵害の報告があるにもかかわらず、バンコクが中国政府の圧力に屈するのではないかと懸念している。</p><p>活動家らは、さらに2人のウイグル人がタイから中国に強制送還されれば、彼らの命が重大な危険にさらされるだろうと述べており、男性のうちの1人は、もし送還されたら「奴隷のようになる」と述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>昨年、タイ当局は、本人たちや国連の嘆願にもかかわらず、40人のウイグル人男性を中国に強制送還した。米国とカナダは彼らに再定住を提案したと伝えられているが、バンコクは中国政府を怒らせることを避けたいようだ。国連は帰還者の所在は依然として不明であると述べた。</p><p>現在、さらに2人の男性が、大部分がイスラム教徒の民族グループに対する中国政府の弾圧の最新の犠牲者になることを恐れており、国連は人道に対する犯罪の可能性があると非難している。</p><p>そのうちの一人のガールフレンドによると、安全上の理由から名前は伏せられているボーイフレンドが「中国以外のどこか」に行きたいとガーディアン紙に語ったという。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Activists fear Bangkok will give in to pressure from Beijing despite reports of torture and human rights abuses against the mostly muslim ethnic minority</p><p>The deportation of two more Uyghurs to China from Thailand would put their lives in grave danger, activists have said, with one of the men saying he would be “like a slave” if he was sent back.</p><p>Last year, Thai authorities forcibly deported 40 Uyghur men to China despite pleas from the men themselves and the UN. The US and Canada had reportedly offered to resettle them , but Bangkok appeared to want to avoid upsetting Beijing. The UN has said the returnees’ whereabouts remain unknown.</p><p>Now, two more men fear becoming the latest victims of Beijing’s repressive crackdown against the largely Muslim ethnic group, condemned by the UN as a potential crime against humanity .</p><p>The girlfriend of one of the men said her boyfriend, whose name is being withheld for security reasons, told the Guardian he wanted to go “anywhere else but China”.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/global-development/2026/nov/08/uyghurs-thailand-china-forced-deportation" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/08 06:36</span>
+    </div>
+
+    
+    <p class="title-ja">「フラット」、「疲れた」、「シニカル」：珍しく陰気なニュージーランド人がここ数年で最も接戦のニュージーランド選挙を実現</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cxr5yyg2nj9eo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">'Flat', 'tired', 'cynical': Unusually gloomy Kiwis deliver New Zealand's tightest election in years</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>土曜日、首都ウェリントンが霧に閉ざされる中、ニュージーランドでは新政権樹立の投票が行われたが、その雰囲気は灰色の天気と同じくらい明白だった。</p><p>「かなり平坦ですね」と21歳のイモージェン・ヴルトガーは言う。 「ある種の無関心と少しの恐怖があります。」</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「疲れた。みんな疲れていると思う」と28歳のシモーンは認める。</p><p>「投票すらしなかった」と40代の男性は恥ずかしそうに告白する。彼は、どのボックスにもチェックを入れる気になれず、それ以上話すことを拒否したと説明した。</p><p>別の有権者は、「ウェリントンはちょっとしたバブルだ」と、私がよく聞いた警告を表明した後、幻滅を感じたと述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>New Zealand voted in a new government as fog choked the capital, Wellington, on Saturday - and the mood was as palpable as the grey weather.</p><p>"It's pretty flat," 21-year-old Imogen Vlutger says. "There's this kind of apathy and a bit of dread."</p><p>"Tired. I think we're all tired," Symone, 28, admits.</p><p>"I didn't even vote," one man in his 40s sheepishly confesses. He couldn't bring himself to tick any of the boxes, he explains, declining to chat further.</p><p>"Wellington's a bit of a bubble," another voter says, expressing a caveat I heard often, before describing feeling disillusioned.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cxr5yyg2nj9eo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/08 23:36</span>
+    </div>
+
+    
+    <p class="title-ja">米国の有権者がAIデータセンターを拒否：反発がフランスにも広がる可能性はあるのか？</p>
+    <p class="title-en"><a href="https://www.france24.com/en/tv-shows/tech-24/20261108-us-voters-reject-ai-data-centres-could-the-backlash-spread-to-france" target="_blank" rel="noopener">US voters reject AI data centres: could the backlash spread to France?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>火曜日の米国中間選挙では、有権者はデータセンターに関する40以上の地方政策に意見を述べ、1つを除くすべての政策に反対した。 1月に民主党が議会を掌握し、テキサス州とジョージア州の新知事が一時停止を要求する中、AI開発ブームはこれまでで最も厳しい政治的試練に直面している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>In Tuesday’s US midterm elections, voters weighed in on more than 40 local measures on data centres, and sided against them in all but one. With Democrats taking control of Congress in January and new governors in Texas and Georgia calling for moratoriums, the AI building boom faces its toughest political test yet.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/tv-shows/tech-24/20261108-us-voters-reject-ai-data-centres-could-the-backlash-spread-to-france" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/08 20:00</span>
+    </div>
+
+    
+    <p class="title-ja">砂漠に生命が吹き込まれる：チリのアタカマでここ数十年で最大規模の花が咲き誇る</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/08/nx-s1-6023812/chile-desert-el-nino" target="_blank" rel="noopener">A desert stirs to life: Chile's Atacama erupts in its biggest floral display in decades</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>色とりどりの野生の花畑がチリ北部のアタカマ砂漠を覆い、地元ではデシエルト フロリド、または砂漠のブルームとして知られる珍しい花が咲く砂漠現象の期間中、世界で最も乾燥した非極地砂漠が活気に満ちた風景に変わります。 NPR のタマラ・メリノ キャプションを隠す</p><p>チリ、コピアポ — チリのアタカマ砂漠の広大な一帯は現在、ピンク、黄色、ライラック、紫のパッチワークとなって、見渡す限りの岩だらけの砂漠の床に広がっています。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>この冬、エルニーニョのスーパーサイクルによってもたらされた大雨により、アタカマ砂漠に鉄砲水が発生し、一部の地域では1950年代の記録開始以来最大の降雨量となった。</p><p>7月と8月の洪水により数十軒の家屋が破壊または損傷し、数百人が避難を余儀なくされた。</p><p>チリのアタカマ砂漠一帯に広がる野生の花畑は、眠っていた種子を目覚めさせる異常な豪雨によって引き起こされる「デシエルト フロリド」または「砂漠のブルーム」として知られる珍しい開花現象の間、咲き誇ります。短い花々が、世界で最も乾燥した非極地の砂漠をピンク、紫、黄色、白の風景に変えます。チリ、ワスコ、2026年10月21日水曜日、NPRのタマラ・メリノ キャプションを隠す</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A field of colorful wildflowers blankets the Atacama Desert in northern Chile, transforming the world's driest non-polar desert into a vibrant landscape during the rare flowering desert phenomenon, known locally as the Desierto Florido, or Desert Bloom. Tamara Merino for NPR hide caption</p><p>COPIAPÓ, Chile — A vast swathe of Chile's Atacama Desert is now a patchwork of pinks, yellows, lilacs and purples stretching across the craggy desert floor as far as the eye can see.</p><p>This winter, heavy rains brought by the El Niño super cycle caused flash floods in the Atacama Desert, with some areas receiving the heaviest rainfall since records began in the 1950s.</p><p>Floodwaters in July and August destroyed or damaged dozens of homes, forcing hundreds of people to evacuate.</p><p>A field of wildflowers blooms across Chile's Atacama Desert during the rare flowering phenomenon known as Desierto Florido, or Desert Bloom, triggered by unusually heavy rainfall that awakens dormant seeds. The brief blooms transform the world's driest nonpolar desert into a landscape of pink, purple, yellow and white. Huasco, Chile, Wednesday, Oct. 21, 2026. Tamara Merino for NPR hide caption</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/08/nx-s1-6023812/chile-desert-el-nino" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/08 18:00</span>
+    </div>
+
+    
+    <p class="title-ja">法王のアルゼンチン訪問で「超資本主義者」ミレイとの対決が始まる</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/nov/08/popes-visit-to-argentina-sets-up-showdown-with-hyper-capitalist-milei" target="_blank" rel="noopener">Pope’s visit to Argentina sets up showdown with ‘hyper-capitalist’ Milei</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>大統領は多くの問題に関して反対の見解を持っており、かつてレオの前任者を「邪悪な者の代表」と呼んだこともある</p><p>庭には木が植えられています。鮮やかな色の建物が再び塗装されています。合唱団はリハーサルをします。他の何百人もの住民が、車椅子を使用している人も含めて、保護区の外で位置を練習している。 11月9日月曜日、カトリック教徒が運営する障害者向けホームであるコットレンゴ・ドン・オリオーネが、教皇レオ14世のアルゼンチン訪問の最初の丸一日の最初の訪問地となるため、興奮が漂っている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>しかし、ブエノスアイレスから約26キロ離れたクレイポールへの教皇の訪問は、障害のある住民約400人を数えるこの家にとって、特別に喜ばしい時期ではなかった。アルゼンチンのハビエル・ミレイ大統領は障害者支援基金を広範囲に削減した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>President has opposing views on many issues, and once called Leo’s predecessor the ‘representative of the Evil One’</p><p>Trees are being planted in the garden. The brightly coloured buildings are getting another coat of paint. The choir rehearses. Hundreds of other residents, several of them using wheelchairs, practise their positions outside the sanctuary. Excitement is in the air, because on Monday 9 November, the Cottolengo Don Orione – a Catholic-run home for disabled people – will be the first stop on Pope Leo XIV’s first full day of his trip to Argentina.</p><p>But the pope’s visit to Claypole, about 26km from Buenos Aires, does not come at an especially happy time for the home, which counts about 400 residents with disabilities. Argentina’s president, Javier Milei , has made wide-ranging cuts to disability funding.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/nov/08/popes-visit-to-argentina-sets-up-showdown-with-hyper-capitalist-milei" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/07 23:15</span>
+    </div>
+
+    
+    <p class="title-ja">中間選挙で勝利した後、米国民主党は次に何をするのでしょうか?</p>
+    <p class="title-en"><a href="https://www.dw.com/en/after-victory-in-the-midterms-what-next-for-us-democrats/a-79884957?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">After victory in the midterms, what next for US Democrats?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>「青い波」が全米に押し寄せ、これを「青い津波」と呼ぶ人もいる。民主党は11月3日の中間選挙で決定的な勝利を収め、米国上下両院でドナルド・トランプ大統領率いる共和党から過半数を奪った。彼らはテキサス州などかつての共和党の地盤でも知事選挙に勝利した。</p><p>火曜日夕方の写真には、全米の民主党の政治家や支持者たちが祝賀し、抱き合ったり、喜びのあまり泣いたりしている様子が映っている。しかし、ホワイトハウスが選挙翌日のXへの投稿でアメリカ国民に「トランプはまだ大統領だ」と念を押した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>トランプ氏には議会が提出した法案に拒否権を発動する権限があり、拒否権は3分の2の多数でのみ覆される。また、過去には時折、議会の決定を単純に無視したこともあった。</p><p>ワシントンD.C.のアメリカン大学行政・政策学部のパトリック・マローン教授はDWに対し、たとえ民主党が両院で3分の2の多数を占めていないとしても、大統領の拒否権が必ずしも問題の終わりではないと語った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A "blue wave" has rolled across the United States, with some even calling it a "blue tsunami." The Democrats scored a decisive victory in the midterm elections on November 3, wresting the majority from President Donald Trump's Republicans in both the US House of Representatives and the Senate. They also won gubernatorial elections in former Republican strongholds such as Texas.</p><p>Pictures from Tuesday evening show Democrat politicians and supporters across the country celebrating, hugging, even weeping with joy. However, as the White House reminded Americans in a post on X the day after the elections: "Trump is still your president."</p><p>Trump has the power to veto any proposed legislation Congress puts before him, and his veto can only be overruled by a two-thirds majority. Also, in the past he has, on occasion, simply ignored Congress' decision.</p><p>Patrick Malone, professor at the public administration and policy department at American University in Washington D.C., told DW that a presidential veto is not necessarily the end of the matter — even though the Democrats don't have a two-thirds majority in either Congressional chamber.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/after-victory-in-the-midterms-what-next-for-us-democrats/a-79884957?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/09 00:47</span>
+    </div>
+
+    
+    <p class="title-ja">エジプト大使館が12年ぶりにリビアに再開</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/8/egyptian-embassy-reopens-in-libya-for-the-first-time-in-12-years?traffic_source=rss" target="_blank" rel="noopener">Egyptian embassy reopens in Libya for the first time in 12 years</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>エジプト大使館が12年ぶりにリビアに再開</p><p>エジプトは、12年間閉鎖していたリビアの首都トリポリの大使館を再開した。この措置は、東部を拠点とする軍司令官ハリファ・ハフタル氏を長年にわたって強力に支援してきたカイロの立場の変化を示唆している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Egyptian embassy reopens in Libya for the first time in 12 years</p><p>Egypt has reopened its embassy in Libya’s capital, Tripoli, after a 12-year closure. The step signals a shift in Cairo’s stance, following years of strongly backing eastern-based military commander Khalifa Haftar.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/8/egyptian-embassy-reopens-in-libya-for-the-first-time-in-12-years?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/08 19:56</span>
+    </div>
+
+    
+    <p class="title-ja">2026 年ダカールユースオリンピック: セネガルがゴールデンダブル</p>
+    <p class="title-en"><a href="https://www.france24.com/en/tv-shows/sports/20261108-2026-dakar-youth-olympic-games-golden-double-for-senegal" target="_blank" rel="noopener">2026 Dakar Youth Olympic Games: Golden Double for Senegal</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>セネガルはダカールユースオリンピックのビーチレスリングで2つの金メダルを獲得した。エリザベス・ディアッタ選手が-55kg級で金メダルを獲得し、開催国にとってユースオリンピック初の金メダルとなった。同胞のマゲット・ディオプもこれに続き、-80kg級で金メダルを獲得した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Senegal won two gold medals in beach wrestling at the Youth Olympic Games in Dakar. Elisabeth Diatta won gold in the -55 kg category, the host country’s first gold medal at the Youth Olympic Games. Her compatriot Maguette Diop followed suit, taking gold in the -80 kg category.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/tv-shows/sports/20261108-2026-dakar-youth-olympic-games-golden-double-for-senegal" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-11-09";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
