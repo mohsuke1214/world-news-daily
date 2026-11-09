@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年11月10日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/10 04:24</span>
+    </div>
+
+    
+    <p class="title-ja">フランス、冷蔵庫攻撃をめぐりイランのサイバー部隊への捜査を開始</p>
+    <p class="title-en"><a href="https://www.france24.com/en/france-opens-probe-into-iranian-cyber-unit-over-fridge-attacks" target="_blank" rel="noopener">France opens probe into Iranian cyber unit over fridge attacks</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>フランスは月曜日、イラン革命防衛隊が先月国内のスーパーマーケットの冷蔵庫に対する「前例のない」サイバー攻撃の背後にいたと述べ、イランに対する欧州レベルの制裁を表明した。 10月11日と12日のサイバー攻撃ではフランスの広範囲のスーパーマーケットが攻撃を受け、冷蔵庫内の温度が上昇し、場合によっては生鮮食品の在庫全体を廃棄せざるを得なくなった。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>France on Monday said Iran's Revolutionary Guards were behind "unprecedented" cyberattacks on supermarket fridges in the country last month, vowing sanctions on a European level against Tehran. Swathes of French supermarkets were hit in the October 11 and 12 cyberattacks, which raised the temperatures in their refrigerators, in some cases forcing them to throw away entire inventories of perishable food.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/france-opens-probe-into-iranian-cyber-unit-over-fridge-attacks" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/10 04:07</span>
+    </div>
+
+    
+    <p class="title-ja">米国政府機関が団結して全国規模の不正ドローンの脅威と戦う</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/9/us-agencies-unite-to-combat-rogue-drone-threats-nationwide?traffic_source=rss" target="_blank" rel="noopener">US agencies unite to combat rogue drone threats nationwide</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ドナルド・トランプ米大統領の政権は、増大する脅威に対処するために対ドローン・システムの使用を促進するための措置を講じていると述べた。</p><p>国防総省、運輸省、エネルギー省、司法省を含むいくつかの米国政府機関は、航空の安全を守り、国家安全保障上の懸念に対処するために、対ドローン技術を評価し、迅速に配備するための覚書に署名した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>米連邦航空局（FAA）が月曜日に発表した声明では、運輸省、国防総省、国土安全保障省、エネルギー省、司法省が「ホワイトハウス特別委員会主導」の取り組みに参加していると述べた。</p><p>ショーン・ダフィー米国運輸長官は、「21世紀の新たな脅威から米国の空域を守るために、政府全体で積極的なアプローチをとっている」と述べた。</p><p>「すべての連邦パートナーを結集することで、不正ドローンの脅威と闘い、飛行する公衆の安全を守る能力を強化することができます。」</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The administration of US President Donald Trump says ⁠it is taking ⁠steps to expedite the use of counter-drone systems to address growing threats.</p><p>Several United States agencies, including the Pentagon and the Transportation, Energy and Justice Departments, have signed ⁠a memo to evaluate counter-drone technologies and quickly deploy them to protect aviation safety and address national security concerns.</p><p>A statement released on Monday by the Federal Aviation Administration (FAA) said the Department of Transportation, Department of Defense, Department of Homeland Security, Department of Energy and Department of Justice were part of the effort “led by the White House Task Force”.</p><p>“We’re taking a proactive, whole-of-government approach to protecting American airspace from emerging 21st-century threats,” said US Transportation Secretary Sean Duffy.</p><p>“By bringing all our federal partners together, we can strengthen our ability to combat rogue drone threats and keep the flying public safe.”</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/9/us-agencies-unite-to-combat-rogue-drone-threats-nationwide?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/10 01:55</span>
+    </div>
+
+    
+    <p class="title-ja">フランス、スーパーマーケットの冷蔵庫ハッキングでイランを非難</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cmg474vk6dyqo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">France accuses Iran of supermarket fridge hacking</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>フランスは先月、全国のスーパーマーケットの冷蔵庫や冷凍庫の温度を上昇させたサイバー攻撃の背後にイラン・イスラム革命防衛隊（ＩＲＧＣ）が関与していると非難した。</p><p>フランスのジャンノエル・バロー外相は、今回の攻撃は「規模も侵略のレベルも前例がない」と述べ、責任者は「欧州レベルで」制裁を受けるだろうと付け加えた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>イランはまだバロット氏の主張に応じていない。</p><p>先月のサイバー攻撃では、フランス全土の何百ものスーパーマーケットの冷蔵庫や冷凍庫が加熱され、数百万ユーロの価値があると推定される生鮮食品や冷凍食品が傷んだ。</p><p>そして先週、他の欧州諸国の数十のスーパーマーケットも冷蔵庫と冷凍庫を狙ったサイバー攻撃の影響を受けた。インスタンスがリンクされているかどうかは不明です。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>France has accused Iran's Islamic Revolutionary Guard Corps (IRGC) of being behind cyber-attacks that raised the temperatures of supermarket fridges and freezers across the country last month.</p><p>French Foreign Minister Jean-NoÃ«l Barrot said the attack was "unprecedented in both its scale and its level of aggression", adding those who were responsible would be hit with sanctions "at the European level".</p><p>Iran is yet to respond to Barrot's allegations.</p><p>The cyber-attack last month saw fridges and freezers in hundreds of supermarkets across France heated up, which spoilt fresh and frozen food estimated to be worth millions of euros.</p><p>Then last week, dozens of supermarkets across several other European countries were also impacted by a cyber-attack that targeted fridges and freezers. It is not known if the instances are linked.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cmg474vk6dyqo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/10 01:22</span>
+    </div>
+
+    
+    <p class="title-ja">ロシア：独立系ノバヤ・ガゼータがモスクワのニュースルームを閉鎖</p>
+    <p class="title-en"><a href="https://www.dw.com/en/russia-independent-novaya-gazeta-shuts-its-moscow-newsroom/a-79899827?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Russia: Independent Novaya Gazeta shuts its Moscow newsroom</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ノバヤ・ガゼタ新聞は月曜日、ロシアでの国家的圧力キャンペーンの中で報道を続けることができないとして、モスクワ支社を閉鎖した。</p><p>故ソ連大統領ミハイル・ゴルバチョフ氏が共同設立したこの捜査機関は、長い間クレムリンにとって厄介な存在だった。近年、ロシアのウクライナ侵攻に関する批判的な報道の中で、ますます障害に遭遇するようになった。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>同社は「外国工作員」という烙印を押され、ウラジーミル・プーチン大統領政権によって復活したソ連時代の用語であり、当局は同社にモスクワ事務所の立ち退きを命じた。</p><p>ロシアの銀行は読者や支援者からの寄付の処理も禁じられた。同紙は完全にオンライン出版に移行してからはこの収入源に大きく依存しており、移行はウクライナ侵攻直後に行われた。ロシア当局は、本格的な侵略を受けて、新たな戦時検閲規則を導入した。</p><p>2021年ノーベル平和賞を受賞した創刊編集長ドミトリー・ムラトフ氏は、ジャーナリストたちがノーバヤ・ガゼータ紙のオフィスに集まり、その閉鎖を見届ける中、戦時中のロシアにおける言論の自由を訴えた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The Novaya Gazeta newspaper closed its Moscow office on Monday, saying it was not able to continue reporting amid a campaign of state pressure in Russia .</p><p>The investigative outlet, co-founded by late USSR chief Mikhail Gorbachev, had long been a thorn in the Kremlin's side. In recent years, it ran into increasing roadblocks amid its critical coverage of the Russian invasion of Ukraine .</p><p>It was branded a "foreign agent," a Soviet-era term resuscitated by President Vladimir Putin 's administration, with officials ordering it to vacate its Moscow offices.</p><p>Russian banks were also forbidden from processing donations from readers and supporters. The paper had been heavily dependent on this income stream after moving wholly into online publishing, with the transition taking place shortly after the invasion of Ukraine. Russian authorities introduced new wartime censorship rules in the wake of the full-scale invasion.</p><p>2021 Nobel Peace Prize -winning founding editor Dmitry Muratov issued an appeal for free speech in wartime Russia as journalists gathered in the Novaya Gazeta offices to witness its closure.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/russia-independent-novaya-gazeta-shuts-its-moscow-newsroom/a-79899827?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/10 03:48</span>
+    </div>
+
+    
+    <p class="title-ja">カタール首相、対イラン戦争終結協議のためトランプ大統領と会談</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/9/qatar-pm-meets-with-trump-for-talks-on-ending-war-on-iran?traffic_source=rss" target="_blank" rel="noopener">Qatar PM meets with Trump for talks on ending war on Iran</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>カタール首相、対イラン戦争終結協議のためトランプ大統領と会談</p><p>カタールのシェイク・ムハンマド・ビン・アブドゥルラフマン・ビン・ジャシム・アル・サーニ首相は、米国・イスラエルの対イラン戦争終結に向けた新たな外交努力の最中、ドナルド・トランプ米大統領と会談した。アルジャジーラのアラン・フィッシャーがホワイトハウスからの最新情報を伝えます。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Qatar PM meets with Trump for talks on ending war on Iran</p><p>Qatari Prime Minister Sheikh Mohammed bin Abdulrahman bin Jassim Al Thani has met with US President Donald Trump amid renewed diplomatic efforts to end the US-Israeli war on Iran. Al Jazeera’s Alan Fisher has the latest from the White House.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/9/qatar-pm-meets-with-trump-for-talks-on-ending-war-on-iran?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/10 03:04</span>
+    </div>
+
+    
+    <p class="title-ja">トルコ鉄鋼工場爆発、少なくとも16人死亡</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cq2d6d5z9y5jo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Turkey steel factory blast kills at least 16 people</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>トルコ西部の港湾都市イズミル近郊の鉄鋼工場で爆発があり、少なくとも１６人が死亡、１３人が負傷した。</p><p>当局によると、死傷者は全員、国内有数の鉄鋼生産会社ハバス工場の労働者だった。現場の映像には、施設内で大規模な火災が発生し、煙の柱が空中に立ち上る様子が映っていた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>地元知事によると、爆発は正午ごろ、代替ボイラーを運んでいたクレーンが崩壊し、資材が下の炉に落下した後発生したと述べた。</p><p>独立した市民社会組織であるトルコ健康安全労働監視団体は、トルコでは依然として職場事故が慢性的な問題であると述べた。</p><p>目撃者らによると、爆発で地面が揺れ、当初は地震が起きたと信じた人もいたという。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>At least 16 people have died and 13 others have been injured in an explosion at an iron and steel factory near the port city of Izmir in western Turkey.</p><p>All those killed and injured were workers at the Habas plant, one of the country's leading steel producers, authorities said. Footage from the scene showed a large fire inside the facility and a towering column of smoke rising into the air.</p><p>The local governor said the blast happened around midday after a crane carrying a replacement boiler collapsed, causing materials to fall into a furnace below.</p><p>Workplace accidents remain a chronic problem in Turkey, the Turkish Health and Safety Labor Watch, an independent civil society organisation, said.</p><p>Eyewitnesses said the explosion shook the ground, with one person initially believing an earthquake had struck.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cq2d6d5z9y5jo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/10 02:26</span>
+    </div>
+
+    
+    <p class="title-ja">「ガザの生活はただただ悲惨」：洪水、援助不足の中でパレスチナ人の状況は「悪化」</p>
+    <p class="title-en"><a href="https://www.france24.com/en/life-in-gaza-simply-miserable-amid-flooding-lack-of-aid-conditions-worsen-for-palestinians" target="_blank" rel="noopener">'Life in Gaza simply miserable': Amid flooding, lack of aid, conditions 'worsen' for Palestinians</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>エリン・オガンケイは、ノルウェー難民評議会（NRC）のコミュニケーションアドバイザー、シャイナ・ロウを歓迎することを嬉しく思います。 Thirteen months into what she describes as a "so-called ceasefire," the humanitarian crisis in Gaza continues to deepen, exposing the profound gap between diplomatic commitments and the lived realities of Palestinian civilians. In an interview with France 24, Shayna Low, communications adviser in Palestine for the Norwegian Refugee Council (NRC), describes a population confronting winter flooding, repeated displacement, deteriorating shelter conditions and persistent restrictions on humanitarian assistance. 「ガザでの生活は本当に悲惨です。」ロー氏はイスラエルに「すべての国境を開放し、制限を解除し、援助を受け入れてもらう」よう求めている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Erin Ogunkeye is pleased to welcome Shaina Low, Communication Adviser for the Norwegian Refugee Council (NRC). Thirteen months into what she describes as a "so-called ceasefire," the humanitarian crisis in Gaza continues to deepen, exposing the profound gap between diplomatic commitments and the lived realities of Palestinian civilians. In an interview with France 24, Shayna Low, communications adviser in Palestine for the Norwegian Refugee Council (NRC), describes a population confronting winter flooding, repeated displacement, deteriorating shelter conditions and persistent restrictions on humanitarian assistance. "Life in Gaza is simply miserable." Low urges Israel to "open all the crossings, lift the restrictions, let aid in."</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/life-in-gaza-simply-miserable-amid-flooding-lack-of-aid-conditions-worsen-for-palestinians" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/09 23:49</span>
+    </div>
+
+    
+    <p class="title-ja">ホルムズ海峡は依然としてイランの影響力の源となっている</p>
+    <p class="title-en"><a href="https://www.dw.com/en/strait-of-hormuz-still-a-source-of-leverage-for-iran/a-79901647?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Strait of Hormuz still a source of leverage for Iran</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イラン戦争が始まって以来、ホルムズ海峡での商船への攻撃により乗組員が死傷の危険にさらされており、海運会社は通過を試みるか貨物を遅らせてコストの上昇に直面するかの選択を迫られている。</p><p>商船は危険にもかかわらず海峡の使用を続けているが、それがいつまで続くかは、イランの攻撃を持続する能力と、船舶を保護しコストを負担する米国の能力に部分的に依存する。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>フランスに拠点を置くイラン問題の専門家アリ・モハマディ氏は、イランの地理と使用する装備のおかげで船舶への攻撃を続けることが可能だと考えている。</p><p>しかし同氏は、戦争による経済的負担がイラン政府の主な制約になっているとみている。同氏は、「ホルムズ海峡におけるイランの制限は軍事的というよりも経済的なものである。戦争の継続は経済に重大な影響を与えるからだ」と述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Since the Iran war started, attacks on commercial ships in the Strait of Hormuz have put crews at risk of death and injury, forcing shipping companies to choose whether to attempt the passage or delay cargos and face higher costs.</p><p>Merchant vessels continue to use the strait despite the danger, but how long that can continue depends partly on Iran's ability to sustain its attacks and the United States' capacity to protect shipping and bear the cost.</p><p>Ali Mohammadi, an expert in Iranian affairs based in France, believes Iran's geography and the equipment it uses allow it to keep attacking ships.</p><p>But he sees the economic burden of the war as Tehran's main constraint. "Iran's limitation in the Strait of Hormuz is economic rather than military, because continuing the war has a significant impact on its economy," he said.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/strait-of-hormuz-still-a-source-of-leverage-for-iran/a-79901647?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/10 04:58</span>
+    </div>
+
+    
+    <p class="title-ja">ファン氏と中国スパイ容疑者との関係捜査でエヌビディア株急落</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c6zxjx01vyleo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Nvidia shares tumble over investigation into Huang's affair with alleged Chinese spy</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米国の半導体メーカーであるエヌビディアが、同社最高経営責任者と中国スパイ容疑者との関係について独立調査を実施すると発表した後、数千億ドルの価値が消失した。</p><p>ジェンセン・ファン氏が不倫を認めたことを受け、同社の株価は月曜日に約6％下落した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>Nvidiaの調査は、米国がNvidiaの社長が中国によるスパイ活動の標的になっていると信じているとの報道を受けて行われた。</p><p>しかし、中国はこの主張を拒否し、外務省は「中国のスパイに関する疑惑は全く根拠がなく、憶測であり、中国を中傷し中傷することを目的としている」と述べた。</p><p>Nvidiaは、会社の機密や国家安全保障が侵害されたと信じる理由はないと述べたが、同社取締役会の声明では、「創業者兼最高経営責任者のジェンセン・フアン氏が外国諜報活動の標的になっているとの最近の報道を踏まえ」調査を開始すると述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Hundreds of billions of dollars have been wiped off the value of Nvidia after the US chipmaker announced an independent investigation would be carried out into its chief executive's affair with an alleged Chinese spy.</p><p>The tech firm saw its shares fall by about 6% on Monday after Jensen Huang admitted having an extramarital affair.</p><p>Nvidia's probe came after reports that the US believed the Nvidia boss had been targeted in an espionage campaign by China.</p><p>However, China has rejected the claims, with its foreign ministry saying "allegations about Chinese spies were "entirely groundless, speculative and intended to smear and malign China".</p><p>Nvidia said it had no reason to believe the company's secrets or national security were compromised, but a statement by the firm's board of directors said it would begin an investigation in "light of recent reporting that founder and chief executive Jensen Huang has been the target of a foreign intelligence effort".</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c6zxjx01vyleo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/10 03:50</span>
+    </div>
+
+    
+    <p class="title-ja">アルジャジーラ・ネット共同創設者で漫画家のシュジャート・アリ氏が54歳で死去</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/9/al-jazeera-net-co-founder-and-cartoonist-shujaat-ali-dies-aged-54?traffic_source=rss" target="_blank" rel="noopener">Al Jazeera.net co-founder and cartoonist Shujaat Ali dies aged 54</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>漫画家でアルジャジーラのオンラインチームの創設メンバーであるシュジャート・アリが54歳で死去した。</p><p>デジタル漫画のパイオニアであるアリは、オンラインで最初のアニメーション風刺画を作成したことで知られています。彼はまた、母国パキスタンおよび海外の多くのメディアで働き、その功績でいくつかの賞を受賞しました。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>彼は先週、仕事から帰宅中に心臓発作を起こして死亡した。彼はラーワルピンディのカシマバードに埋葬され、両親もそこに埋葬されている。</p><p>アリはパキスタン初の法廷芸術家であり、鉛筆と技術を使って多くの有名な事件の経過を記録した。</p><p>彼の義理の息子であるワカール・サイード氏がドーン紙に語ったところによると、彼は最近パキスタン空軍で働いていたという。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Shujaat Ali, cartoonist and founding member of Al Jazeera’s online teams, has died at the age of 54.</p><p>A pioneer of digital cartoons, Ali was credited with creating the first animated caricatures online. He also worked at a number of media outlets in his native Pakistan and abroad, receiving several awards for his work.</p><p>He died last week after suffering a heart attack as he returned home from work. He was buried in Qasimabad in Rawalpindi, where his parents are also buried.</p><p>Ali was Pakistan’s first court artist, documenting the course of a number of well-known cases using his pencil and skills.</p><p>He had recently been working with the Pakistan Air Force, his son-in-law, Waqar Saeed, told the Dawn newspaper.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/9/al-jazeera-net-co-founder-and-cartoonist-shujaat-ali-dies-aged-54?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/10 01:42</span>
+    </div>
+
+    
+    <p class="title-ja">中国がスパイ疑惑を否定し、NVIDIAが混乱</p>
+    <p class="title-en"><a href="https://www.france24.com/en/video/20261109-nvidia-in-turmoil-as-china-denies-spying-claims" target="_blank" rel="noopener">Nvidia in turmoil as China denies spying claims</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>今週月曜日、AIチップ製造の巨人がCEOと中国スパイ容疑者との関係を調査すると発表した後、エヌビディア株は急落した。ジェンスン・ファン氏が中国政府に情報を流したとされる中国人実業家と親密な関係にあったとのメディア報道を受けて、外国諜報活動の標的となったのではないかとの懸念がある。一方、中国はスパイ疑惑を「中傷キャンペーン」だと非難した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Nvidia shares tumbled this Monday after the AI chipmaking giant said it would investigate its CEO's affair with a suspected Chinese spy. There are concerns Jensen Huang was targeted by a foreign intelligence effort following a media report that he had a close relationship with a Chinese businesswoman who allegedly passed information to Beijing. China, meanwhile, has slammed the spying allegations as a "smear campaign".</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261109-nvidia-in-turmoil-as-china-denies-spying-claims" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/10 01:21</span>
+    </div>
+
+    
+    <p class="title-ja">インドの収益化廃止：10年経った今も約束は果たされていない</p>
+    <p class="title-en"><a href="https://www.dw.com/en/india-s-demonetization-10-years-on-promises-remain-unfulfilled/a-79903331?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">India’s demonetization: 10 years on, promises remain unfulfilled</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>2016 年 11 月 8 日、ナレンドラ モディ首相は国民に向けたテレビ演説で、深夜にすべての 500 ルピー紙幣と 1,000 ルピー紙幣の流通を停止すると発表しました。</p><p>この驚きの措置により、流通している通貨価値の86.9％が一気に無効化された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>モディ首相はインド国民に「我が国を浄化するための大きな犠牲」を払うよう求めた。</p><p>同氏は、この困難がブラックマネー、汚職、偽造通貨、テロ資金供与の撲滅に役立つと約束した。この演習は、よりクリーンで透明性の高い経済に向けた大きな一歩として提示されました。</p><p>数百万人のインド人が預金を両替するために銀行に殺到した。銀行やATMの外には長蛇の列ができ、人々は何時間も待っていて、いつお金が手に入るか分からないこともありました。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>On November 8, 2016, Prime Minister Narendra Modi announced in a televised address to the nation that he was withdrawing all 500- and 1,000-rupee banknotes from circulation at midnight.</p><p>The surprise move invalidated 86.9% of the value of currency in circulation in a single stroke.</p><p>Modi asked Indians to make a "grand sacrifice for cleansing our country."</p><p>He promised that the hardship would help eliminate black money, corruption, counterfeit currency and terrorist financing. The exercise was presented as a major step towards a cleaner and more transparent economy.</p><p>Millions of Indians rushed to banks to exchange their savings. Long queues formed outside banks and ATMs, with people waiting for hours, sometimes without knowing when they would get their money.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/india-s-demonetization-10-years-on-promises-remain-unfulfilled/a-79903331?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/10 04:39</span>
+    </div>
+
+    
+    <p class="title-ja">共和党議員、ヘグセス国防長官の弾劾採決を強行</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cwr5y58jjp8ro?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Republican congressman to force impeachment vote on Defence Secretary Hegseth</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>共和党議員は今週、米国憲法に違反したとしてピート・ヘグセス国防長官を弾劾するための採決を強行する予定だ。</p><p>トーマス・マッシー下院議員は「ヘグセス長官は議会の許可なしに９０日以上イランで敵対行為を行ったことで法律違反であり、責任を問われなければならない」と述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>共和党が1月まで議会で政権を維持することを考えると、この取り組みは失敗に終わる可能性が高い。しかしマッシー氏は、民主党が独自の弾劾手続きを開始する前に、ドナルド・トランプ大統領にヘグセス氏の解任を促したいと述べている。</p><p>ヘグセス氏はマッシー氏の異動について火曜日に記者会見を行う予定だが、心配していないと述べた。</p><p>マッシー氏は月曜午後、下院議場での決議で弾劾条項を正式に導入した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A Republican congressman plans to force a vote in the House of Representatives this week to impeach Defence Secretary Pete Hegseth, alleging he has violated the US Constitution.</p><p>"By engaging in hostilities in Iran for more than 90 days without congressional authorization, Secretary Hegseth is breaking the law and must be held accountable," Representative Thomas Massie said.</p><p>The effort will likely fail, given Republicans will remain in power in Congress until January. But Massie says he wants to push President Donald Trump to fire Hegseth before Democrats can launch their own impeachment process.</p><p>Hegseth, who will hold a news conference on Tuesday about Massie's move, said he was not concerned.</p><p>Massie formally introduced the articles of impeachment in a resolution on the House floor on Monday afternoon.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cwr5y58jjp8ro?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/10 04:31</span>
+    </div>
+
+    
+    <p class="title-ja">イランとアメリカは交渉したいと「我々は考えている」とエジプトFMが語る</p>
+    <p class="title-en"><a href="https://www.france24.com/en/tv-shows/t%C3%AAte-%C3%A0-t%C3%AAte/20261109-we-think-the-iranians-and-americans-want-to-negotiate-egyptian-fm-says" target="_blank" rel="noopener">'We think' the Iranians and Americans want to negotiate, Egyptian FM says</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>エジプトのバドル・アブデラッティ外相は、フランス２４紙とのインタビューで、イランと米国が交渉を望んでいると信じていると述べたが、さらなるエスカレーションを防ぐために「具体的な合意」を求めた。同氏はまた、カイロは依然としてドナルド・トランプ米大統領に、行き詰まっているガザ和平計画を「前進」させることを「期待している」とし、エジプトに対する米軍事援助は継続すると「自信を持っている」と述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>In an interview with FRANCE 24, Egyptian Foreign Minister Badr Abdelatty said he believed Iran and the United States wanted to negotiate, but called for a "concrete deal" to prevent another escalation. He also said Cairo was still "counting" on US President Donald Trump to "move forward" with the stalled Gaza peace plan and was "confident" US military aid to Egypt would continue.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/tv-shows/t%C3%AAte-%C3%A0-t%C3%AAte/20261109-we-think-the-iranians-and-americans-want-to-negotiate-egyptian-fm-says" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/10 04:07</span>
+    </div>
+
+    
+    <p class="title-ja">トランプ大統領、立場を転換、最近の米中間選挙で不正があったと主張</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/9/trump-reverses-stance-alleges-fraud-in-recent-us-midterm-elections?traffic_source=rss" target="_blank" rel="noopener">Trump reverses stance, alleges fraud in recent US midterm elections</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ドナルド・トランプ米大統領は、先週の中間選挙の誠実さに疑問を呈し、民主党の勝利を祝福し、結果を受け入れる用意があると述べてから1週間も経たないうちに方針を転換した。</p><p>トランプ大統領は月曜、トゥルース・ソーシャルへの投稿で、「この『選挙』が誠実であったと本当に信じている人がいるのだろうか」と書いた。 「世論調査はどうしてこんなに間違っているのでしょうか？？」</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>共和党は、2016年、2020年、2024年の大統領選挙のように、世論調査が再び自分たちの支持を過小評価しているのではないかと疑問を呈したが、結果は最終的には逆となった。</p><p>世論調査では民主党が好調な夜となることがおおむね指摘されており、同党が下院で多数派を占める有利な位置にあり、上院で勝利する現実的なチャンスがあることが示唆されていた。</p><p>実際、ピュー・リサーチが選挙前の世論調査データを分析した報告書を発表したところ、そのデータは州知事と上院議員選挙の27選挙中23選挙で民主党の支持率を少なくとも2ポイント過小評価していたことが判明した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>United States President Donald Trump has questioned the integrity of last week’s midterm elections, reversing course less than a week after congratulating Democrats on their victories and saying he was willing to accept the results.</p><p>“Does anybody really believe that this ‘Election’ was honest,” Trump wrote in a Truth Social post on Monday. “How could the Polls be so wrong???”</p><p>While Republicans questioned whether polls were once again underestimating their support, as they had in the 2016, 2020, and 2024 presidential elections, the results ultimately went the other way.</p><p>Polls had largely pointed to a strong night for Democrats, with surveys suggesting the party was well positioned to take control of the House of Representatives and had a realistic chance of winning the Senate.</p><p>In fact, Pew Research released a report analysing pre-election polling data and found that the data understated the Democratic margin by at least 2 points in 23 of 27 races for governor and the US Senate.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/9/trump-reverses-stance-alleges-fraud-in-recent-us-midterm-elections?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/09 21:45</span>
+    </div>
+
+    
+    <p class="title-ja">共和党の中間期敗北から議会が戻ってきた。そしてトランプ大統領が新たな首席補佐官を任命</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/09/g-s1-152627/up-first-newsletter-stephen-miller-trump-congress-nvidia-cop31" target="_blank" rel="noopener">Congress is back after GOP's midterm defeat. And, Trump appoints new chief of staff</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>トランプ大統領はスージー・ワイルズ氏の後任としてスティーブン・ミラー氏を新しい首席補佐官に任命した。中間選挙で共和党が敗北して以来、トランプ大統領にとって初の大規模人事となる。ミラー氏は副首席補佐官で、特に移民政策など、物議を醸したトランプ大統領の政策の多くを形作る上で重要な役割を果たしてきた。有権者のデータによると、民主党が支持を集めたのはトランプ大統領の移民強制執行が一因だった。</p><p>第119回議会は、民主党が多数を占める新たな下院と上院の介入を前に最後の数週間を迎えている。議員らの重要な議題は、12月11日に資金が枯渇する中、連邦政府の運営を継続することである。議員らは、典型的な12の歳出法案を交渉する時間と政治的意志が不足しているため、資金を延長するために短期の継続決議を使用する可能性が高い。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>President Trump has appointed Stephen Miller as his new chief of staff , replacing Susie Wiles. It's Trump's first major personnel change since the Republicans' defeat in the midterms. Miller, who was deputy chief of staff, has been key in shaping many of Trump's controversial policies, particularly on immigration. Voter data indicates that the Democrats gained support partly due to Trump's immigration enforcement.</p><p>The 119th Congress is reaching its final weeks before a new Democrat-controlled House and Senate step in. Lawmakers' key agenda item is keeping the federal government open , as funding runs out on Dec. 11. They will likely use a short-term continuing resolution to extend funding, because they lack the time and political will to negotiate the typical 12 appropriations bills.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/09/g-s1-152627/up-first-newsletter-stephen-miller-trump-congress-nvidia-cop31" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/10 02:06</span>
+    </div>
+
+    
+    <p class="title-ja">ウクライナで戦うため南アフリカを出国しようとした疑いでジンバブエ人9人を逮捕</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cm93z3lp5lnpo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Nine Zimbabweans caught allegedly trying to leave South Africa to fight in Ukraine</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>警察によると、ジンバブエ人９人がロシアとウクライナの戦争に参戦するため国外に出ようとしていた疑いで南アフリカで逮捕された。</p><p>このグループは20歳から26歳までで、日曜日の夕方、ヨハネスブルグとその周辺で複数の専門分野からなるチームによって逮捕された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>当局は、彼らは「国外への飛行機に搭乗する準備をしていた」ところで逮捕されたが、最終目的地は不明だと付け加えた。</p><p>彼らは、政府の許可なしに傭兵活動を違法とする南アフリカの対外軍事援助規制法に違反した罪で起訴されている。</p><p>警察は、南アフリカ最大の空港であるORタンボで5人が逮捕され、さらに4人がヨハネスブルグ東のブルーマのホテルでインターポールが関与した多分野のチームによって逮捕されたと発表した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Nine Zimbabweans have been arrested in South Africa after they were caught allegedly trying to leave the country to fight in the war between Russia and the Ukraine, police say.</p><p>The group, aged between 20 and 26, were arrested in and around Johannesburg by a multidisciplinary team on Sunday evening.</p><p>They were caught as they were "preparing to board flights out of the country", authorities added, but their final destination is unclear.</p><p>They have been charged with contravening South Africa's Regulation of Foreign Military Assistance Act, which outlaws mercenary activity without government permission.</p><p>Police said five people were arrested at South Africa's biggest airport, OR Tambo, and another four at a hotel in Bruma, east of Johannesburg by a multidisciplinary team that involved Interpol.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cm93z3lp5lnpo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/10 00:56</span>
+    </div>
+
+    
+    <p class="title-ja">アフリカのフェイクニュース: 偽情報の時代、何が真実かを誰が決めるのでしょうか?</p>
+    <p class="title-en"><a href="https://www.dw.com/en/fake-news-in-africa-in-an-age-of-disinformation-who-decides-what-s-true/a-79874039?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Fake news in Africa: In an age of disinformation, who decides what's true?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>誤った情報は世界中の民主主義に脅威をもたらします。誇張された WhatsApp メッセージ、操作された TikTok 動画、または Facebook 上の明らかな速報アラートはすべて、特に選挙の準備段階において、アフリカおよびその他の地域の人々を誤った方向に導く可能性があります。</p><p>人工知能によって画像、音声、ビデオの操作がますます容易になるにつれ、ますます多くの国がフェイク ニュースを特定し、それに対抗するスキルを国民に身につけさせようとしています。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>しかし、これらの取り組みは本当に意識を高めることを目的としているのだろうか、それとも特定の政府がこの戦いを、各国の内外からの世論をコントロールし、反対の声を沈黙させ、国民を誤った方向に導くために利用しているのだろうか？</p><p>シェフィールド大学のジャーナリズム講師ダニ・マドリッド・モラレス氏は、アフリカ政府は偽情報や誤情報の発信源と戦う取り組みを大幅に強化する必要があると考えている。</p><p>同氏はDWに対し、フェイクニュースの影響に打ち勝つために「実際にうまくやっている国は、あったとしてもごくわずかだ」と語った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Misinformation poses a threat to democracy worldwide: An exaggerated WhatsApp message, a manipulated TikTok video or an apparent breaking news alert on Facebook can all misguide people in Africa and beyond — particularly in the run-up to elections.</p><p>As artificial intelligence is making it increasingly easy to manipulate images, voices and videos, more and more countries are trying to equip their populations with skills to identify and counter fake news .</p><p>But are these efforts really about raising awareness, or are certain governments using this fight to control public opinion, silence dissident voices and misguide the populace — from both within and outside of these respective nations?</p><p>Journalism lecturer Dani Madrid-Morales at the University of Sheffield believes that African governments must significantly step up their efforts to combat sources of disinformation and misinformation.</p><p>He told DW that "there are very few countries — if any — that are actually doing a good job" to beat the influence of fake news.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/fake-news-in-africa-in-an-age-of-disinformation-who-decides-what-s-true/a-79874039?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-11-10";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
