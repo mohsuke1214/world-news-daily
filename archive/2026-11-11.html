@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年11月11日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/11 01:59</span>
+    </div>
+
+    
+    <p class="title-ja">大統領選に先立ち、政治的運命がリネールにとって教訓となる可能性があるスポーツ界のレジェンドたち</p>
+    <p class="title-en"><a href="https://www.france24.com/en/sport/20261110-sports-legends-whose-political-fortunes-may-be-a-lesson-to-riner-ahead-of-presidential-bid" target="_blank" rel="noopener">Sports legends whose political fortunes may be a lesson to Riner ahead of presidential bid</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>フランスの柔道スター、テディ・リネール氏が月曜日、2027年のフランス大統領選への出馬を表明した可能性があるが、競技場から暴徒の説教壇に転身したスポーツスターは彼だけではない。彼の最も有名な前任者について読んでください。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>French judo star Teddy Riner may have announced his bid for the 2027 French presidential campaign on Monday, but he is not the only sports star to transition from stadium to bully pulpit. Read about some of his most famous predecessors.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/sport/20261110-sports-legends-whose-political-fortunes-may-be-a-lesson-to-riner-ahead-of-presidential-bid" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/11 01:20</span>
+    </div>
+
+    
+    <p class="title-ja">ブルガリア高速道路玉突き事故で少なくとも12人死亡</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/10/at-least-12-people-killed-in-bulgaria-motorway-pile-up?traffic_source=rss" target="_blank" rel="noopener">At least 12 people killed in Bulgaria motorway pile-up</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ブルガリア高速道路玉突き事故で少なくとも12人死亡</p><p>ブルガリア南東部の高速道路で約50台の車両が絡む複数の衝突事故で、少なくとも12人が死亡、数十人が負傷した。衝突は濃霧と視界不良の中で発生し、それが玉突き事故の一因となったと考えられている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>At least 12 people killed in Bulgaria motorway pile-up</p><p>At least 12 people have been killed and dozens injured in multiple crashes involving around 50 vehicles on a motorway in south-eastern Bulgaria. The crashes occurred amid dense fog and poor visibility, which are believed to have contributed to the pile-ups.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/10/at-least-12-people-killed-in-bulgaria-motorway-pile-up?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/11 01:19</span>
+    </div>
+
+    
+    <p class="title-ja">フランスのモハメド・アルファイド捜査で逮捕、警察発表</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/ck1wvwyrd4ywo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Arrests made in Mohamed Al Fayed probe in France, police say</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>フランス警察は、モハメド・アルファイドさんの虐待捜査に関連してパリのリッツホテルを含む3つの施設を捜索した後、逮捕を行った。</p><p>パリ検察庁はBBCに対し、数名が先月取り調べのために拘留され、後に釈放されたと語った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ロンドン警視庁は生存者に送った極秘の書簡の中で、英国とフランス当局の共同作戦とみられる10月13日と14日の捜索に警察官が立ち会ったと述べた。</p><p>ハロッズとリッツの元オーナーによる虐待と人身売買の疑いで逮捕が行われるのは初めて。</p><p>モハメド・アルファイド氏、スタッフによる複数回の強姦容疑で告発</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>French police have made arrests after three properties, including the Ritz hotel in Paris, were searched in relation to an investigation into Mohamed Al Fayed's abuse.</p><p>The Paris prosecutor's office told the BBC that several individuals were taken into custody for questioning last month and later released.</p><p>In a confidential letter sent to survivors, the Metropolitan Police said its officers were present during the searches on 13 and 14 October, in what is understood to be a joint operation between British and French authorities.</p><p>It is the first time any arrests have been made in relation to alleged abuse and trafficking by the former Harrods and Ritz owner.</p><p>Mohamed Al Fayed accused of multiple rapes by staff</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/ck1wvwyrd4ywo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/11 00:57</span>
+    </div>
+
+    
+    <p class="title-ja">イラン、冷蔵庫ハッキングへの関与を否定、フランスは大使を召喚</p>
+    <p class="title-en"><a href="https://www.dw.com/en/iran-denies-role-in-fridge-hack-france-summons-ambassador/a-79910206?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Iran denies role in fridge hack, France summons ambassador</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イランは火曜日、先月数百のスーパーマーケットに対するサイバー攻撃の背後に同国のイスラム革命防衛隊（IRGC）が関与しているとするフランスの非難を却下し、パリはこの事件について話し合うためにテヘランの大使を呼び出した。</p><p>「イラン外務省は、フランスでのサイバー活動疑惑に関するフランス政府のイランに対する根拠のない一方的な非難を断固として拒否する」と述べ、「イスラム共和国に対する非難を平準化するこの陳腐な政策を強く非難する」と付け加えた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>10月11日から12日にかけて夜通し始まったこの攻撃では、スーパーマーケットの冷蔵庫や冷凍庫の温度が上昇し、農産物が傷み、場合によっては火災が発生することもあった。</p><p>その後、ヨーロッパやその他の国でも同様の事件が相次ぎ、今月にはフランスの血液銀行の冷却装置への攻撃が失敗した事件も含まれているが、これらのその後の出来事が関連しているかどうかはまだ明らかではない。</p><p>フランスのジャンノエル・バロー外相は火曜日、フランス政府は「いかなる可能性も排除せず、さらなる攻撃を阻止するために適切かつ必要と思われるあらゆる措置を（公に開示できないものも含めて）講じる」と述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Iran on Tuesday dismissed French accusations that its Islamic Revolutionary Guard Corps (IRGC) was behind a cyberattack on hundreds of supermarkets last month , as Paris summoned Tehran's ambassador to discuss the incident.</p><p>"Iran's Foreign Ministry categorically rejects the French government's baseless and one-sided accusations against Iran regarding alleged cyber activities in France ," the ministry said, adding that it "strongly condemns this hackneyed policy of leveling accusations against the Islamic Republic."</p><p>The alleged attack, which began overnight on October 11-12, raised the temperatures in supermarket refrigerators and freezer units , spoiling produce and even causing fires in isolated instances.</p><p>A series of similar incidents have since followed in Europe and beyond , even including a failed attack on cooling units at French blood banks this month , though it is not yet clear if these subsequent events are connected.</p><p>French Foreign Minister Jean-Noel Barrot said on Tuesday that his government would "rule nothing out and will take all measures — including those we may not disclose publicly — that we deem proportionate and necessary to deter any further attacks."</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/iran-denies-role-in-fridge-hack-france-summons-ambassador/a-79910206?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/11 02:03</span>
+    </div>
+
+    
+    <p class="title-ja">イスラエルの新議会、指導者らが政権樹立を目指して宣誓宣誓</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/crd939lpzjp9o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Israel's new parliament sworn in as leaders compete to form government</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>野党指導者のガディ・アイゼンコット氏が暫定首相ベンヤミン・ネタニヤフ氏の追放を目指しているイスラエルの新議会が宣誓を行った。</p><p>元陸軍長官はネタニヤフ首相よりもクネセト議員からの推薦を受けて政権樹立の任務を与えられているが、同首相を支持する人々全員が共同統治に意欲を示しているわけではない。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>10月の総選挙ではアイゼンコット氏の4党連合が48議席を獲得したのに対し、ネタニヤフ首相の政党は53議席を獲得し、120議席の国会では両党とも過半数に届かなかった。連立政権構築までの期限は28日間で、2週間延長される可能性もある。</p><p>新しいMKのほぼ半数は前議会の議員ではなかったが、アラブ主導の政党は記録的な議席を獲得した。</p><p>ネタニヤフ首相とアイゼンコット首相は就任宣誓直後、相手方主導の政府を支持する危険性について議会に警告した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Israel's new parliament has been sworn in, as opposition leader Gadi Eisenkot seeks to oust caretaker Prime Minister Benjamin Netanyahu.</p><p>The former army chief has been tasked with forming a government after receiving more recommendations from members of the Knesset than Netanyahu, although not all those backing him are willing to govern together.</p><p>Eisenkot's bloc of four parties won 48 seats in October's election, while Netanyahu's bloc won 53, leaving both short of a majority in the 120-seat Knesset. He has 28 days to build a coalition, with a possible two-week extension.</p><p>Almost half of the new MKs did not serve in the previous parliament, while Arab-led parties have a record number of seats.</p><p>Shortly after they were sworn in, Netanyahu and Eisenkot warned parliament about the perils of supporting a government led by the other.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/crd939lpzjp9o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/11 01:39</span>
+    </div>
+
+    
+    <p class="title-ja">カタール首相のワシントン訪問は、米国とイランの外交が再開される中で行われる</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/10/qatari-pms-washington-visit-comes-amid-renewed-us-iran?traffic_source=rss" target="_blank" rel="noopener">Qatari PM’s Washington visit comes amid renewed US–Iran diplomacy</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>カタール首相のワシントン訪問は、米国とイランの外交が再開される中で行われる</p><p>中東地球問題評議会の非常勤研究員であるナエフ・アル・ナベト氏が、カタール首相のワシントン訪問、米国とイランの立場の変化、そしてカタールの調停を通じて双方を交渉に戻す取り組みについて語ります。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Qatari PM’s Washington visit comes amid renewed US–Iran diplomacy</p><p>Nayef Al-Nabet, a non-resident fellow at the Middle East Council on Global Affairs, discusses the Qatari prime minister’s visit to Washington, shifting US–Iran positions, and efforts to bring both sides back to negotiations through Qatari mediation.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/10/qatari-pms-washington-visit-comes-amid-renewed-us-iran?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/11 00:39</span>
+    </div>
+
+    
+    <p class="title-ja">ルイス・ハミルトン、エジプトのラファ交差点とガザ支援施設を訪問</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/nov/10/lewis-hamilton-egypt-rafah-crossing-gaza-aid-facilities" target="_blank" rel="noopener">Lewis Hamilton visits Egypt’s Rafah crossing and Gaza aid facilities</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>7度のF1世界チャンピオンが国境地帯とエジプト赤新月社が運営する物流倉庫を視察</p><p>ルイス・ハミルトンは、ガザ地区との国境検問所であるエジプトのラファを訪れ、同地域に人道援助を送っている団体と面会した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>7度のF1世界チャンピオンは、この地域の紛争と人道危機について声を上げ、平和を訴えてきた。同氏はガザ地区でのイスラエル軍の空爆で死亡した子供たちについてソーシャルメディアに頻繁に投稿し、停戦を呼びかけた。</p><p>「コンゴの解放、スーダンの解放、シリアの解放、パレスチナの解放を確実に進める必要があると思う。多くの平和があり、いつかは達成できることを願っている」とハミルトン氏は10月に語った。</p><p>昨年合意に達した停戦合意により、ガザ地区での大規模な戦闘行為は停止されたが、同地域に届く援助の量は、合意された最低1日あたり600台のトラックをはるかに下回ったままである。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Seven-time F1 world champion tours border area and logistics warehouses operated by Egyptian Red Crescent</p><p>Lewis Hamilton has visited Egypt’s Rafah border crossing with the Gaza Strip to meet organisations sending humanitarian aid to the territory.</p><p>The seven-time Formula One world champion has spoken out about conflict and humanitarian crises in the region, and has called for peace. He has frequently posted on social media about children killed in Israeli airstrikes in Gaza and called for a ceasefire.</p><p>“I think we need to make sure we’re pushing to free Congo, free Sudan, free Syria, free Palestine . I think there’s a lot of peace that I’m hoping we get to at some stage,” Hamilton said in October.</p><p>A ceasefire agreement reached last year has halted major combat operations in Gaza, but the amount of aid reaching the territory continues to fall far short of the agreed-upon minimum of 600 trucks a day.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/nov/10/lewis-hamilton-egypt-rafah-crossing-gaza-aid-facilities" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/09 23:49</span>
+    </div>
+
+    
+    <p class="title-ja">ホルムズ海峡は依然としてイランの影響力の源である</p>
+    <p class="title-en"><a href="https://www.dw.com/en/strait-of-hormuz-still-a-source-of-leverage-for-iran/a-79901647?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Strait of Hormuz still a source of leverage for Iran</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イラン戦争が始まって以来、ホルムズ海峡での商船への攻撃により乗組員が死傷の危険にさらされており、海運会社は通過を試みるか、貨物を遅らせてコストの上昇に直面するかの選択を迫られている。</p><p>商船は危険にもかかわらず海峡の使用を続けているが、それがいつまで続くかは、イランの攻撃を持続する能力と、船舶を保護しコストを負担する米国の能力に部分的に依存する。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>フランスに拠点を置くイラン問題の専門家アリ・モハマディ氏は、イランの地理と使用する装備のおかげで船舶への攻撃を続けることが可能だと考えている。</p><p>しかし同氏は、戦争による経済的負担がイラン政府の主な制約になっているとみている。 "Iran's limitation in the Strait of Hormuz is economic rather than military, because continuing the war has a significant impact on its economy," he said.</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Since the Iran war started, attacks on commercial ships in the Strait of Hormuz have put crews at risk of death and injury, forcing shipping companies to choose whether to attempt the passage or delay cargos and face higher costs.</p><p>Merchant vessels continue to use the strait despite the danger, but how long that can continue depends partly on Iran's ability to sustain its attacks and the United States' capacity to protect shipping and bear the cost.</p><p>Ali Mohammadi, an expert in Iranian affairs based in France, believes Iran's geography and the equipment it uses allow it to keep attacking ships.</p><p>But he sees the economic burden of the war as Tehran's main constraint. "Iran's limitation in the Strait of Hormuz is economic rather than military, because continuing the war has a significant impact on its economy," he said.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/strait-of-hormuz-still-a-source-of-leverage-for-iran/a-79901647?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/10 23:40</span>
+    </div>
+
+    
+    <p class="title-ja">モンゴルの鉄の冬：古代の伝統を守る競争</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/witness/2026/11/10/mongolias-iron-winter-a-race-to-save-an-ancient-tradition?traffic_source=rss" target="_blank" rel="noopener">Mongolia’s Iron Winter: A Race to Save an Ancient Tradition</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>2 人の若い馬飼いが、コミュニティの古代の生活様式を救うために、モンゴルで最も危険な冬の儀式を復活させます。</p><p>In Mongolia’s remote Tsakhir Valley, horses mean survival. For generations, herders protected them from winter storms by gathering a vast herd and nominating their bravest young men to protect it.しかし、環境圧力の高まりにより、何世紀にもわたる伝統は2019年に突然放棄され、通過儀礼が永久に失われるのではないかとの懸念が生じた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>遺産を取り戻そうと決意した村の長老たちは、冬の群れを復活させ、モンゴル史上最悪の冬となる冬を馬を守るという気の遠くなるような責任を2人の10代の友人に課すことを誓う。過酷な数か月間、少年たちは吹雪、疲労、疑念と戦い、鉄の冬では何も一人では生きていけないことを知ります。</p><p>『アイアン・ウィンター』はカシミール・バージェスによるドキュメンタリー映画です。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Two young horse herders revive Mongolia’s most dangerous winter ritual to save their community’s ancient way of life.</p><p>In Mongolia’s remote Tsakhir Valley, horses mean survival. For generations, herders protected them from winter storms by gathering a vast herd and nominating their bravest young men to protect it. But mounting environmental pressures forced the centuries-old tradition to be abruptly abandoned in 2019, sparking fears that the rite of passage would be lost forever.</p><p>Determined to reclaim their heritage, village elders pledge to revive the winter herd and place the daunting responsibility on two teenage friends to safeguard the horses through what becomes Mongolia’s deadliest winter on record. Over several brutal months, the boys battle blizzards, exhaustion and doubt, discovering that in the Iron Winter, nothing can survive alone.</p><p>Iron Winter is a documentary film by Kasimir Burgess.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/witness/2026/11/10/mongolias-iron-winter-a-race-to-save-an-ancient-tradition?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/10 23:16</span>
+    </div>
+
+    
+    <p class="title-ja">「人間を統治する神のようなもの」：多くの脱北者は北朝鮮の金氏の娘を確実な後継者とみなしている</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/10/g-s1-152795/like-gods-reigning-over-humans-many-defectors-see-daughter-of-north-koreas-kim-as-heir-apparent" target="_blank" rel="noopener">'Like gods reigning over humans': Many defectors see daughter of North Korea's Kim as heir apparent</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ファイル - 北朝鮮政府が提供したこの写真では、2026年3月19日木曜日、北朝鮮の軍事訓練基地を訪問する指導者の金正恩氏（中央）とキム・ジュエと名付けられたとされる娘。独立系ジャーナリストには、北朝鮮政府が配布したこの画像に描かれている出来事を取材するアクセスが与えられていなかった。この画像の内容は提供されたものであり、独自に検証することはできません。 朝鮮通信社/KCNA、KNS経由、AP経由 キャプションを隠す</p><p>韓国・ソウル -- 3年前に北朝鮮から逃亡するまで、キム・ユミさんは国営テレビが金正恩朝鮮労働党委員長と幼い娘の姿を映すたびに深い不満を感じていた。そのメッセージは明白で憂慮すべきものだと彼女は感じた。北朝鮮は、今度は金氏の娘への最終的な権力の世襲への基礎を築いているのだ。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>金王朝の権力掌握に公の場で疑問を呈することは、厳しい迫害を意味する。家族の漁業を台無しにした厳格なパンデミック規制にすでに怒りを感じていた彼女は、家族とともにボートで韓国に亡命した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>FILE - In this photo provided by the North Korean government, its leader Kim Jong Un, center, and his daughter, reportedly named Kim Ju Ae, visit a military training base in North Korea, Thursday, March 19, 2026. Independent journalists were not given access to cover the event depicted in this image distributed by the North Korean government. The content of this image is as provided and cannot be independently verified. 朝鮮通信社/KCNA via KNS via AP hide caption</p><p>SEOUL, South Korea — Until she fled North Korea three years ago, Kim Yumi felt deeply frustrated whenever state TV showed leader Kim Jong Un with his young daughter. The message, she felt, was clear and worrying: North Korea was laying the groundwork for an eventual hereditary transfer of power, this time to Kim's daughter.</p><p>Publicly questioning the Kim dynasty's hold on power would mean severe persecution. Already angered by draconian pandemic regulations that ruined her family's fishing business, she defected to South Korea by boat with her family.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/10/g-s1-152795/like-gods-reigning-over-humans-many-defectors-see-daughter-of-north-koreas-kim-as-heir-apparent" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/10 22:31</span>
+    </div>
+
+    
+    <p class="title-ja">日本はトランプ大統領の外交政策の優先事項に変化の兆しを注視している</p>
+    <p class="title-en"><a href="https://www.dw.com/en/japan-watches-for-signs-of-change-in-trump-s-foreign-policy-priorities/a-79909398?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Japan watches for signs of change in Trump's foreign policy priorities</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>アジア太平洋経済協力会議（APEC）首脳会議に合わせて米国、中国、ロシアの首脳が会談する予定まであと1週間となっており、日本はインド太平洋に対する米国の政策に変化の兆しがないか注視している。</p><p>今年のAPEC会合は中国の深セン市で11月18～19日に開催される予定だ。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>日本政府は、ドナルド・トランプ米大統領が先週の中間選挙で苦境に立たされたことで、同大統領が外交的な迅速な勝利を求めるよう駆り立てられるのではないかと懸念している。それはトランプ大統領の政治家としての資質の証拠だと言えるが、それは地域におけるワシントンの同盟国の利益を考慮に入れていない。</p><p>11月3日の中間選挙の結果に動揺するホワイトハウスの雰囲気を見極めようと、日本政府は迅速に動いた。</p><p>日本の茂木敏充外相は月曜、パリでのG7外相会合に合わせてマルコ・ルビオ米国務長官と会談した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>With just a week to go before the leaders of the United States, China and Russia are expected to meet on the sidelines of the Asia-Pacific Economic Cooperation (APEC) summit, Japan is closely watching for signs of any shift in Washington's policy toward the Indo-Pacific.</p><p>The APEC gathering, taking place this year in the Chinese city of Shenzhen, is scheduled for November 18-19.</p><p>Tokyo fears that the drubbing US President Donald Trump suffered in last week's midterm elections may push him to seek a diplomatic quick win, one he can point to as evidence of his statesmanship but that fails to take into account the interests of Washington's allies in the region.</p><p>Tokyo has moved swiftly to try to ascertain the mood in a White House that was left reeling by the results of the November 3 midterm election.</p><p>Japanese Foreign Minister Toshimitsu Motegi held talks with US Secretary of State Marco Rubio on the sidelines of the G7 foreign ministers' meeting in Paris on Monday.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/japan-watches-for-signs-of-change-in-trump-s-foreign-policy-priorities/a-79909398?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/10 21:08</span>
+    </div>
+
+    
+    <p class="title-ja">ジョン・ケリー氏、米国とその他の世界はグリーンエネルギーに関して中国の先導に追随する必要があると語る</p>
+    <p class="title-en"><a href="https://www.theguardian.com/environment/2026/nov/10/china-green-energy-john-kerry-cop31" target="_blank" rel="noopener">US and rest of world must follow China’s lead on green energy, says John Kerry</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>元米国務長官、ほとんどの国が「よろよろと進んでいる」一方、中国政府は「大幅に加速している」と発言</p><p>中国は化石燃料からの脱却で世界をリードしており、米国を含む世界の他の国々も今は追従しなければならない、とジョン・ケリー元米国務長官がガーディアン紙に語った。中国が今年の気候変動サミットにどのように取り組むのか正確に疑問を抱いている警官ウォッチャーら。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>今年はトルコで気候変動会議が開催されるCop31が開幕する中、中国がついに長い間避けてきた指導的役割に踏み出すかどうかについて多くの憶測が飛び交っている。 2026年3月に採択された最新の「5カ年計画」の中で、中国は初めて「世界の気候ガバナンスに積極的に参加し、主導する」ことを約束した。 COP31は、中国政府が歴史的には消極的だったこのレトリックを実行に移す用意ができている最初の兆候となる可能性がある。</p><p>グリーンエネルギーは、パンデミック後の低迷する中国経済を軌道に乗せる輸出原動力の重要な要素である。輸出の成功は、国内の一般消費を大幅に押し上げることができなかったこととは対照的であり、この構造的弱点が指導者たちを絶えず悩ませてきた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Former US secretary of state says most nations are ‘stumbling along’ while Beijing has ‘hugely accelerated’</p><p>China is leading the world in moving away from fossil fuels , and the rest of the globe – including the US – must now follow, the former US secretary of state John Kerry has told the Guardian, as Cop watchers wonder exactly how China is going to approach this year’s climate summit.</p><p>As Cop31 opens – this year the climate conference is in Turkey – there is plenty of speculation about whether China will finally step into the leadership role that it has long avoided. In its latest “five-year plan” adopted in March 2026, China for the first time pledged to “actively participate in and lead global climate governance”. Cop31 could provide the first indications Beijing is ready to put that rhetoric into action, something it has historically been reluctant to do.</p><p>Green energy is a vital component of the export engine that has kept China’s sluggish post-pandemic economy on track. The success of its exports stands in contrast to its failure to significantly boost domestic general consumption, a structural weakness that has persistently vexed leaders.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/environment/2026/nov/10/china-green-energy-john-kerry-cop31" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/11 02:02</span>
+    </div>
+
+    
+    <p class="title-ja">治安部隊が最高裁判所を占拠、ソマリアの元最高裁判事が語る</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/10/security-forces-seized-top-court-somalias-ex-chief-justice-says?traffic_source=rss" target="_blank" rel="noopener">Security forces seized top court, Somalia’s ex-chief justice says</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>治安部隊が最高裁判所を占拠、ソマリアの元最高裁判事が語る</p><p>ソマリアの元首席判事バシェ・ユスフ・アハメッド氏はアルジャジーラに対し、最高裁判所がハッサン・シェイク・モハムド大統領の任期延長、そしてその結果としての大統領職は違憲であるとの判決を下した後、300人以上の治安部隊が最高裁判所を「軍事占拠」したと語った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Security forces seized top court, Somalia’s ex-chief justice says</p><p>Somalia’s former Chief Justice Bashe Yusuf Ahmed told Al Jazeera that more than 300 security forces had ‘militarily occupied’ the Supreme Court after it ruled that President Hassan Sheikh Mohamud’s term extension, and consequently his presidency, was unconstitutional.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/10/security-forces-seized-top-court-somalias-ex-chief-justice-says?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/11 01:38</span>
+    </div>
+
+    
+    <p class="title-ja">教皇レオ14世がラテンアメリカ歴訪の第2行目としてアルゼンチンを訪問</p>
+    <p class="title-en"><a href="https://www.france24.com/en/video/20261110-pope-leo-xiv-visits-argentina-in-second-leg-of-latin-american-tour" target="_blank" rel="noopener">Pope Leo XIV visits Argentina in second leg of Latin American tour</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>教皇レオ14世はウルグアイ訪問に続き、南米歴訪の第2行目としてアルゼンチンを訪問した。訪問中、彼は公開ミサを挙行し、信者と会い、宗教指導者や政府指導者と会談した。ペルーは教皇の巡礼の最終目的地となる。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Pope Leo XIV visited Argentina on the second leg of his South American tour, following a stop in Uruguay. During his visit, he celebrated public Masses, met with the faithful and held talks with religious and government leaders. Peru is the final stop on the pontiff's tour.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261110-pope-leo-xiv-visits-argentina-in-second-leg-of-latin-american-tour" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/10 22:22</span>
+    </div>
+
+    
+    <p class="title-ja">ハーフマラソンのランニングイベントで27人が体調を崩し、カリフォルニア州警察が捜査</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cq0ldlyd556go?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">California police investigate after 27 fall ill at half-marathon running event</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>カリフォルニア州サンタバーバラ市では、日曜日に市内で開催されたハーフマラソンのランニングイベントで30人近くが医療機関を受診せざるを得なくなったことを受け、警察が捜査を進めている。</p><p>BBCの米国パートナーであるCBSニュースに寄せられた声明の中で、警察官らは、レース終了後に「異常な症状のため」治療を求めたレース参加者についてサンタバーバラ・コテージ病院から報告を受けたと述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「報告された症状の原因はまだ確認されていない」と声明は付け加えた。</p><p>病院を運営するコテージ・ヘルスはCBSに対し、レース参加者から「予想を上回る数の緊急来院」があったと語った。</p><p>警察は「現時点で国民に推奨される具体的な行動はないが、体調不良を感じた参加者は医師の診察を受け、医療専門家の指導に従うべきだ」としている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Police in Santa Barbara, California, are investigating after nearly 30 people had to seek medical care at a half-marathon running event held in the city on Sunday.</p><p>In a statement provided to the BBC's US partner CBS News, officers said they received a report from Santa Barbara Cottage Hospital about race participants who sought medical treatment "for unusual symptoms" after the race ended.</p><p>"The cause of the reported symptoms has not been confirmed," the statement added.</p><p>Cottage Health, which operates the hospital, told CBS it had seen "a larger than expected number of emergency visits" from those who ran the race.</p><p>"There is no specific action recommended for the public at this time; however, participants who feel unwell should seek medical attention and follow guidance from healthcare professionals," police said.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cq0ldlyd556go?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/10 06:58</span>
+    </div>
+
+    
+    <p class="title-ja">トランプ大統領が米国はイスラエルへの援助を削減すると述べたときの意味</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/09/nx-s1-6029320/us-trump-israel-military-aid" target="_blank" rel="noopener">What Trump meant when he said the U.S. is cutting aid to Israel</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>エルサレム — 米国中間選挙の日、トランプ大統領がFOXニュースに対し、米国の対イスラエル援助額40億ドルを削減すると語ったとき、多くのイスラエル国民はパニックに陥った。イスラエルは何十年にもわたって米国の軍事援助の最大の受領国の一つとなっている。</p><p>「我々にとって、米国は最大の友人の一つだ。だから大統領がそのようなことを言うと、顔面平手打ちだ！」エルサレムの臨床心理学者、ヤイル・ワイラウフさん（36）は言う。地元メディアによると、トランプ大統領の「爆弾」発表は国防省と財務省も意表を突いたという。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>一方、米国の対イスラエル軍事援助に反対する米国の有権者や候補者らはトランプ大統領の動きを歓迎した。ミシガン州選出の上院議員、民主党のアブドゥル・エルサイード氏（イスラエルを大量虐殺とアパルトヘイトで非難しているが、イスラエルは否認している）は、大統領が「この政策に関しては実際に正しい」と思うとNPRに語った。</p><p>しかし、国防専門家や元政府高官らは、米国のイスラエルへの援助はなくなるわけではないと述べている。形が変わっているだけです。</p><p>昨年5月、イスラエルのベンヤミン・ネタニヤフ首相は、CBSの60ミニッツでトランプ大統領の投票日のコメントと同様のことを述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>JERUSALEM — On the day of the U.S. midterm elections, when President Trump told Fox News he is cutting $4 billion in U.S. aid to Israel, many Israelis panicked. Israel has been one of the biggest recipients of U.S. military aid for decades.</p><p>"For us, the U.S. is one of our biggest friends. So when a president says something like that, it's a slap in the face!" says Yair Wairauch, 36, a clinical psychologist in Jerusalem. Local media say Trump's "bombshell" announcement also caught the country's defense and finance ministries by surprise.</p><p>Meanwhile, U.S. voters and candidates who oppose U.S. military aid to Israel celebrated Trump's move. Democrat Abdul El-Sayed, the senator-elect from Michigan — who accuses Israel of genocide and apartheid, charges Israel denies — told NPR he thinks the president is "actually right on this policy."</p><p>But defense experts and former government officials say U.S. aid to Israel is not going away. It's just changing shape.</p><p>Last May, Israeli Prime Minister Benjamin Netanyahu said something similar to Trump's Election Day comment on CBS' 60 Minutes .</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/09/nx-s1-6029320/us-trump-israel-military-aid" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/11 00:22</span>
+    </div>
+
+    
+    <p class="title-ja">エジプトの列車衝突事故で政治的責任が求められる</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/10/deadly-egypt-train-collision-prompts-calls-for-political-accountability?traffic_source=rss" target="_blank" rel="noopener">Deadly Egypt train crash prompts calls for political accountability</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>エジプトの首都カイロ郊外で起きた列車衝突事故は、同国の保健・人口省によると少なくとも7人が死亡、125人以上が負傷し、議会や政治に責任を求める声が高まっている。この災害は、エジプト国家が鉄道網の改善につぎ込んだ数百万ドルの効果と、それらの投資が本当に乗客の安全性を向上させているのかという緊急の疑問を引き起こしている。</p><p>日曜日、ギザとファイユーム間を走行していた列車がカイロ－アスワン間で別の列車の後部に衝突し、後続の列車がアル・アヤット地区の田舎道に脱線した。墜落後、アブドルファッタハ・エル・シシ大統領は当局に対し、「過失があったと判明した人物の責任を問う」ための緊急調査を実施するよう指示した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>エジプト議会の運輸通信委員会は火曜日、調査のためカメル・エルワジル運輸大臣を緊急会議に召喚した。一方、野党の声は大臣の批判から政府全体の解任要求に至るまで、政治的責任の要求をエスカレートさせている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A deadly train collision in the outskirts of the Egyptian capital Cairo , which killed at least seven people and injured more than 125 others according to the country’s Ministry of Health and Population, has ignited a wave of parliamentary and political demands for accountability. The disaster raises urgent questions about the effect of the millions of dollars the Egyptian state has poured into upgrading the railway network and whether those investments are genuinely improving passenger safety.</p><p>A train travelling between Giza and Fayoum on Sunday ran into the back of another train on the Cairo-to-Aswan route, causing the latter to derail onto a countryside road in al-Ayyat district. Following the crash, President Abdel Fattah el-Sisi directed authorities to conduct an urgent investigation to “hold accountable anyone found to have been negligent”.</p><p>The Egyptian parliament’s Transport and Communications Committee summoned Transport Minister Kamel el-Wazir to an emergency session on Tuesday to investigate. Meanwhile, opposition voices have escalated demands for political accountability, ranging from criticising the minister to demanding the dismissal of the entire government.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/10/deadly-egypt-train-collision-prompts-calls-for-political-accountability?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/10 17:39</span>
+    </div>
+
+    
+    <p class="title-ja">コンゴ民主共和国、「卑怯者」として兵士66人に死刑判決</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cmreye1q3dnjo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">DR Congo sentences 66 soldiers to death for being 'cowards'</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>地元メディアの報道によると、コンゴ民主共和国で少なくとも66人の兵士が、卑劣さ、反乱、命令への服従拒否などの罪で死刑判決を受けた。</p><p>この判決は、コンゴ民主共和国東部、北キブ州ワリカレの軍事法廷で行われた71人の兵士に対する裁判に続いて行われた。兵士4人は無罪となったが、もう1人は懲役10年の判決を受けた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>軍は、この裁判はコンゴ民主共和国東部で武装勢力と戦う兵士たちの規律を改善することを目的としていると述べた。</p><p>この地域は数十年にわたる紛争に耐え、政府軍とM23グループを含む反政府連合である国家再建戦線（FRN）との間で戦闘が続いている。</p><p>伝えられるところによると、兵士らは10月20日にワリカレでFRN戦闘員との衝突中に陣地を放棄して逃走したとして逮捕された。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>At least 66 soldiers have been sentenced to death in the Democratic Republic of Congo for cowardice, mutiny and refusing to obey orders, local media report.</p><p>The sentences followed a trial of 71 soldiers before a military court in Walikale, in North Kivu province, in eastern DR Congo. Four soldiers were acquitted, while another was sentenced to 10 years in prison.</p><p>The army said the trial was intended to improve discipline among troops as they battle armed groups in eastern DR Congo.</p><p>The region has endured decades of conflict, with fighting continuing between government forces and the Front for the Refoundation of the Nation (FRN), a rebel coalition that includes the M23 group.</p><p>The soldiers were reportedly arrested on 20 October in Walikale, where they were accused of abandoning their positions and fleeing during clashes with FRN fighters.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cmreye1q3dnjo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-11-11";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
