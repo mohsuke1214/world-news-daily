@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年11月12日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/12 02:09</span>
+    </div>
+
+    
+    <p class="title-ja">ヨーロッパで最もハッキングされた国は?なぜフランスはこれほど多くのサイバー攻撃の標的になっているのか</p>
+    <p class="title-en"><a href="https://www.france24.com/en/france/20261111-the-most-hacked-country-in-europe-why-is-france-the-target-of-so-many-cyberattacks" target="_blank" rel="noopener">The most hacked country in Europe? Why is France the target of so many cyberattacks</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>一部のアナリストによると、フランスのスーパーマーケットの冷蔵庫に対する「前例のない」ハッキングは、この国をヨーロッパで最もハッキングされた国となった一連の大規模なサイバー攻撃の最新のものだという。サイバー攻撃は世界的に増加傾向にありますが、なぜフランスがこれほど狙われやすいのでしょうか?</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The “unprecedented” hacks of French supermarket refrigerators were the latest in a series of major cyberattacks that have made the country the most hacked in Europe, according to some analysts. Cyberattacks are on the rise globally, but why is France such a ready target?</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/france/20261111-the-most-hacked-country-in-europe-why-is-france-the-target-of-so-many-cyberattacks" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/12 01:20</span>
+    </div>
+
+    
+    <p class="title-ja">「とにかく高すぎる」：住宅と賃金がスペインのストライキの中心</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/11/its-just-too-expensive-housing-and-wages-at-the-heart-of-spains-strike?traffic_source=rss" target="_blank" rel="noopener">‘It’s just too expensive’: Housing and wages at the heart of Spain’s strike</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>スペイン・マドリード – マドリード中心部では、経営者らが先月パリで勃発した暴動に注目していたようだ。</p><p>全国規模のストライキのさなか、水曜日には多くの人が店の窓に板を張った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>警察はいくつかの主要なデパートの前に並んでいます。 At others, police vans protect the entrances.</p><p>これはスペインで 14 年ぶりの全国ゼネストであり、手頃な価格の住宅の不足がすべての原因となっています。</p><p>市中心部のグランビア通りを封鎖したデモ参加者らは怒りと不満を募らせている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Madrid, Spain – In central Madrid, business owners seemed to have taken note of the riots that erupted in Paris last month.</p><p>Amid a nationwide strike , many have boarded up their shop windows on Wednesday.</p><p>Police are lined up in front of some major department stores. At others, police vans protect the entrances.</p><p>This is the first national general strike in Spain in 14 years, and it is all about the lack of affordable housing .</p><p>The protesters who have blocked the city’s central Gran Via are angry and frustrated.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/11/its-just-too-expensive-housing-and-wages-at-the-heart-of-spains-strike?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/12 01:05</span>
+    </div>
+
+    
+    <p class="title-ja">アルゼンチンの弁護士、フォークランド石油事件で英国の主権主張を嘲笑</p>
+    <p class="title-en"><a href="https://www.theguardian.com/uk-news/2026/nov/11/argentine-lawyer-mocks-uk-sovereignty-claim-in-falklands-oil-case" target="_blank" rel="noopener">Argentinian lawyer mocks UK’s sovereignty claim in Falklands oil case</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>弁護士、英国が海洋の一部に対して国王に主権があるという歴史的教義を信じるのは間違っていると主張</p><p>アルゼンチンは国際法廷で、英国がフォークランド諸島周辺の海域をドミニウム・マリス・ブリタニチとして扱う17世紀の植民地大国として行動することを許されるべきではないと述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ハンブルクでの公聴会でアルゼンチン代表のマルセロ・コーエン氏は、英国王室が海洋の広大な部分に対して主権を有するという歴史的教義を明らかに信じているとして英国を嘲笑した。</p><p>アルゼンチンは、さらなる仲裁に先立ち、英国にフォークランド諸島北盆地での石油掘削の停止を強制する判決を国際海洋法裁判所（イトロス）に申請した。</p><p>シーライオン油田は、アルゼンチンが長年主権を主張している英国の海外領土であるフォークランド諸島の北約210マイルにある。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Lawyer says Britain wrong to believe in historic doctrine that crown has sovereignty over parts of oceans</p><p>Britain should not be permitted to act as a 17th-century colonial power treating the waters around the Falkland Islands as a Dominium maris Britannici , Argentina has told an international tribunal.</p><p>Marcelo Kohen, representing Argentina at a hearing in Hamburg, mocked Britain for apparently believing in the historic doctrine that the British crown has sovereignty over expansive parts of the oceans.</p><p>Argentina has applied to the international tribunal for the law of the sea (Itlos) for a ruling that would force Britain to suspend the drilling for oil in the North Basin of the Falkland Islands ahead of further arbitration.</p><p>The Sea Lion oilfield is about 130 miles north of the Falkland Islands, a British overseas territory over which Argentina has a longstanding sovereignty claim.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/uk-news/2026/nov/11/argentine-lawyer-mocks-uk-sovereignty-claim-in-falklands-oil-case" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/12 00:05</span>
+    </div>
+
+    
+    <p class="title-ja">ロシアとウクライナの交渉は戦後安全保障に向かうも進展なく終了</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/ck792we7zrz4o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Russia-Ukraine talks turn to post-war security but end without breakthrough</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ウクライナ戦争終結を目指すロシア、ウクライナ、米国のアブダビでの三者協議は２日目で終了した。</p><p>アメリカ側は「何らかの突破口」が見られると述べたが、ロシアの侵略によって引き起こされた約5年にわたる戦争を終わらせる突破口の兆しはなかった。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ウクライナ交渉チームのデービッド・アラハミア氏は、2月以来となる今回の交渉は「最も困難なものの一つだった」と語った。</p><p>「ロシア側は非常に厳しい指示を出してきたと思うので、議論を和らげるのは極めて困難だった」と同氏は語った。しかし同氏は「良い勢い」を感じているとも付け加え、第２ラウンドの協議をできるだけ早く開催するよう求めた。</p><p>モスクワとキエフの両国は、大規模な捕虜交換が進行中で、間もなく実施される可能性があることを確認した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Trilateral talks in Abu Dhabi between Russia, Ukraine and the US aimed at ending the war in Ukraine have concluded after a second day.</p><p>Although the American side said they saw "some openings", there was no hint of any breakthroughs to end the nearly five year-long war sparked by Russia's invasion.</p><p>Davyd Arakhamia from Ukraine's negotiating team said that this round of talks - the first since February - "was one of the hardest."</p><p>"I believe the Russians came with very strict directives, so it was extremely difficult to soften the discussion," he said. But he added that he felt "good momentum" and urged for a second round of talks to be organised as soon as possible.</p><p>Both Moscow and Kyiv confirmed that a large-scale prisoner of war exchange was in the works and could be carried out soon.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/ck792we7zrz4o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/12 01:59</span>
+    </div>
+
+    
+    <p class="title-ja">イラン支援容疑者3人がフェアフォード空軍事件を含む攻撃を計画、米国が発表</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c3rryrryk59zo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Three Iran-backed suspects plotted attacks including RAF Fairford incident, US says</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米国司法省（DOJ）は、米国と欧州での一連の陰謀に関与したとして、イラン支援工作員3名を起訴したと発表した。</p><p>司法省は、イラン工作員らが最近「英国の空軍基地でテロ計画を画策した」と述べ、米軍が駐留する英国のフェアフォード空軍基地近くで９月に起きた大規模事件に関与していたと述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>3人はロンドン、アムステルダム、パリを含む18件の襲撃および襲撃未遂に関与した疑いで司法省から告発されている。一部の事件は男らがFaceTimeを通じて指示したものだと言われている。</p><p>司法省は、彼らはハラカット・アハブ・アル・ヤミン・アル・イスラミヤ（HAYI）というグループの名前で活動していたと述べた。</p><p>司法省は火曜日、イラン人のモフセン・モハジェリ氏、イラク国籍のモハマド・アリ・アル・ハサニ氏、イランとイラクの二重国籍者モハマド・バケル・サード・ダウッド・アル・サーディ氏が未封印の起訴状で起訴されたと発表した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The US Department of Justice (DOJ) has announced charges against three Iran-backed operatives that it alleges were involved in a string of plots in the US and Europe.</p><p>The DOJ said Iranian agents most recently "orchestrated a terrorist plot at an air force base in the United Kingdom", saying they were involved in the major incident in September near RAF Fairford in the UK, where US armed forces were stationed.</p><p>The three men have been accused by the DOJ of being involved in 18 attacks and attempted attacks, including in London, Amsterdam and Paris. Some of the incidents were said to be directed by the men over FaceTime.</p><p>The DOJ said they acted in the name of the group Harakat Ashab al-Yamin al-Islamiya (HAYI).</p><p>Iranian Mohsen Mohajeri, Iraqi national Mohammad Ali al-Hassani and dual Iranian-Iraqi citizen Mohammad Baqer Saad Dawood al-Saadi were charged in an indictment unsealed on Tuesday, the DOJ said.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c3rryrryk59zo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/12 01:58</span>
+    </div>
+
+    
+    <p class="title-ja">UAEでのロシア・ウクライナ協議で大規模な捕虜交換合意が確保</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/11/russia-ukraine-talks-in-uae-secure-major-prisoner-exchange-deal?traffic_source=rss" target="_blank" rel="noopener">Russia-Ukraine talks in UAE secure major prisoner exchange deal</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>UAEでのロシア・ウクライナ協議で大規模な捕虜交換合意が確保</p><p>ロシアとウクライナは、米国の仲介によるアブダビでの２日間の会談を経て、大規模な捕虜交換に合意した。しかし、領土と長期安全保障協定をめぐって両国の意見が依然として分かれており、交渉は戦争終結に向けた進展がないまま終わった。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Russia-Ukraine talks in UAE secure major prisoner exchange deal</p><p>Russia and Ukraine have agreed to a major prisoner exchange following two days of US-mediated talks in Abu Dhabi. But negotiations ended without a breakthrough on ending the war as the two sides remain divided over territory and long-term security arrangements.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/11/russia-ukraine-talks-in-uae-secure-major-prisoner-exchange-deal?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/12 01:45</span>
+    </div>
+
+    
+    <p class="title-ja">イラン攻撃にイランが利用されればヨーロッパの米軍基地を攻撃するだろうと治安長官が語る</p>
+    <p class="title-en"><a href="https://www.france24.com/en/france/20261111-tehran-will-strike-us-bases-in-europe-if-used-to-attack-iran-security-chief-says" target="_blank" rel="noopener">Tehran will strike US bases in Europe if used to attack Iran, security chief says</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イラン治安長官のモーセン・レザエイ氏は水曜日、イランは欧州にある米軍基地がイスラム共和国に対する爆撃に使用された場合には攻撃するだろうと述べた。今月初めの中間選挙でドナルド・トランプ大統領率いる共和党が大敗したことを受けて、米国政府はイランに対する新たな攻撃を行うとの脅しを撤回するようになったようだ。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Iranian security chief Mohsen Rezaei said Wednesday that Tehran would attack US bases located in Europe if they were used to carry out bombing raids against the Islamic republic. The heavy defeat of US President Donald Trump's Republican Party in the midterm elections earlier this month seems to have pushed Washington to pull back its threats to carry out fresh strikes against Iran.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/france/20261111-tehran-will-strike-us-bases-in-europe-if-used-to-attack-iran-security-chief-says" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/11 21:21</span>
+    </div>
+
+    
+    <p class="title-ja">下院はヘグセスの弾劾を事実上終わらせる。そして英国攻撃を計画した容疑で3人の男が起訴される</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/11/g-s1-152949/up-first-newsletter-pete-hegseth-jim-jordan-iran-backed-trio-us-bases" target="_blank" rel="noopener">House effectively ends Hegseth impeachment. And, 3 men accused of plotting U.K. attacks</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>下院は、ピート・ヘグセス国防長官を弾劾しようとする共和党議員トーマス・マッシーの取り組みを事実上潰した。同会議所は211対204の賛成多数で弾劾条項を下院司法委員会に送り返し審査することを可決した。この動きは、弾劾に関する議場採決の可能性を回避し、現在の議会が終了するまでに弾劾が取り上げられないことを事実上保証する。マッシー氏は月曜日、弾劾記事を再提出し、イランとの戦争とカリブ海と東太平洋での米国の麻薬密輸船に対する攻撃に関連した重大な犯罪でヘグセス氏を非難していた。</p><p>オハイオ州のジム・ジョーダン下院議員が新しい少数派下院リーダーとなる。下院共和党は昨日、先週の中間選挙での敗北を受けて辞任するマイク・ジョンソン議長の後任人事を投票した。 62歳のジョーダン氏は、下院監視委員会と司法委員会での経験を活かしている。民主党がトランプ大統領とその政権に対する調査を計画している中、２つの委員会は新議会で中心的な役割を果たす構えだ。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The House has effectively killed Republican Rep. Thomas Massie's effort to impeach Defense Secretary Pete Hegseth. The chamber voted 211 to 204 to send the impeachment articles back to the House Judiciary Committee for review. The move circumvents any potential floor vote on the impeachment and virtually ensures it won't be addressed before the current Congress session ends. Massie had reintroduced the impeachment articles on Monday, accusing Hegseth of high crimes related to the war with Iran and U.S. strikes against drug boats in the Caribbean and Eastern Pacific.</p><p>Rep. Jim Jordan of Ohio will be the new minority leader of the House. House Republicans voted yesterday to replace Speaker Mike Johnson, who is stepping down after last week's midterm losses. At 62, Jordan brings experience from the House Oversight and Judiciary committees. The two panels are poised to play a central role in the new Congress as Democrats plan investigations into President Trump and his administration.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/11/g-s1-152949/up-first-newsletter-pete-hegseth-jim-jordan-iran-backed-trio-us-bases" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/12 01:38</span>
+    </div>
+
+    
+    <p class="title-ja">インドネシア副大統領、与党同盟に亀裂の兆しが出るなか辞任</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cmvgxgz87qqro?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Indonesia's vice president resigns amid signs ruling alliance is fraying</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>インドネシアのジブラン・ラカブミン・ラカ副大統領が辞表を提出したと側近がBBCに語ったところ、これはプラボウォ・スビアント大統領を権力の座に押し上げた政治同盟にさらに緊張を与える可能性があるとのことだ。</p><p>これは、インドネシアの最高裁判所が、ジブランの2024年の選挙キャンペーン中に使用された高校の文書が無効であるとの判決を下した後のことである。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>この判決を受けて、100人以上の議員がジブラン氏の弾劾手続きに道を開く可能性のある議会の発議を支持するようになった。</p><p>側近のブディ・アリエ氏は、ジブラン氏の辞任届は水曜日にプラボウォ氏に直接提出されたと述べた。受け入れられたかどうかは不明のままだ。</p><p>ジブラン氏は、高校卒業資格が選挙に立候補するための法的要件を満たしているかどうかについて、長い間論争に直面してきた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Indonesia's Vice-President Gibran Rakabuming Raka has submitted his resignation, an aide has told the BBC, in a move which could further strain the political alliance that helped propel President Prabowo Subianto to power.</p><p>It comes after Indonesia's Supreme Court ruled that a high-school document used during Gibran's 2024 election campaign was invalid.</p><p>The ruling prompted more than 100 lawmakers to support a parliamentary initiative that could have paved the way for proceedings to impeach Gibran.</p><p>The aide, Budi Arie, said Gibran's resignation letter was submitted directly to Prabowo on Wednesday. It remains unclear if it has been accepted.</p><p>Gibran has long faced controversy over whether his high school qualifications met legal requirements to run for office.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cmvgxgz87qqro?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/12 01:06</span>
+    </div>
+
+    
+    <p class="title-ja">トルコでのCOP31会談：米国、中国、インドの首脳はサミットを欠席</p>
+    <p class="title-en"><a href="https://www.france24.com/en/cop31-talks-in-turkey-leeaders-from-us-china-and-india-skip-summit" target="_blank" rel="noopener">COP31 talks in Turkey: Leaders from US, China and India skip summit</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>私たちの環境編集者である Valérie Dekimpe はさらに詳しく話しています。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Valérie Dekimpe, our environment editor, has more.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/cop31-talks-in-turkey-leeaders-from-us-china-and-india-skip-summit" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/10 23:16</span>
+    </div>
+
+    
+    <p class="title-ja">「人間を統治する神のようなもの」：多くの脱北者は北朝鮮の金氏の娘を確実な後継者とみなしている</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/10/g-s1-152795/like-gods-reigning-over-humans-many-defectors-see-daughter-of-north-koreas-kim-as-heir-apparent" target="_blank" rel="noopener">'Like gods reigning over humans': Many defectors see daughter of North Korea's Kim as heir apparent</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ファイル - 北朝鮮政府が提供したこの写真では、2026年3月19日木曜日、北朝鮮の軍事訓練基地を訪問する指導者の金正恩氏（中央）とキム・ジュエと名付けられたとされる娘。独立系ジャーナリストには、北朝鮮政府が配布したこの画像に描かれている出来事を取材するアクセスが与えられていなかった。この画像の内容は提供されたものであり、独自に検証することはできません。 朝鮮通信社/KCNA、KNS経由、AP経由 キャプションを隠す</p><p>韓国・ソウル -- 3年前に北朝鮮から逃亡するまで、キム・ユミさんは国営テレビが金正恩朝鮮労働党委員長と幼い娘の姿を映すたびに深い不満を感じていた。そのメッセージは明白で憂慮すべきものだと彼女は感じた。北朝鮮は、今度は金氏の娘への最終的な権力の世襲への基礎を築いているのだ。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>金王朝の権力掌握に公の場で疑問を呈することは、厳しい迫害を意味する。家族の漁業を台無しにした厳格なパンデミック規制にすでに怒りを感じていた彼女は、家族とともにボートで韓国に亡命した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>FILE - In this photo provided by the North Korean government, its leader Kim Jong Un, center, and his daughter, reportedly named Kim Ju Ae, visit a military training base in North Korea, Thursday, March 19, 2026. Independent journalists were not given access to cover the event depicted in this image distributed by the North Korean government. The content of this image is as provided and cannot be independently verified. 朝鮮通信社/KCNA via KNS via AP hide caption</p><p>SEOUL, South Korea — Until she fled North Korea three years ago, Kim Yumi felt deeply frustrated whenever state TV showed leader Kim Jong Un with his young daughter. The message, she felt, was clear and worrying: North Korea was laying the groundwork for an eventual hereditary transfer of power, this time to Kim's daughter.</p><p>Publicly questioning the Kim dynasty's hold on power would mean severe persecution. Already angered by draconian pandemic regulations that ruined her family's fishing business, she defected to South Korea by boat with her family.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/10/g-s1-152795/like-gods-reigning-over-humans-many-defectors-see-daughter-of-north-koreas-kim-as-heir-apparent" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/10 21:08</span>
+    </div>
+
+    
+    <p class="title-ja">ジョン・ケリー氏、米国とその他の世界はグリーンエネルギー分野で中国の先導に追随する必要があると語る</p>
+    <p class="title-en"><a href="https://www.theguardian.com/environment/2026/nov/10/china-green-energy-john-kerry-cop31" target="_blank" rel="noopener">US and rest of world must follow China’s lead on green energy, says John Kerry</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>元米国務長官、ほとんどの国が「よろよろと進んでいる」一方、中国政府は「大幅に加速している」と発言</p><p>中国は化石燃料からの脱却で世界をリードしており、米国を含む世界の他の国々も今は追従しなければならない、とジョン・ケリー元米国務長官はガーディアン紙に語った。中国が今年の気候変動サミットにどのように取り組むつもりなのか、まさに疑問に思っている警察ウォッチャーたち。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>今年はトルコで気候変動会議が開催されるCop31が開幕する中、中国がついに長い間避けてきた指導的役割に踏み出すかどうかについて多くの憶測が飛び交っている。 2026年3月に採択された最新の「5カ年計画」の中で、中国は初めて「世界の気候ガバナンスに積極的に参加し、主導する」ことを約束した。 COP31は、中国政府が歴史的には消極的だったこのレトリックを実行に移す用意ができている最初の兆候となる可能性がある。</p><p>グリーンエネルギーは、パンデミック後の低迷する中国経済を軌道に乗せる輸出原動力の重要な要素である。輸出の成功は、国内の一般消費を大幅に押し上げることができなかったこととは対照的であり、この構造的弱点が指導者たちを絶えず悩ませてきた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Former US secretary of state says most nations are ‘stumbling along’ while Beijing has ‘hugely accelerated’</p><p>China is leading the world in moving away from fossil fuels , and the rest of the globe – including the US – must now follow, the former US secretary of state John Kerry has told the Guardian, as Cop watchers wonder exactly how China is going to approach this year’s climate summit.</p><p>As Cop31 opens – this year the climate conference is in Turkey – there is plenty of speculation about whether China will finally step into the leadership role that it has long avoided. In its latest “five-year plan” adopted in March 2026, China for the first time pledged to “actively participate in and lead global climate governance”. Cop31 could provide the first indications Beijing is ready to put that rhetoric into action, something it has historically been reluctant to do.</p><p>Green energy is a vital component of the export engine that has kept China’s sluggish post-pandemic economy on track. The success of its exports stands in contrast to its failure to significantly boost domestic general consumption, a structural weakness that has persistently vexed leaders.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/environment/2026/nov/10/china-green-energy-john-kerry-cop31" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/12 01:08</span>
+    </div>
+
+    
+    <p class="title-ja">ブラジル選挙裁判所、メタに130万ドルの罰金、意図的な選挙偏向はないと認定</p>
+    <p class="title-en"><a href="https://www.france24.com/en/brazil-electoral-court-fines-meta-1-3-mn-sees-no-deliberate-election-bias" target="_blank" rel="noopener">Brazil electoral court fines Meta $1.3 MN, sees no deliberate election bias</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>リオ特派員のヤン・オノシュコ氏はさらに詳しく語ります。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Jan Onoszko, our correspondent in Rio, has more.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/brazil-electoral-court-fines-meta-1-3-mn-sees-no-deliberate-election-bias" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/12 00:15</span>
+    </div>
+
+    
+    <p class="title-ja">デンマークの「真っ当な人種差別的」住宅法との闘いの内部</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/features/2026/11/11/they-see-me-as-non-western-top-court-to-rule-on-denmarks-housing-law?traffic_source=rss" target="_blank" rel="noopener">Inside the fight against Denmark’s ‘straight up racist’ housing law</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>デンマーク、コペンハーゲン – デンマークの首都の多文化でトレンディな地区、ノレブロの落書きで覆われた橋の下で、サラはヒジャブに触ります。</p><p>「私はイスラム教徒です。政府やメディアの言い方からすると、彼らは私を西洋人ではないと見ています」と、デンマークで生まれ育った46歳の彼女は本名を明かさないように求めた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>彼女は、この国のいわゆる「ゲットー法」は、人口の4パーセント強を占めるイスラム教徒を弾圧する手段であると信じている。</p><p>11月23日、デンマーク最高裁判所は、住民の半数以上が「非西洋人」に分類される地域の非営利住宅の売却、取り壊し、または転用を強制する可能性がある同法の将来を形作る可能性のある訴訟について判決を下す予定である。</p><p>デンマークでは、非営利の住宅に 100 万人以上が宿泊でき、誰でも利用できます。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Copenhagen, Denmark – Under a graffiti-covered bridge in Norrebro, a multicultural, trendy district of the Danish capital, Sara touches her hijab.</p><p>“I am Muslim. The way the government and the media speak, they see me as not Western,” says the 46-year-old, who was born and raised in Denmark and asked not to use her real name.</p><p>She believes the country’s so-called “ghetto law” is a way of cracking down on Muslims, who account for little more than 4 percent of the population.</p><p>On November 23, Denmark’s Supreme Court is due to rule on a case that could shape the future of that law, which can force the sale, demolition or conversion of nonprofit homes in areas where more than half of residents are classed as “non-Western”.</p><p>In Denmark, nonprofit housing accommodates more than one million people and is open to all.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/features/2026/11/11/they-see-me-as-non-western-top-court-to-rule-on-denmarks-housing-law?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/11 23:00</span>
+    </div>
+
+    
+    <p class="title-ja">ジャーナリスト殺害はエクアドルの状況悪化を浮き彫りにする</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/nov/11/ecuador-journalist-killing" target="_blank" rel="noopener">Killing of journalist underscores deteriorating conditions in Ecuador</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ラテンアメリカの国を​​最も暴力的な国に変えたギャング抗争のさなか、トマス・ベルトラン氏が射殺された</p><p>エクアドル人ジャーナリストが射殺されたとき、日曜日の夜、トマス・ベルトランさんは車を操作してガレージに入れていた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ベルトラン氏は、マナビ県の小都市カルセタに関するニュースを掲載するフェイスブックページを運営した。カルセタの太平洋沿岸は、ラテンアメリカで最も安全な国の一つを最も暴力的な国の一つに変えた麻薬密売ルートを巡るギャング抗争の重要な火種となっている。</p><p>警察と検察庁はこの事件について多くを語っておらず、犯人については武装していて現場から逃走したこと以外はほとんど知られていない。ベルトラン氏は以前にも地元当局が関与した汚職疑惑を報じていたが、この犯罪がベルトラン氏の仕事に関連しているかどうかも不明だった。</p><p>それにもかかわらず、多くの報道の自由団体はすでにエクアドルでジャーナリストの状況が劇的に悪化した最新の例として彼の殺害を挙げている。同国では昨年だけで6人のジャーナリストが殺害された。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Tomás Beltrán was shot dead amid gang warfare that has turned Latin American country into one of its most violent</p><p>Tomás Beltrán was manoeuvring his car into his garage on Sunday night when the Ecuadorian journalist was shot dead.</p><p>Beltrán ran a Facebook page with news about Calceta, a small city in the province of Manabí, whose Pacific coastline has made it a key flashpoint in the gang warfare over drug trafficking routes that has transformed one of Latin America’s safest countries into one of its most violent .</p><p>Police and the public prosecutor’s office have not said much about the case, and little was known about the killers except that they were armed and then fled the scene. It was also unclear whether the crime was linked to Beltrán’s work, though he had previously reported allegations of corruption involving local authorities.</p><p>Regardless, many press freedom groups already cite his murder as the latest example of how conditions for journalists have deteriorated dramatically in Ecuador. Six journalists were killed in the country last year alone.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/nov/11/ecuador-journalist-killing" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/11 22:24</span>
+    </div>
+
+    
+    <p class="title-ja">カナダで母親と娘が襲撃され4頭のハイイログマが死亡</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cwg5r8zrm11mo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Four grizzly bears killed in Canada after fatal attack on mother and daughter</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>カナダのブリティッシュコロンビア州で母親と娘が襲われ、ハイイログマ4頭が死亡した。</p><p>ジェニファー・バルカラスさん（48歳）と娘のセラ・リードさん（20歳）は今月初め、ベラクーラのトレイルエリアで午後の散歩に出かけた後に死亡した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ブリティッシュ・コロンビア州自然保護局（BCCOS）は彼らの死に関する調査を開始し、その後の法医学検査により、雌豚とその子3頭が襲撃の原因であることが確認された。</p><p>BCCOSのジェフ・タイヤ監察官は火曜日の最新情報で、公衆を保護するために「州の人間と野生動物の紛争対応ガイドラインに従って」4基すべてが破壊されたと述べた。</p><p>カナダでハイイログマに襲われた疑いで母と娘死亡</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Four grizzly bears have been killed in connection with a fatal attack on a mother and daughter in the Canadian province of British Columbia.</p><p>Jennifer Balcarras, 48, and her daughter Selah Reed, 20, died earlier this month after going on an afternoon walk in a trail area in Bella Coola.</p><p>The British Columbia Conservation Office Service (BCCOS) launched an investigation into their deaths and forensic testing has since confirmed a sow and her three cubs were responsible for the attack.</p><p>All four were destroyed "in accordance with provincial human-wildlife conflict response guidelines" to protect the public, BCCOS Inspector Jeff Tyre said in an update on Tuesday.</p><p>Mother and daughter die after suspected grizzly bear attack in Canada</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cwg5r8zrm11mo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/12 02:23</span>
+    </div>
+
+    
+    <p class="title-ja">ユースオリンピックにブレイクダンサーが出場するセネガルからのご挨拶</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/11/g-s1-150228/senegal-youth-olympic-games-breakdancing" target="_blank" rel="noopener">Greetings from Senegal, where breakdancers are competing in the Youth Olympics</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>セナガルの首都ダカールでは、6人のティーンエイジャーが最高のブレイクダンスの動きを練習している間、ポータブルスピーカーからヒップホップ音楽が流れていた。彼らはすねを滑らせて空中に飛び上がり、かかとをつかんで空中ポーズをとりました。</p><p>セネガルのブレイクダンサーたちは、今月、同国の歴史的な開催地となるユースオリンピック競技大会に先立ち、技術を磨いていた。アフリカの地でオリンピック競技が開催されるのは初めて。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>上の写真は先月、15歳のスザンヌ・トゥーレがブレイクダンスのポーズをとっているときに撮ったものです。彼女はセネガル国立スポーツダンス＆ブレイクチームの唯一の女の子です。 3年前、彼女の弟は彼女にブレイクダンスを紹介した。</p><p>セネガルチームのダンサーたちは、ムバラクスやイェラなどの国民的スタイルの伝統的な動きをルーチンに混ぜ込み、風車のような動きで腕と脚を旋回させます。 「私たちのルーティンにはアメリカとヨーロッパの影響を感じることができますが、アフリカのダンスもあります。これらのアフリカのダンスをブレイクに混ぜることです」とコーチのフランシス・シメオン・ゴミスは言う。</p><p>彼らはこれを、ダンスフロアで自国が提供できるものを世界に示すチャンスと捉えており、本拠地でメダルを獲得したいと考えている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Hip-hop music blasted over a portable speaker while half-a-dozen teenagers practiced their best breakdancing moves in Senagal's capital Dakar. They glided on their shins and jumped into the air, clutched their heels and struck midair poses.</p><p>Senegal's breakdancers were honing their craft ahead of the country's historic hosting of the Youth Olympic Games this month. It's the first time an Olympic event is being held on African soil.</p><p>I took the photo above last month as 15-year-old Suzanne Toure struck a breakdancing pose. She is the only girl on the Senegal National Sport Dance and Break Team. Three years ago, her little brother introduced her to breakdancing.</p><p>Dancers on the Senegalese team mix traditional moves into their routines from national styles such as mbalax and Yela , swirling their arms and legs in a windmill-like motion. "You can sense some American and European influence in our routines, yes, but there are also African dances. It's about mixing these African dances into the breaking," says coach Francis Siméon Gomis.</p><p>They see this as their chance to show the world what their nation can offer on the dance floor, and hope to win a medal on home turf.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/11/g-s1-150228/senegal-youth-olympic-games-breakdancing" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/12 00:34</span>
+    </div>
+
+    
+    <p class="title-ja">ケニア、最後のエボラ出血熱患者を退院、無病状態を待つ</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/11/kenya-discharges-last-ebola-patient?traffic_source=rss" target="_blank" rel="noopener">Kenya discharges last Ebola patient, awaits disease-free status</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ケニアは最後のエボラ出血熱患者を解放し、エボラ出血熱から解放されたと宣言されるまでの42日間のカウントダウンを開始した。</p><p>10月6日にナイロビで最初の感染者が確認されてから5週間以上が経過した水曜日、アデン・ドゥアーレ保健大臣がナイロビでの記者会見で発表した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>デュエール氏は、ケニアは12月23日の期限が来るまで予防措置を継続すると述べた。</p><p>保健省は以前、確認された9人の感染者全員が最初の患者の連絡先リストに関連付けられていたと指摘し、アウトブレイクは制御下にあると自信を表明していた。これは、市中感染がなかったことを示しています。最後の症例は10月19日に記録されました。</p><p>最初の患者はコンゴ民主共和国（DRC）からウガンダを経由して旅行し、家族4人と医療従事者4人にウイルスを感染させた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Kenya has released its last Ebola patient and begun a 42-day countdown to be declared free of the disease.</p><p>Health Minister Aden Duale made the announcement at a news conference in Nairobi on Wednesday, more than five weeks after the country recorded its first case on October 6.</p><p>Duale said Kenya would continue to exercise prevention measures until the December 23 date is reached.</p><p>The Ministry of Health previously expressed confidence that the outbreak was under control, noting that all nine confirmed cases were linked to the first patient’s contact list. This indicated that there had been no community transmission. The last case was recorded on October 19.</p><p>The first patient travelled from the Democratic Republic of the Congo (DRC) through Uganda, and transmitted the virus to four family members and four healthcare workers.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/11/kenya-discharges-last-ebola-patient?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-11-12";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
