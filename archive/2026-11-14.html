@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年11月14日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/14 01:47</span>
+    </div>
+
+    
+    <p class="title-ja">11月13日のパリ攻撃：11年後、フランスが犠牲者に追悼の意を表する</p>
+    <p class="title-en"><a href="https://www.france24.com/en/november-13-paris-attacks-eleven-years-later-france-pays-tribute-to-victims" target="_blank" rel="noopener">November 13 Paris attacks: Eleven years later, France pays tribute to victims</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>あれから11年が経ち、フランスは11月13日の攻撃の犠牲者に追悼の意を表する。今週金曜日、フランス当局、被害者団体、家族らが集まり、2015年11月13日にパリで起きた襲撃事件で死亡した人々に追悼の意を表した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Eleven years on, France pays tribute to the victims of the November 13 attacks. French officials, victims’ associations and families gathered this Friday to pay their respects to those killed in the attacks in Paris on November 13, 2015.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/november-13-paris-attacks-eleven-years-later-france-pays-tribute-to-victims" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/14 01:44</span>
+    </div>
+
+    
+    <p class="title-ja">ロシアで自動車爆破、軍人死亡、元ウクライナ首相顧問が負傷</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/13/car-bombings-in-russia-kill-military-officer-injure-ex-ukraine-pm-adviser?traffic_source=rss" target="_blank" rel="noopener">Car bombings in Russia kill military officer, injure ex-Ukraine PM adviser</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>サンクトペテルブルクで同様の襲撃で軍人が死亡した翌日、モスクワで自動車爆弾テロが発生し、ウクライナ元首相の顧問が重傷を負った。</p><p>金曜日の爆発は、ウクライナでの戦闘に参加した人々を標的とした一連の爆破・銃撃事件の最新のものとなった。ロシア政府はキエフの攻撃を非難している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ロシア調査委員会によると、モスクワの爆発では、以前はウクライナのミコラ・アザロフ元首相の顧問を務めていたセルゲイ・ザボロトニー氏が運転する車が直撃した。</p><p>ザヴォロトヌイ氏は負傷で入院したと委員会は付け加えた。刑事捜査が進行中である可能性のある容疑者は特定されていない。</p><p>アザロフ氏は、ウクライナのモスクワ寄りのヴィクトル・ヤヌコーヴィチ大統領の下で首相を務めたが、同大統領はデモ参加者によって大統領職を追われ、2014年2月にロシアに亡命した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A car bombing in Moscow has critically injured an adviser to Ukraine’s former prime minister a day after a similar attack killed a military officer in St Petersburg.</p><p>The explosion on Friday was the latest in a series of bombings and shootings that have targeted people involved in the fighting in Ukraine. Moscow has blamed Kyiv for the attacks.</p><p>The Moscow explosion struck a car driven by Sergei Zavorotnyi, who previously worked as an adviser to former Ukrainian Prime Minister Mykola Azarov, according to Russia’s Investigative Committee.</p><p>Zavorotnyi was hospitalised with injuries, the committee added. It did not identify possible suspects pending a criminal inquiry.</p><p>Azarov served as prime minister under Ukraine’s Moscow-friendly President Viktor Yanukovych, who was forced from office by protesters and fled to Russia in February 2014.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/13/car-bombings-in-russia-kill-military-officer-injure-ex-ukraine-pm-adviser?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/14 01:40</span>
+    </div>
+
+    
+    <p class="title-ja">ローゼンバーグ氏：妥協のないプーチン大統領、ウクライナとの和平要求を強める</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cq39glwprknjo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Rosenberg: Uncompromising Putin ups demands for peace with Ukraine</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ロシアのウラジーミル・プーチン大統領は、ウクライナの「永遠の平和」を望むと述べた。</p><p>それは、約5年前にロシアの隣国への全面侵攻を命令し、包括的な停戦の考えを拒否し続けている同じロシア大統領だ。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>そして、モスクワの見解では、平和の前提条件とは何でしょうか？</p><p>クレムリンは米国のスティーブ・ウィトコフ特使とジャレッド・クシュナー特使との会談後、「不可分な安全保障と平和の新たな長期的構造」と明言した。</p><p>クレムリンの言葉を翻訳すると、ロシアがロシアに利益をもたらす方法でヨーロッパの安全保障体制を変えたいと考えていることを意味する。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Russia's President Vladimir Putin says he wishes "eternal peace" for Ukraine.</p><p>That is the same Russian president who ordered the full-scale invasion of Russia's neighbour nearly five years ago and who continues to reject the idea of a comprehensive ceasefire.</p><p>And what, in Moscow's view, is a prerequisite for peace?</p><p>The Kremlin spelt it out after talks with US envoys Steve Witkoff and Jared Kushner: "A new, long-term architecture of indivisible security and peace."</p><p>Translated from Kremlin-speak, it means Moscow wants to change the security set-up of Europe in a way that benefits Russia.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cq39glwprknjo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/13 17:49</span>
+    </div>
+
+    
+    <p class="title-ja">チャールズの嵐により、南ヨーロッパ全域で洪水と飛行機の欠航が発生</p>
+    <p class="title-en"><a href="https://www.theguardian.com/environment/2026/nov/13/storm-charles-floods-flight-cancellations-southern-europe-weather" target="_blank" rel="noopener">Storm Charles causes floods and flight cancellations across southern Europe</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>先週、大雨と強風もカナダのブリティッシュコロンビア州全域に混乱を引き起こした</p><p>今週、チャールズ暴風雨がイベリア半島、特にポルトガルとスペインの極南部に破壊的な天候をもたらした。大雨と強い南西風が最初にポルトガルのマデイラ島に到達し、その後11月11日に本土に向かいました。フンシャル空港では時速84.5マイル（時速136キロ）の突風が記録され、降水量の合計は12時間で355ミリ（13.97インチ）に達した。リスボンでは水曜日に183便が欠航したが、これは通常の1日の輸送量の約3分の1に相当し、マドリード・バラハス空港では155便が欠航となった。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Heavy rain and strong winds have also caused disruption across British Columbia, Canada, over the last week</p><p>Storm Charles has brought destructive weather to the Iberian peninsula this week, particularly in Portugal and the far south of Spain. Heavy rain and strong south-westerly winds arrived first in the Portuguese island of Madeira, before the system headed towards the mainland on 11 November. A wind gust of 84.5mph (136 km/h) was recorded at Funchal airport, alongside rainfall totals reaching 355mm (13.97in) in 12 hours. In Lisbon, 183 flights were cancelled on Wednesday, about a third of its normal daily traffic, while Madrid Barajas airport had 155 cancellations.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/environment/2026/nov/13/storm-charles-floods-flight-cancellations-southern-europe-weather" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/14 01:34</span>
+    </div>
+
+    
+    <p class="title-ja">エルサレム日報：ガザで赤ちゃんが寒さで死亡</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/13/jerusalem-daily-baby-dies-from-cold-in-gaza?traffic_source=rss" target="_blank" rel="noopener">Jerusalem Daily: Baby dies from cold in Gaza</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>エルサレム日報：ガザで赤ちゃんが寒さで死亡</p><p>53カ国がイスラエルに援助容認を求める中、ガザで乳児が寒さで死亡。一方、ガザと占領下のヨルダン川西岸ではイスラエルによる攻撃が続いている。アルジャジーラのマラ・ラヤンが最新情報を伝えている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Jerusalem Daily: Baby dies from cold in Gaza</p><p>A baby dies from the cold in Gaza as 53 countries urge Israel to allow aid in. Meanwhile, Israeli attacks continue in Gaza and the occupied West Bank. Al Jazeera’s Marah Rayan has the latest.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/13/jerusalem-daily-baby-dies-from-cold-in-gaza?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/14 01:15</span>
+    </div>
+
+    
+    <p class="title-ja">ヨルダン川西岸：「国際貿易と金融支援がなければ、大規模な入植地は存在しなかったでしょう」</p>
+    <p class="title-en"><a href="https://www.france24.com/en/video/20261113-west-bank-without-international-trade-and-financial-support-large-settlements-would-not-exist-1" target="_blank" rel="noopener">West Bank: ‘Without international trade and financial support, large settlements would not exist’</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>フランスはパレスチナ占領地、すなわちヨルダン川西岸地区のイスラエル入植地との貿易を制限する法案を検討している。パリ・ドーフィーヌ・PSL大学名誉教授でパレスチナ国際法尊重学術団体会長のアイヴァル・エケランド氏が、アリソン・サージェント氏と提案された措置について話し合う。同氏は物品だけでなく、金融サービス、保険、観光などのサービスも対象とした制限を求めている。 「金融機関、保険、物品の提供などの支援がなければ、和解、大規模な和解は存在しなかったでしょう」と彼は主張する。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>France is considering legislation to restrict trade with Israeli settlements in the occupied Palestinian territories, namely the West Bank. Ivar Ekeland, Professor Emeritus at Paris Dauphine-PSL University and Chair of the Organization of Academics for the Respect of International Law in Palestine, discusses the proposed measures with Alison Sargent. He calls for restrictions to cover n ot only goods but also services, including financial services, insurance and tourism. "Without the support of financial entities, of insurance, of providing goods and so on, settlements, big settlements, would not exist," he argues.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261113-west-bank-without-international-trade-and-financial-support-large-settlements-would-not-exist-1" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/14 00:32</span>
+    </div>
+
+    
+    <p class="title-ja">イラン、バーレーンの米国レーダーシステムを標的に</p>
+    <p class="title-en"><a href="https://www.dw.com/en/iran-targeted-us-radar-system-in-bahrain/a-79942640?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Iran targeted US radar system in Bahrain</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イランは金曜日、イラン軍がバーレーンで米国の早期警戒レーダーシステムを攻撃したと発表した。しかし、米軍はこの主張を否定し、イランの攻撃用無人機２機を撃墜したと発表した。</p><p>イラン革命防衛隊（IRGC）は当初、空軍がバーレーン島のレーダーを標的にして破壊したと声明で述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>彼らは、これはホルムズ海峡沿岸のイランのシリク県にある通信塔に対する米国の攻撃に対する報復攻撃であると主張した。</p><p>数時間後、米軍中央軍はレーダーが破壊されたとする革命防衛隊の主張を否定し、過激派組織によるバーレーンを狙った２機の「一方通行攻撃ドローン」を停止させたと発表した。</p><p>このビデオを表示するには、JavaScript を有効にし、HTML5 ビデオをサポートする Web ブラウザへのアップグレードを検討してください。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Iran said its forces hit a US early warning radar system in Bahrain on Friday. However, the US military denied the claims and said it shot down two Iranian attack drones.</p><p>Iran's Revolutionary Guard Corps (IRGC) initially said in a statement that its air force targeted and destroyed the radar on the island of Bahrain.</p><p>They claimed this was a retaliatory attack in response to an US attack on a telecommunications tower in the Iranian county of Sirik, on the shores of the Strait of Hormuz.</p><p>Several hours later, the US military's Central Command, denied the IRGC's claim that the radar was destroyed and said it stopped two "one-way attack drones" targeting Bahrain by the militant group.</p><p>To view this video please enable JavaScript, and consider upgrading to a web browser that supports HTML5 video</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/iran-targeted-us-radar-system-in-bahrain/a-79942640?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/13 21:28</span>
+    </div>
+
+    
+    <p class="title-ja">国連監視機関、未査察のイラン核施設に「懸念を強める」</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cm75261e3pdko?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">UN watchdog 'increasingly concerned' over uninspected Iran nuclear site</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>国連の核監視機関は、査察が許可されていないイランの核施設について「懸念を強めている」と述べた。</p><p>イランは昨年６月、イスラエルが核施設への攻撃を開始する前日に、国際原子力機関（ＩＡＥＡ）に対し、イスファハーン市にウラン濃縮工場を設置する計画を通告した。米国も同月後半にストライキに参加した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>通信社が入手した報告書の中で、IAEAは正確な位置や核物質が含まれているかどうかは分からないと述べた。</p><p>最近の戦争の開始以来、イランはIAEA査察官の核施設への立ち入りを制限しており、同機関が濃縮ウラン備蓄を検証することを妨げている。</p><p>２０１５年の核合意に基づき、イランは濃縮ウランの備蓄量を３００キロ、濃縮度を純度３．６７％に制限することで合意した。その後、両方を上回りました。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The UN's nuclear watchdog has said it is "increasingly concerned" about a nuclear facility in Iran which it has not been allowed to inspect.</p><p>Iran informed the International Atomic Energy Agency (IAEA) of plans to set up the uranium enrichment plant in the city of Isfahan a day before Israel began attacking its nuclear sites last June. The US joined the strikes later that month.</p><p>In a report seen by news agencies, the IAEA said it does not know the exact location or whether it contains nuclear material.</p><p>Since the start of the latest war, Iran has restricted IAEA inspectors' access to its nuclear sites, preventing the agency from verifying its enriched uranium stockpile.</p><p>Under a 2015 nuclear deal, Iran agreed to limit its enriched uranium stockpile to 300kg and enrichment to 3.67% purity. It subsequently exceeded both.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cm75261e3pdko?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/14 02:02</span>
+    </div>
+
+    
+    <p class="title-ja">Nvidia 事件: 市場は AI に熱中できなくなりつつありますか?</p>
+    <p class="title-en"><a href="https://www.france24.com/en/americas/20261113-the-nvidia-affair-are-markets-about-to-fall-out-of-love-with-ai" target="_blank" rel="noopener">The Nvidia affair: Are markets about to fall out of love with AI?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ジェンセン・フアン氏の Nvidia からの退職は、AI ブームの背後にある脆弱性を明らかにしました。不倫問題、中国スパイ疑惑、米議員への証人喚問に伴う同氏の辞任を受けて株価が動揺する中、テクノロジーの本当の責任者は誰なのか、それに乗っかる巨大資本が混乱を乗り切れるのかという疑問が高まっている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Jensen Huang’s departure from Nvidia exposes the vulnerabilities behind the AI boom. As equities reel in response to his resignation following extramarital affairs, alleged Chinese espionage and a summons to testify before US lawmakers, questions mount over who is really in charge of tech and whether the immense capital riding on it can survive the turmoil.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/americas/20261113-the-nvidia-affair-are-markets-about-to-fall-out-of-love-with-ai" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/14 01:01</span>
+    </div>
+
+    
+    <p class="title-ja">インド・アッサム州でトラックとバスが衝突、少なくとも24人が死亡</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/13/truck-and-bus-crash-in-indias-assam-state-kills-at-least-24-people?traffic_source=rss" target="_blank" rel="noopener">Truck and bus crash in India’s Assam state kills at least 24 people</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>インド北東部アッサム州でコンテナトラックとバスが衝突し、少なくとも24人が死亡、11人が負傷したと警察が発表した。</p><p>事故は金曜日、州都ディスプールの東約225キロ（140マイル）にある、一角サイで有名なユネスコ世界遺産のカジランガ国立公園近くのゴラガート地区の高速道路で起きた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>アッサム州のヒマンタ・ビスワ・サルマ州首相がX番組で「悲劇的な事故に深く心を痛めている」と述べたように、死者の中には子供数名とバスの運転手も含まれていたと当局者らは述べた。</p><p>「この喪失の大きさに私たち全員が動揺しており、愛する人を亡くしたすべての家族に心を痛めています。彼らの痛みを和らげる言葉はありませんが、彼らが一人ではないことを知ってもらいたいです。この悲しみの時にアッサム州全員が彼らの側に立っています」とサルマさんは語った。</p><p>同氏は、地元当局が現場にいて「負傷者が遅滞なく最善の医療を受けられるよう、救援体制を個人的に監督している」と付け加えた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>At least 24 people have been ⁠⁠killed and 11 others injured, after a container truck collided with a bus in ⁠⁠India’s northeastern state of Assam, police said.</p><p>The crash happened on Friday on a highway in Golaghat district, near Kaziranga National Park, a UNESCO World Heritage Site famous for its one-horned rhinos, about 225km (140 miles) east of the state capital, Dispur.</p><p>Several children and the bus driver were among the dead, officials said, as Assam Chief Minister Himanta Biswa Sarma said on X he was “deeply distressed by the tragic accident”.</p><p>“The scale of this loss has shaken all of us, and my heart goes out to every family that has lost a loved one. No words can ease their pain, but I want them to know that they are not alone. All of Assam stands with them in this hour of grief,” Sarma said.</p><p>He added that local authorities were at the site and “personally overseeing the relief arrangements … to make sure the injured receive the best possible medical care without delay”.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/13/truck-and-bus-crash-in-indias-assam-state-kills-at-least-24-people?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/14 00:28</span>
+    </div>
+
+    
+    <p class="title-ja">中国は習・トランプ・プーチン首脳会談の話の中でロシアのジレンマに直面している</p>
+    <p class="title-en"><a href="https://www.dw.com/en/beijing-faces-its-russia-dilemma-amid-talk-of-xi-trump-putin-summit/a-79942427?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Beijing faces its Russia dilemma amid talk of Xi-Trump-Putin summit</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>中国、ロシア、米国の首脳による前例のない会談が、来週中国のテクノロジーの中心地である深センで開催されるアジア太平洋経済協力会議（APEC）首脳会議に合わせて開催される可能性がある。</p><p>中国はまだ会談の開催を確認していない。しかし、中国外務省当局者は最近、報道陣に対し、中国政府は関係者と「連絡を取っている」と語った。モスクワではクレムリンの代表者が「調整」の作業が進行中であると述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>首脳会談の可能性についての最も明確な示唆は、先週末ドナルド・トランプ米大統領によってもたらされた。トランプ大統領はフロリダの空港で記者団に対し、APECで予定されている会談の一つはロシアのウラジーミル・プーチン大統領と中国の習近平国家主席との会談になると「考えている」と述べた。</p><p>このビデオを表示するには、JavaScript を有効にし、HTML5 ビデオをサポートする Web ブラウザへのアップグレードを検討してください。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>An unprecedented meeting between the leaders of China , Russia and the United States could be happening on the sidelines of Asia-Pacific Economic Cooperation (APEC) summit in China's tech hub of Shenzhen next week.</p><p>China has yet to confirm that the meeting will take place. However, a Chinese Foreign Ministry official recently told the press that Beijing was "in communication" with relevant parties. In Moscow, a Kremlin representative said work on "coordination" was underway.</p><p>The clearest indication about the potential summit came from US President Donald Trump last weekend. Talking to reporters at a Florida airport, Trump said he "thinks" one of the meetings planned for APEC will be with Russian President Vladimir Putin and Chinese President Xi Jinping .</p><p>To view this video please enable JavaScript, and consider upgrading to a web browser that supports HTML5 video</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/beijing-faces-its-russia-dilemma-amid-talk-of-xi-trump-putin-summit/a-79942427?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/13 18:41</span>
+    </div>
+
+    
+    <p class="title-ja">Nvidia スキャンダル: ハワード・ラトニック氏、行動の欠如の疑いで圧力を受ける</p>
+    <p class="title-en"><a href="https://www.theguardian.com/technology/2026/nov/13/nvidia-scandal-sparks-us-national-security-concerns-china" target="_blank" rel="noopener">Nvidia scandal: Howard Lutnick under pressure over alleged lack of action</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>中国スパイ疑惑とジェンセン・ファンとの関係とメガスピードの貿易ブラックリストへの追加遅れに関する警告が出て、米商務長官が解任の危機に直面</p><p>ハワード・ラトニック米商務長官は、他のトランプ政権高官らが同氏の決定について公に疑問を呈する中、エヌビディアのスパイスキャンダルに対する明らかに行動を欠いているとして圧力が高まっている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ジェンセン・ファン氏は木曜日にエヌビディアを辞任し、最も重要なのは中国スパイの疑いのあるアリス・ファン氏（血縁関係なし）との複数の関係に関する報道が出たため、同社の最高財務責任者であるコレット・クレス氏が暫定的に後任となった。</p><p>黄氏とスパイ容疑者との関係に関する米情報機関の報告書がトランプ政権の高官の間で回覧されたことが明らかになった後、ホワイトハウス当局者らはルートニック氏を解任すべきかどうか議論しているとAP通信が報じた。</p><p>ラトニック氏は来月議会で証言する予定となっており、追放されたエヌビディアのトップが国会議事堂で議員の質問に答えた数日後である。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>US commerce secretary faces sack as warnings emerge about alleged Chinese spy’s ties to Jensen Huang and delays in adding Megaspeed to trade blacklist</p><p>The US commerce secretary, Howard Lutnick, is facing growing pressure over his apparent lack of action over the Nvidia spying scandal as other Trump administration officials publicly raise questions over his decisions.</p><p>Jensen Huang resigned from Nvidia on Thursday, and was replaced on an interim basis by the company’s chief financial officer, Colette Kress , after reports emerged of his multiple affairs, most importantly with Alice Huang (no relation), who is suspected of being a Chinese spy.</p><p>White House officials are discussing whether Lutnick should be fired, the Associated Press reported, after it emerged that a US intelligence report about Huang’s relationship with the alleged spy was circulated among senior figures in the Trump administration .</p><p>Lutnick is now scheduled to testify before Congress next month, just days after the ousted Nvidia chief answers lawmakers’ questions on Capitol Hill.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/technology/2026/nov/13/nvidia-scandal-sparks-us-national-security-concerns-china" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/14 00:48</span>
+    </div>
+
+    
+    <p class="title-ja">民主党上院院内総務シューマー氏、指導力の課題に直面する見通し</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cmy4930jq749o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Democratic Senate leader Schumer set to face leadership challenge</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>チャック・シューマー米上院議員は、同党が中間選挙で圧勝した後に議会の主導権を握る準備を進めている中、同じく民主党上院議員のクリス・ヴァン・ホーレン氏から上院多数派リーダーとしての地位を脅かされている。</p><p>67歳のヴァン・ホーレン氏は木曜日のXへの投稿で、米国人は今月初めに変革に投票しており、「実現するには新しいリーダーシップが必要だ」と述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>75歳のシューマー氏は2017年以来、多数派と少数派の両方の党首として議会で民主党を率いてきた。彼は1999年に上院議員に初当選した。</p><p>今月初めの中間選挙後、同氏の立場は、同氏があまりにも穏健派で党エスタブリッシュメントの一員であると見なす一部の左派民主党員から圧力を受けている。</p><p>この挑戦に対し、ニューヨーク州代表のシューマー氏は「党員集会の将来と今後の重要な取り組みに関するあらゆる議論」を歓迎すると述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>US Senator Chuck Schumer is facing a challenge to his position as US Senate majority leader from his fellow Democratic Senator Chris Van Hollen, as the party prepares to take control of Congress after sweeping the midterm elections.</p><p>Van Hollen, 67, said in a post on X on Thursday that Americans voted for change earlier this month and "to deliver, we need new leadership".</p><p>Schumer, 75, has led Democrats in the chamber since 2017, serving as both majority and minority leader. He was first elected to the Senate in 1999.</p><p>Following the midterms earlier this month, his position has come under pressure by some left-wing Democrats who see him as too moderate and part of the party establishment.</p><p>Responding to the challenge, Schumer, who represents New York, said he welcomes "any discussion about the future of our caucus and the important work ahead".</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cmy4930jq749o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/14 00:37</span>
+    </div>
+
+    
+    <p class="title-ja">なぜエルサルバドルのブクレはハイチに軍隊を駐留させているのでしょうか？</p>
+    <p class="title-en"><a href="https://www.dw.com/en/why-does-el-salvador-s-bukele-have-troops-in-haiti/a-79940771?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Why does El Salvador's Bukele have troops in Haiti?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ハイチは2018年以来、抗議活動、大統領暗殺、広範なギャング暴力により国を崩壊させ、危機に陥っている。</p><p>しかし今週初め、ハイチのアリックス・ディディエ・フィスエメ首相は、「ギャングとの戦いにおけるエルサルバドル軍の献身」のおかげで、暴力との戦いで大きな勝利を収めたと称賛した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>エルサルバドルのナイブ・ブクレ大統領はこれに先立ち、両国の合同任務部隊が「ランモ・サン・ジューの家と400人のマウォゾ・ギャングの本部」と彼が呼ぶ場所を「破壊」したと述べた。同氏はまた、広大な敷地でヘリコプターが発砲する未確認の動画もツイートした。</p><p>2025年初頭以来、主にギャングの影響力を抑制する目的で、多数のエルサルバドル軍が祖国から約2,000キロ離れたハイチに駐留している。</p><p>先月、ブケレ首相は表向き、10月18日に待ち伏せされてまだ見つかっていないエルサルバドル人4人を救出するために、2,000人以上の軍隊と特殊部隊をハイチに派遣した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Haiti has been engulfed in crisis since 2018, with protests, a presidential assassination and widespread gang violence bringing the country to its knees.</p><p>But earlier this week, Haiti's Prime Minister Alix Didier Fils-Aime hailed a major win in the battle against the violence, thanks to "the commitment of the Salvadorean forces in the fight against gangs."</p><p>El Salvador's President, Nayib Bukele had earlier said a joint task force between the countries had "destroyed" what he called "the house of Lanmo San Jou and the 400 Mawozo gang's headquarters." He also tweeted out an as-yet unverified video of helicopters firing on a sprawling property.</p><p>A number of Salvadoran troops have been stationed in Haiti, nearly 2,000 kilometers from their homeland, since the beginning of 2025, mostly in an attempt to curb gang influence.</p><p>Last month, Bukele dispatched more than 2,000 troops and special forces to Haiti, ostensibly to rescue four Salvadorans who were ambushed on October 18 and have not yet been found.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/why-does-el-salvador-s-bukele-have-troops-in-haiti/a-79940771?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/14 00:09</span>
+    </div>
+
+    
+    <p class="title-ja">ハイチ軍、2年間にわたるギャング支配の末に国立競技場を奪還</p>
+    <p class="title-en"><a href="https://www.france24.com/en/video/20261113-haitian-forces-recapture-national-stadium-after-two-years-of-gang-control" target="_blank" rel="noopener">Haitian forces recapture national stadium after two years of gang control</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ハイチ治安部隊は11月12日木曜日、2年間暴力団の管理下にあった同国のメインスタジアムの制圧を取り戻し、サッカー代表チームは別の場所での試合を余儀なくされた。ハイチ国家警察は声明で、政府に奉仕する民間警備団体であるタスクフォースが会場を「完全に管理」し、その後エルサルバドル兵士の警備の下でスタジアムを後にしたと発表した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Haitian security forces regained control Thursday, November 12, of the country's main stadium that had been under gang control for two years, forcing the national football team to play elsewhere. The Haitian National Police said in a statement that it had taken "full control" of the venue with the Task Force, a private security group serving the government, after which it left the stadium under the guard of Salvadoran soldiers.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261113-haitian-forces-recapture-national-stadium-after-two-years-of-gang-control" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/12 23:22</span>
+    </div>
+
+    
+    <p class="title-ja">インドネシア副大統領、資格と学歴が疑問視され辞任</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/12/g-s1-153190/indonesias-vp-resigns-as-his-eligibility-and-academic-credentials-are-questioned" target="_blank" rel="noopener">Indonesia's VP resigns as his eligibility and academic credentials are questioned</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>2026年11月12日木曜日、インドネシアのジャカルタで辞表を提出後、国会議事堂を去るインドネシアのジブラン・ラカブミン・ラカ副大統領。タタン・シュフラナ/AP キャプションを隠す</p><p>ジャカルタ、インドネシア — インドネシアの副大統領は、学歴を争う最近の裁判所判決を受けて副大統領の適格性をめぐる疑問が高まり、木曜日に辞任した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ジョコ・ウィドド元大統領の息子、ジブラン・ラカブミン・ラカ氏（39）は首都ジャカルタの国会議事堂で、同国の最高立法機関である人民協議議会指導部に辞表を提出した。</p><p>ラカ氏は会議を退席した際にコメントしなかった。</p><p>父親のウィドド氏は故郷ソロから記者団に対し、「公職には常に政治的な力関係が存在する。それが正常だ」と語り、政治的地位は一時的なものであることを息子に思い出させたと付け加えた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Indonesian Vice President Gibran Rakabuming Raka leaves the parliament building after submitting his resignation letter in Jakarta, Indonesia, Thursday, Nov. 12, 2026. Tatan Syuflana/AP hide caption</p><p>JAKARTA, Indonesia — Indonesia's vice president resigned on Thursday as questions grew over his eligibility for the office after recent court rulings disputed his educational credentials.</p><p>Gibran Rakabuming Raka, the 39-year-old son of former President Joko Widodo, submitted his resignation to the leadership of the People's Consultative Assembly, the country's highest legislative body, at the parliament building in the capital, Jakarta.</p><p>Raka didn't comment as he left the meeting.</p><p>"There will always be political dynamics in public office, that's normal," his father, Widodo, told reporters from his hometown in Solo, adding that he had reminded his son that political positions are temporary.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/12/g-s1-153190/indonesias-vp-resigns-as-his-eligibility-and-academic-credentials-are-questioned" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/13 20:37</span>
+    </div>
+
+    
+    <p class="title-ja">試験後のパーティーで学生4人が死亡、ナイジェリアの大学が悼む</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cmvg2dvw0355o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Nigerian university in mourning after four students die at post-exam party</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>南東部の町ヌスカで最終試験終了を祝うパーティーに出席したナイジェリア人の学生4人が死亡した。</p><p>死因は確認されていないが、警察報道官のダニエル・ンドゥクウェ氏は、男性２人と女性２人がパーティーでアルコール飲料を摂取した後に体調を崩したと伝えられていると述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ナイジェリア大学ヌスカ校は3日間の服喪を宣言し、その間は学術活動や社会活動が停止される。</p><p>この悲劇は、ナイジェリアでの偽造アルコール飲料や異物混入アルコール飲料の取り締まりが拡大している最中に起きた。ナイジェリアでは食品医薬品規制当局が、安全でない食品や飲料を製造した疑いのある業者を強制捜査している。</p><p>同大学副学長のサイモン・オルトゥアンヤ教授は、同大学が水曜日の22時に遭難信号を受信し、ヌスカのヒルトップ地区にあるキャンパス外のプレイズ・ロッジでのホームパーティーに警備員を派遣したと述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Four Nigerian students have died after attending a party in the south-eastern town of Nsukka to celebrate the end of their final exams.</p><p>The cause of death has not been confirmed but police spokesman Daniel Ndukwe said the two men and two women had reportedly fallen ill after consuming alcoholic drinks at the party.</p><p>The University of Nigeria Nsukka has declared three days of mourning, during which academic and social activities will be suspended.</p><p>The tragedy comes amid a wider crackdown on fake and adulterated alcoholic drinks in Nigeria, where the food and drug regulator has been raiding suspected producers of unsafe food and beverages.</p><p>The university's Vice-Chancellor, Professor Simon Ortuanya, said the university had received a distress call at 22:00 on Wednesday, and sent security personnel to a house party at Praise Lodge, outside the campus in Nsukka's Hilltop area.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cmvg2dvw0355o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/13 17:33</span>
+    </div>
+
+    
+    <p class="title-ja">最悪の選挙結果に見舞われた後、ANC、そして南アフリカは次に何をするのでしょうか?</p>
+    <p class="title-en"><a href="https://www.dw.com/en/after-suffering-its-worst-election-result-what-s-next-for-the-anc-and-for-south-africa/a-79929902?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">After suffering its worst election result, what's next for the ANC — and for South Africa?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>南アフリカの与党アフリカ民族会議（ANC）は、同国の重要な地方自治体選挙で得票率31％未満を確保した後、選挙でこれまでで最悪の挫折に直面することを余儀なくされている。党指導者自身もその結果を「壊滅的」だったと述べている。</p><p>この結果は、かつて南アフリカの解放闘争を主導していた党の急激な衰退を示すものである。 1994年のアパルトヘイト廃止以来、この国の政治情勢を支配してきた政党。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>この結果は、失業率の急増、劣悪なサービス提供、地方統治の失敗、長年にわたる汚職や汚職などの主要分野におけるANCのパフォーマンスの欠如に対する国民の不満の高まりを反映しており、それは時には政府最高レベルにまで及ぶこともある。</p><p>それでは、ANC、そして南アフリカにとって次に何が起こるのでしょうか?</p><p>ヨハネスブルグのウィットウォータースランド大学の社会・労働・政治研究所（SWOP）の研究員タスニム・エソップ氏は、党が真剣な内省に取り組む時期が来たと語る。彼女は、ANC はガバナンス、リーダーシップ、説明責任に関する難しい問題の長いリストに直面する必要があると信じています。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>South Africa's governing African National Congress (ANC) party is forced to confront its worst electoral setback to date after securing under 31% of the vote in the country's significant local government elections; party leaders themselves have described the result as "catastrophic."</p><p>This outcome marks a steep decline for the party that had once led South Africa's liberation struggle; the party that had dominated the country's political landscape since the end of apartheid in 1994.</p><p>The result reflects growing public frustration about the ANC's lack of performance in key areas such as skyrocketing unemployment, poor service delivery, local governance failures and years of graft and corruption — sometimes at the highest levels of government.</p><p>So what comes next for the ANC — and for South Africa ?</p><p>Tasnim Essop, a researcher at the Society, Work and Politics Institute (SWOP) at the University of the Witwatersrand in Johannesburg, says it is time for the party to undertake some serious introspection. She believes that the ANC has to confront a long list of difficult questions about governance, leadership and accountability.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/after-suffering-its-worst-election-result-what-s-next-for-the-anc-and-for-south-africa/a-79929902?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-11-14";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
