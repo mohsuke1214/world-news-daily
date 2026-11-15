@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年11月16日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/16 01:04</span>
+    </div>
+
+    
+    <p class="title-ja">英国人観光客がビリニュス教会の外でイエス像を破壊</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/15/british-tourist-smashes-jesus-statue-outside-vilnius-church?traffic_source=rss" target="_blank" rel="noopener">British tourist smashes Jesus statue outside Vilnius church</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>英国人観光客がビリニュス教会の外でイエス像を破壊</p><p>ある男がビリニュスの教会から十字架につけられたイエスの像を運び出し、別の男性と冗談を言いながらそれを掲げた後、路上で叩きつけた。 ２人は現場から逃走した。司祭は英語を話す容疑者の特定に協力を求めた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>British tourist smashes Jesus statue outside Vilnius church</p><p>A man removed a statue of the crucified Jesus from a church in Vilnius and held it up while joking with another man, before smashing it on the street. Both men fled the scene. A priest has appealed for help identifying the English-speaking suspects.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/15/british-tourist-smashes-jesus-statue-outside-vilnius-church?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/16 00:24</span>
+    </div>
+
+    
+    <p class="title-ja">48時間以内に2,200人の移民が島に到着、カナリア諸島は政府の行動を要請</p>
+    <p class="title-en"><a href="https://www.france24.com/en/video/20261115-canaries-urge-government-action-after-2-200-migrants-reach-the-islands-in-48h-1" target="_blank" rel="noopener">Canaries urge government action after 2,200 migrants reach the islands in 48h</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>スペインは、今週末約２２００人が船でカナリア諸島に到着したと発表した。スペイン諸島は、アフリカからの移民にとってヨーロッパへの主要な入国地点の 1 つです。スペイン内務省によると、１月から先月末までに１万３０００人以上が到着した。 FRANCE 24国際情勢編集者、アンドリュー・ヒリアー氏による詳細と分析。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Spain says nearly 2,200 migrants have arrived by boat to the Canary Islands this weekend. The Spanish islands are one of the main entry points into Europe for migrants from Africa. The Spanish Interior Ministry says more than 13,000 arrived there between January and the end of last month. Details and analysis by Andrew Hilliar, FRANCE 24 international affairs editor.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261115-canaries-urge-government-action-after-2-200-migrants-reach-the-islands-in-48h-1" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/15 23:40</span>
+    </div>
+
+    
+    <p class="title-ja">中絶をより身近なものにするポーランドの活動家らが反対に直面</p>
+    <p class="title-en"><a href="https://www.dw.com/en/polish-activists-face-opposition-as-they-make-abortion-more-accessible/a-79943914?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Polish activists face opposition as they make abortion more accessible</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ポーランドの女性権利活動家らは、ヨーロッパで最も厳しい中絶法の一つを擁するポーランドに、中絶薬を供給する世界初の宅配ロッカーを開設したと発表した。</p><p>「アボートマット」として知られるこのロッカーは、ポーランド議会の向かい側の建物内にあり、活動家らによると、これはドナルド・トゥスク氏のような政治家に対する明確なメッセージだという。ポーランド首相は、2023年の議会選挙前に妊娠12週目までの希望に応じた中絶を導入すると約束したが、連立政権は共通の立場で合意できていない。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>欧州連合加盟国のうち、ポーランドとマルタの 2 か国のみが、希望による中絶を認めていません。</p><p>ポーランドでは、妊娠が犯罪（レイプや近親相姦）の結果である場合、または女性の健康や生命が危険にさらされる場合にのみ中絶が許可されています。</p><p>中絶ドリームチームと呼ばれる非営利団体の活動家、ユスティナ・ヴィドルジンスカさんは、ポーランド初の中絶センターであるアボタクの房飾りの後ろの小部屋でDWに「アボートマット」を見せた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Women's rights activists in Poland have opened what they say is the world's first delivery locker supplying abortion pills in a country with one of Europe's most restrictive abortion laws .</p><p>Known as the "Abortomat," the locker is in a building opposite the Polish parliament, in what activists say is a clear message to politicians like Donald Tusk . The Polish prime minister pledged to introduce abortion on demand up to the 12th week of pregnancy before the 2023 parliamentary election, but his coalition has been unable to agree on a common position.</p><p>Only two European Union member states, Poland and Malta, do not allow abortion on request.</p><p>In Poland, abortion is only allowed when the pregnancy is the result of a crime — rape or incest — or when it endangers the health or life of the woman.</p><p>Justyna Wydrzynska , an activist from a nonprofit organization called Abortion Dream Team, showed DW the "Abortomat" in a small room behind a tasseled portiere at Abotak, Poland's first abortion center.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/polish-activists-face-opposition-as-they-make-abortion-more-accessible/a-79943914?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/15 20:06</span>
+    </div>
+
+    
+    <p class="title-ja">ヨルダンで教会銃乱射事件で男性3人に死刑判決</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c3rrg9xgqlwpo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Three men sentenced to death in Jordan over fatal church mass shooting</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ヨルダンの裁判所は先月教会で銃乱射事件を起こした男３人に絞首刑を言い渡した。</p><p>10月23日の襲撃では、カラク県のギリシャ正教会でキリスト教の葬儀に出席していた9人が死亡、34人が負傷した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ヨルダン国軍は日曜の声明で、男らは「テロ行為」のほか、武器所持、「テロ組織の思想の助長」、「テロ行為の共謀」の罪で有罪判決を受けたと発表した。</p><p>ヨルダン人の兄弟2人と義理の弟の3人は襲撃現場から逃走し、3日後に逮捕された。彼らは公的に特定されていません。</p><p>カラックには、イスラム教徒が多数を占める王国にある大規模なキリスト教徒コミュニティの本拠地がある。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A Jordanian court has sentenced three men to death by hanging for carrying out a fatal mass shooting on a church last month.</p><p>The attack on 23 October killed nine people and injured 34 others who had been attending a Christian funeral at a Greek Orthodox church in Karak governorate.</p><p>Jordan's Armed Forces said in a statement on Sunday that the men had been convicted of committing "terrorist acts", as well as possessing weapons, "promoting the ideas of a terrorist organisation" and "conspiracy to commit terrorist acts".</p><p>The three men - two Jordanian brothers and their brother-in-law - fled the scene of the attack and were arrested three days later. They have not been publicly identified.</p><p>Karak is home to a sizeable Christian community in the Muslim-majority kingdom.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c3rrg9xgqlwpo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/16 00:32</span>
+    </div>
+
+    
+    <p class="title-ja">ガザの瓦礫から70人の遺体が回収、数千人が行方不明</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/15/70-bodies-recovered-from-gaza-rubble-thousands-still-missing?traffic_source=rss" target="_blank" rel="noopener">70 bodies recovered from Gaza rubble, thousands still missing</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ガザの瓦礫から70人の遺体が回収、数千人が行方不明</p><p>ガザの家族は3年以上ぶりに愛する人たちを埋葬しており、回収チームは35日間で瓦礫の下から70人の遺体を回収している。さらに少なくとも8,000人が閉じ込められたままであると考えられている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>70 bodies recovered from Gaza rubble, thousands still missing</p><p>Families in Gaza are burying loved ones after more than three years, as recovery teams retrieve 70 bodies from beneath the rubble in 35 days. At least 8,000 more are believed to remain trapped.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/15/70-bodies-recovered-from-gaza-rubble-thousands-still-missing?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/16 00:29</span>
+    </div>
+
+    
+    <p class="title-ja">イラン、バーレーンの米軍基地へのドローン攻撃を主張</p>
+    <p class="title-en"><a href="https://www.france24.com/en/iran-claims-drone-attack-on-us-military-base-in-bahrain" target="_blank" rel="noopener">Iran claims drone attack on US military base in Bahrain</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>バーレーンは日曜、潜在的な脅威について２件の警報を発令したが、首都マナマで爆発が発生した９月以来初めての警報だった。これは、イランが米国と同盟を結んでいる島国の空軍基地を標的にし、中東戦争中の空爆の長い小康状態に終止符を打ったことを受けたもので、米国が海上封鎖を維持し、イランがホルムズ海峡の制圧を続ける中、紛争終結に向けた交渉が膠着状態にある中で行われた。レイチェル・グリフィスによる物語。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Bahrain issued two alerts of potential threats on Sunday, its first such warnings since September as blasts rocked the capital, Manama. It comes after Iran targeted an airbase in the US-allied island state, ending a long lull in strikes during the Middle East War and comes as negotiations to end the conflict remain at a stalemate, with the US maintaining its naval blockade and Iran its stranglehold over the strait of Hormuz. Story by Rachael Griffiths.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/iran-claims-drone-attack-on-us-military-base-in-bahrain" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/15 17:17</span>
+    </div>
+
+    
+    <p class="title-ja">イスラエル、ガザキャンプ攻撃でハマスの司令官を殺害、当局者発表</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cqrkg4r6mg7xo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Israel kills Hamas commander in strike on Gaza camp, officials say</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イスラエルとガザの当局者は、2023年10月7日のイスラエル攻撃の計画と監督に貢献したハマスの幹部がイスラエルの空爆で死亡したと発表した。</p><p>ハマスのアル・カッサム旅団軍事部門によると、ラファ旅団の新たな司令官に任命されたサミル・アブ・ユニス氏が土曜日、ガザ地区南部のアル・マワシで殺害された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>地元ハマス当局者はユニスの死亡を認めた。イスラエル軍は同氏を標的にしたとし、攻撃前に「民間人への被害を軽減するための措置が講じられた」と述べた。</p><p>ガザの目撃者らによると、アル・マワシで数百人の避難民を避難させているアル・ワハ・キャンプのテントに４発のミサイルが命中し、火災が発生したという。</p><p>南部ハンユニス市のナセル病院の医療関係者は、負傷者３名と死体が到着したと述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A senior Hamas figure who helped plan and oversee the 7 October 2023 attack on Israel has been killed in an Israeli airstrike, officials in Israel and Gaza have said.</p><p>Samir Abu Younis, the newly appointed commander of the Rafah Brigade, was killed on Saturday in Al-Mawasi in the southern Gaza Strip, according to Hamas's Al-Qassam Brigades military wing.</p><p>A local Hamas official confirmed Younis's death. The Israeli military said it had targeted him and that prior to the strike "steps were taken to mitigate harm to civilians".</p><p>Eyewitnesses in Gaza said four missiles struck a tent in the Al-Waha camp, which shelters hundreds of displaced people in Al-Mawasi, causing a fire to break out.</p><p>A medical source at Nasser Hospital in the southern city of Khan Younis said three injured people had arrived there, as well as a dead body.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cqrkg4r6mg7xo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/15 05:26</span>
+    </div>
+
+    
+    <p class="title-ja">事実確認: 「イラン」のコンテンツファームは数百万に達する</p>
+    <p class="title-en"><a href="https://www.dw.com/en/fact-check-iranian-content-farms-reach-millions/a-79934190?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Fact check: 'Iranian' content farms reach millions</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米国のイラン攻撃後に地域激化への懸念が高まる中、ドナルド・トランプ米大統領は11月9日のホワイトハウス会見で、米国・イスラエルとイランの戦争は「事実上終わった」と主張した。 「私たちは現状を維持しているだけです。」</p><p>イランをめぐる紛争など、社会の関心が高まる時期は、いわゆるコンテンツ ファームの肥沃な土壌を生み出します。トランプ大統領の声明を受けて、インターネット上ではイラン戦争に関する投稿が再び急増した。そして、イラン軍とのつながりを主張するアカウントのネットワークは成長しており、閲覧数は数百万件に達している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>DW ファクト チェックでは、これらのアカウントの多くを調査し、コンテンツ ファームの動作の繰り返しの兆候を発見しました。 DWが提供したアカウントを調査した専門家らは、これらのアカウントは複数のソーシャルメディアプラットフォームにまたがる親イランコンテンツアグリゲーターの広範なエコシステムの一部であると説明している。</p><p>コンテンツ ファームは、Web サイトまたはソーシャル メディア アカウント、またはそのいずれかのネットワークであり、短期間に大量の安価なコンテンツを生成します。それらは経済的インセンティブによって動かされている可能性がありますが、政治的影響力キャンペーンの手段としても機能する可能性があります。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>As fears of regional escalation grew after US strikes on Iran, US President Donald Trump claimed the US-Israel war with Iran was " effectively over " on November 9 at a White House briefing . "We're just keeping it the status quo."</p><p>Periods of heightened public interest, such as the conflict involving Iran, create fertile ground for so-called content farms . Following Trump's statement, posts on the Iran war surged online again. And a growing network of accounts claiming links to Iran's military has accumulated millions of views.</p><p>DW Fact Check examined a number of these accounts and found recurring signs of content farm behavior. Experts who reviewed the accounts DW provided describe them as part of a broader ecosystem of pro-Iran content aggregators that connect across multiple social media platforms.</p><p>Content farms are websites or social media accounts, or a network of either, producing large amounts of cheap content in a short time span. They may be driven by economic incentives, but they can also serve as vehicles for political influence campaigns.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/fact-check-iranian-content-farms-reach-millions/a-79934190?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/15 23:56</span>
+    </div>
+
+    
+    <p class="title-ja">Nvidiaの元上司に関係する中国スパイ容疑者が2025年に退任、Megaspeedが発表</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cmdx1vpprk9vo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Suspected China spy linked to Nvidia's ex-boss left in 2025, Megaspeed says</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>Nvidiaの元上司ジェンセン・ファンと関係があるとされる中国スパイ容疑者のアリス・ファンは、昨年8月にメガスピードの役員職を辞任したと同社は発表した。</p><p>ジェンセン・ファン氏は、アリス・ファン氏およびその従業員の一人と不倫関係にあった疑いが明らかになり、AIチップ製造大手エヌビディアの最高経営責任者（CEO）を辞任した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>Megaspeed は東南アジアにおける Nvidia チップの最大の購入者であり、Nvidia の不祥事により、米国の輸出制限にもかかわらずハイエンド AI チップが中国に行き着いた可能性について疑問が生じています。</p><p>シンガポールに本拠を置く同社は日曜日、自社事業に関する内部調査を開始したと発表した。</p><p>同社は、「当社の事業、サプライチェーン、世界的事業について、検証可能な証拠によって裏付けられていない主張を含む」報道を認識していると述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Alice Huang, a suspected China spy who has been linked to Nvidia's former boss Jensen Huang, left her executive role at Megaspeed in August last year, the company says.</p><p>Jensen Huang resigned as chief executive of the AI chip-making giant Nvidia after it emerged he had allegedly had affairs with Alice Huang as well as with one of his employees.</p><p>Megaspeed is the biggest buyer of Nvidia chips in south-east Asia and the scandal at Nvidia has raised questions about the possibility that high-end AI chips may have ended up in China despite US export restrictions.</p><p>The Singapore-based company said on Sunday it had launched an internal investigation into its business.</p><p>It said it was aware of reports "containing assertions about our business, supply chain and global operations that are not supported by verifiable evidence".</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cmdx1vpprk9vo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/15 23:00</span>
+    </div>
+
+    
+    <p class="title-ja">中国スパイ、チップ販売、トランプ大統領との関係…深まるNVIDIAスキャンダル</p>
+    <p class="title-en"><a href="https://www.france24.com/en/chinese-spy-chip-sales-trump-ties-the-nvidia-scandal-deepens" target="_blank" rel="noopener">Chinese spy, chip sales, Trump ties... The Nvidia scandal deepens</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>Nvidiaのスキャンダルは解明され続けています。日曜日、シンガポールに本拠を置く企業メガスピードは、中国人実業家のアリス・ファン氏が2025年に正式に同社を退社したと発表した。彼女は、エヌビディアの前CEOジェンセン・ファン氏と関係を持った中国のスパイ容疑者である。昨年末、彼女がチップ密輸の容疑で捜査を受けていたことが暴露された。このスキャンダルは、米国政府がどの程度知っていたのかについても疑問を引き起こしており、トランプ氏はこの件について警告を受けていたとされるが、反応しなかったという。 Shael の CEO であり、パリのテクノロジー投資家である Laïla Mörch 氏による分析。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The Nvidia scandal continues to unravel. Sunday, the Singapore-based company Megaspeed said that Chinese businesswoman Alice Huang had officially left the company in 2025. She is the alleged Chinese spy that had an affair with Nvidia's former CEO Jensen Huang. Late last year, revelations showed she was being investigated for chip smuggling. The scandal has also raised questions about how much the US government knew – Trump was allegedly warned about the affair but did not react. Analysis by Laïla Mörch, CEO of Shael and tech investor in Paris.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/chinese-spy-chip-sales-trump-ties-the-nvidia-scandal-deepens" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/15 15:31</span>
+    </div>
+
+    
+    <p class="title-ja">中国は習・トランプ・プーチン首脳会談の話の中でロシアのジレンマに直面している</p>
+    <p class="title-en"><a href="https://www.dw.com/en/beijing-faces-its-russia-dilemma-amid-talk-of-xi-trump-putin-summit/a-79942427?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Beijing faces its Russia dilemma amid talk of Xi-Trump-Putin summit</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>今週、中国のテクノロジーの中心地である深センで開催されるアジア太平洋経済協力会議（APEC）首脳会議に合わせて、中国、ロシア、米国の首脳による前例のない会談が行われる可能性がある。</p><p>中国はまだ会談の開催を確認していない。しかし、中国外務省当局者は最近、報道陣に対し、中国政府は関係者と「連絡を取っている」と語った。モスクワではクレムリンの代表者が「調整」の作業が進行中であると述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>首脳会談の可能性についての最も明確な示唆は、先週末ドナルド・トランプ米大統領によってもたらされた。トランプ大統領はフロリダの空港で記者団に対し、APECで予定されている会談の一つはロシアのウラジーミル・プーチン大統領と中国の習近平国家主席との会談になると「考えている」と述べた。</p><p>このビデオを表示するには、JavaScript を有効にし、HTML5 ビデオをサポートする Web ブラウザへのアップグレードを検討してください。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>An unprecedented meeting between the leaders of China , Russia and the United States could be happening on the sidelines of Asia-Pacific Economic Cooperation (APEC) summit in China's tech hub of Shenzhen this week.</p><p>China has yet to confirm that the meeting will take place. However, a Chinese Foreign Ministry official recently told the press that Beijing was "in communication" with relevant parties. In Moscow, a Kremlin representative said work on "coordination" was underway.</p><p>The clearest indication about the potential summit came from US President Donald Trump last weekend. Talking to reporters at a Florida airport, Trump said he "thinks" one of the meetings planned for APEC will be with Russian President Vladimir Putin and Chinese President Xi Jinping .</p><p>To view this video please enable JavaScript, and consider upgrading to a web browser that supports HTML5 video</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/beijing-faces-its-russia-dilemma-amid-talk-of-xi-trump-putin-summit/a-79942427?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/15 13:00</span>
+    </div>
+
+    
+    <p class="title-ja">世界の指導者らが立て続けに外交首脳会議のためアジアへ向かう</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/nov/15/asia-diplomatic-summits-trump-xi-putin-apec-asean" target="_blank" rel="noopener">World leaders head to Asia for back-to-back diplomatic summits</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>中国、フィリピン、カンボジアの会合で貿易、技術、地域安全保障の影響力を巡る争いが中心に</p><p>超大国である中国と米国の間の影響力をめぐる争いを背景に、世界の指導者たちは今週、相次いでハイレベル首脳会議を開催するためにアジアに飛ぶ。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>中国政府は、アジア太平洋経済協力会議（APEC）首脳会議のために南部の技術拠点である深センにドナルド・トランプ大統領を迎えることで国内有利となるだろう。それは、米国の指導者が中間選挙で敗北した 2 週間後に始まります。</p><p>このサミットはまた、長らく世界で最も価値のある企業であった米国のチップメーカー、エヌビディアのトップが、米国諜報機関が中国のスパイと疑う女性と関係を持っていたという、せいぜい気まずい暴露の後に行われた。</p><p>Apecは世界のGDPの60％以上を占め、主に自由貿易と多国間主義を推進してきた。しかし、今年の会談は、トランプ大統領、中国国家主席、習近平国家主席、ロシアのウラジーミル・プーチン大統領の間で確認された三者会談によって定義される可能性がある。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Tussle for influence as trade, tech and regional security to take centre stage in China, Philippines and Cambodia meetings</p><p>World leaders will fly in to Asia for back-to-back high-level summits this week against the backdrop of the tussle for influence between the superpowers China and the US.</p><p>Beijing will have the home advantage when it welcomes Donald Trump to its southern technology hub of Shenzhen for the Asia-Pacific Economic Cooperation (Apec) leaders’ meeting. It starts two weeks after the US leader lost midterm elections .</p><p>The summit also comes after an awkward-at-best revelation that the head of Nvidia, the US chipmaker that for a long time was the world’s most valuable company, was having an affair with a woman US intelligence suspects was a Chinese spy .</p><p>Apec represents more than 60% of global GDP and has primarily promoted free trade and multilateralism. This year’s meeting could be defined, however, by the confirmed trilateral meeting between Trump, the Chinese president, Xi Jinping, and Vladimir Putin of Russia.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/nov/15/asia-diplomatic-summits-trump-xi-putin-apec-asean" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/16 00:57</span>
+    </div>
+
+    
+    <p class="title-ja">判事、トランプ大統領による日曜日の「ゴミ島」ワシントンDCゴルフコースの閉鎖を阻止</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c6j9mn7l14y0o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Judge blocks Trump closure of 'Trash Island' Washington DC golf course on Sunday</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>連邦判事は、ワシントンDCにある歴史的なゴルフコースと公園の米国政府による閉鎖を一時的に差し止めた。</p><p>アナ・レイエス連邦地方判事は、大規模改修のため11月15日から閉鎖されると述べたイースト・ポトマック・ゴルフリンクスに対する大統領の計画に対する数か月にわたる異議申し立てを監督してきた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>レイエス氏は、ドナルド・トランプ大統領は公園やゴルフコースを閉鎖することはできないと述べたが、政権がどちらも積極的に管理する必要はないと付け加えた。</p><p>熱心なゴルファーであるトランプ大統領は、築106年のコースを改修する計画によって「世界のどこよりも最高で最も壮観なゴルフコースの1つ」が誕生すると述べた。 BBCはホワイトハウスにコメントを求めた。</p><p>同氏は現在のコースを「ゴミ島」と宣言し、訴訟が続いているにもかかわらず、「一般に公開され、同時に最高レベルのゴルフに合わせて設計され、ワー​​ルドクラスのトーナメントを開催できる」スペースを作るために15か月かけて改修すると発表した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A federal judge has temporarily blocked the US government's closure of an historic golf course and park in Washington DC.</p><p>US District Judge Ana Reyes has been overseeing a months-long challenge to the president's plans for East Potomac Golf Links, which he said would be closed from 15 November for extensive renovations.</p><p>Reyes has said President Donald Trump cannot close the park nor its golf course, but added that his administration was not required to actively manage either.</p><p>Trump, an avid golfer, has said his plans to upgrade the 106-year-old course will create "one of the Best and Most Spectacular Golf Courses anywhere in the World". The BBC has contacted the White House for comment.</p><p>Declaring the current course "Trash Island", he announced in October that it would be renovated over 15 months to create a space that "will be open to the Public while, at the same time, designed to the Highest Level of Golf and able to hold World Class Tournaments" - despite the ongoing litigation.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c6j9mn7l14y0o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/16 00:40</span>
+    </div>
+
+    
+    <p class="title-ja">中間選挙で全米議会と州知事に「記録的な数の女性が当選」</p>
+    <p class="title-en"><a href="https://www.france24.com/en/tv-shows/spotlight/20261115-record-number-of-women-elected-to-us-congress-governorships-across-country-in-midterm-elections" target="_blank" rel="noopener">'Record number of women elected' to US Congress & governorships across country in midterm elections</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>2026 年の米国中間選挙を受けて、ギャビン・リー氏はポリティコ上級国政記者ローレン・ヒョードル氏を歓迎することを嬉しく思います。彼女は、議会や知事に選出される民主党の女性、特に幼い子どもを持つ母親の数が増えていることについて語ります。 「おそらく母親こそがこの問題を解決する最良のメッセンジャーであるという認識が地図全体にありました」と彼女は説明し、「生活費、手頃な価格、やりくりの方法」についての有権者の懸念を指摘した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Following the 2026 US midterm elections, Gavin Lee is pleased to welcome Politico Senior National Politics Reporter Lauren Fedor. She discusses the growing number of Democratic women elected to Congress and governorships, particularly mothers of young children. “There was a realisation across the map that perhaps moms were the best messenger for this,” she explains, pointing to voters' concerns about “the cost of living, affordability, how to make ends meet.”</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/tv-shows/spotlight/20261115-record-number-of-women-elected-to-us-congress-governorships-across-country-in-midterm-elections" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/15 18:26</span>
+    </div>
+
+    
+    <p class="title-ja">カナダ軍基地の大火災で5人目のカナダ兵が負傷で死亡</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cmrlgn4x2xw8o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Fifth Canadian soldier dies from injuries caused by large fire at military base</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>先月軍事訓練場で草火事が発生した際に受けた負傷がもとで、5人目のカナダ人兵士が死亡した。</p><p>10月17日、実弾射撃訓練中に発火した火災は強風に乗ってカナダ軍ウェインライト基地内に急速に広がり、当初4人が死亡、数十人が負傷した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>カナダ軍は声明で、オンタリオ州で治療を受けていたウィリアム・ダグラス・ダル・ビアンコ上等兵が金曜日に死亡したと発表した。</p><p>マーク・カーニー首相はXに「カナダ人はダル・ビアンコ二等兵の愛する人たち、そしてこの恐ろしい悲劇の影響で今も悲しんでいるすべての人たちを私たちの心の中に抱えている」と書いた。</p><p>カナダ軍は、土曜日の時点で24人の軍人が依然として病院で治療を受けており、14人が解放されたと発表した。合計38人の軍人が負傷した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A fifth Canadian soldier has died from injuries he suffered when a grass fire swept through a military training area last month.</p><p>Four people were killed initially and dozens were injured when the fire, which ignited during a live fire training exercise, spread rapidly through Canadian Forces Base Wainwright carried by strong winds on 17 October.</p><p>Pte William Douglas Dal Bianco, who had been receiving medical care in Ontario, died on Friday, the Canadian Armed Forces said in a statement.</p><p>Prime Minister Mark Carney wrote on X: "Canadians are holding Private Dal Bianco's loved ones, and all those still grieving in the wake of this terrible tragedy, in our hearts."</p><p>The Canadian Armed Forces said that 24 military personnel were still in hospital receiving treatment, while 14 had been released as of Saturday. Thirty-eight military personnel had been injured in total.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cmrlgn4x2xw8o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/15 01:05</span>
+    </div>
+
+    
+    <p class="title-ja">危機と抗議活動激化、チリ極右大統領に圧力</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/14/nx-s1-6040144/chile-protests-fuel-kast-students" target="_blank" rel="noopener">Fuel crisis and protests pressure Chile's far-right president</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>2026年11月5日、チリのサンティアゴで、教育政策や生活費の高騰、未成年者に対する性犯罪で有罪判決を受けた人々の減刑に抗議する学生たちを警察が放水で解散させる中、覆面をしたデモ参加者が火炎瓶を投げる準備をしている。エステバン・フェリックス/AP、キャプションを隠す</p><p>チリ・サンティアゴ — チリの超保守的な大統領は、就任からわずか8カ月で劣勢に立たされていることに気づく。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ホセ・アントニオ・カストは、右派政治の極端な末端から進歩的な問題、リプロダクティブ・ライツ、福祉政策を厳しく批判するキャリアを送ってきた政治家だが、現在世論調査での支持率はわずか24％にとどまっている。</p><p>2025年12月にカスト氏が社会問題に対する強硬姿勢への言及を一切避け、代わりに全国メディアで取り上げられている2つの注目の問題、不法移民と公安に焦点を当てて大統領に就任してから1年も経っていない。</p><p>しかし、彼は最優先課題に取り組むどころか、苦戦している。そしてアメリカ大陸や世界中の他の地域と同様に、生活費の上昇が彼に大きな打撃を与えている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A masked demonstrator prepares to throw a Molotov cocktail as police use a water cannon to disperse students protesting education policies, rising living costs and reduced sentences for people convicted of sexual offenses against minors in Santiago, Chile, Nov. 5, 2026. Esteban Felix/AP hide caption</p><p>SANTIAGO, Chile — Chile's ultraconservative president finds himself on the back foot after just eight months in power.</p><p>José Antonio Kast, a politician who spent a career railing against progressive issues, reproductive rights and welfare policies from the extreme fringes of right-wing politics, now finds himself with just 24% approval in the polls.</p><p>It is less than a year since Kast stormed to the presidency in December 2025 by avoiding all mention of his hardline stances on social matters, focusing instead on two hot-button issues whipped up in the national media: illegal immigration and public security.</p><p>But rather than pressing ahead with those at the top of his agenda, he has floundered. And as elsewhere around the Americas and worldwide, rising costs of living have come to hit him hard.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/14/nx-s1-6040144/chile-protests-fuel-kast-students" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/15 06:05</span>
+    </div>
+
+    
+    <p class="title-ja">ナイジェリアの次期選挙がAI偽情報の増加によって台無しにされる</p>
+    <p class="title-en"><a href="https://www.dw.com/en/nigeria-s-upcoming-election-marred-by-rising-ai-disinformation/a-79946897?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Nigeria's upcoming election marred by rising AI disinformation</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ナイジェリアでは総選挙まであと 2 か月強となっており、現職のボラ・ティヌブ氏が、深刻な治安情勢との闘いと国の経済危機の解決に重点を置いて立候補している。彼はアティク・アブバカル元副大統領や野党幹部のピーター・オビと対決する。</p><p>同国の選挙管理機関である独立国家選挙委員会（INEC）は最近、予備的な有権者登録簿を公表したが、伝えられるところによると、人工知能（AI）を使用して生成されたと思われる画像が満載だという。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>AI 使用の明らかな兆候の中には、画像内の誇張された顔の特徴や、前回の選挙以降に死亡した人々の名前や身元情報の重複など、選挙人名簿上の不一致が含まれていました。</p><p>この展開は、来る2027年の総選挙に向けた組織の全体的な準備に対する懸念を引き起こしている。 INECは、手続きへのアクセスを許可することで今後の投票の透明性を高める代わりに、大陸全土の選挙におけるAIの影響力拡大に関する広範な論争の中で非難を浴びている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Nigeria has just over two months to go until its general election, with incumbent Bola Tinubu running on a ticket focused on combating raging insecurity and resolving the nation's economic crisis . He faces off against former Vice President Atiku Abubakar and senior opposition figure Peter Obi.</p><p>The country's electoral body, the Independent National Electoral Commission (INEC), recently released its preliminary voter's register, which reportedly is riddled with images believed to have been generated using artificial intelligence (AI) .</p><p>Among the telltale signs of AI usage were exaggerated facial features in images and inconsistencies on the electoral registers, such as duplicates of names and even identities of people who since the previous election had died.</p><p>The development raises concerns about the body's overall preparedness ahead of the country's upcoming 2027 general election. Instead of making the upcoming vote more transparent by allowing access to its procedures, INEC has come under fire amid broader controversies about the expanding influence of AI in elections across the continent.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/nigeria-s-upcoming-election-marred-by-rising-ai-disinformation/a-79946897?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/14 17:31</span>
+    </div>
+
+    
+    <p class="title-ja">スーダン：避難民への援助が激減する中、悲惨さが悪化</p>
+    <p class="title-en"><a href="https://www.dw.com/en/sudan-misery-worsens-amid-plummeting-aid-for-displaced-people/a-79938864?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Sudan: Misery worsens amid plummeting aid for displaced people</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>国際移住機関（IOM）と国連難民高等弁務官事務所（UNHCR）は、深刻な資金不足により、スーダン向けの緊急避難所や基本的な家庭用品の供給が枯渇していると警鐘を鳴らしている。柔軟な資金が緊急に提供されなければ、今後数か月間、さらに多くの家族が異常気象、治安不安、暴力、搾取から適切に保護されずに対処しなければならないことになる。</p><p>最近発表された共同声明によると、国連の人道的ニーズと対応計画には 29 億ドル (26 億 2000 万ユーロ) が必要です。この資金はスーダンの2,040万人の人々に救命援助を提供することを目的としています。しかし、これまでのところ必要な資金の47％しか集まっていない。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>戦争と飢餓に苦しむこの国の合計3,370万人が人道援助に依存している。だけでも約 1,540 万人が緊急避難所と基本的な家庭用品を必要としています。しかし、資金不足のため、援助団体が支援できたのはわずか 10% でした。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The International Organization for Migration (IOM) and the United Nations High Commissioner for Refugees ( UNHCR ) are sounding the alarm: Serious funding gaps have depleted the supplies of emergency shelter and basic household goods intended for Sudan . Without urgent provision of flexible funding, even more families will have to cope without adequate protection from extreme weather conditions, insecurity, violence and exploitation in the coming months.</p><p>According to a recently published joint statement , $2.9 billion (€2.62bn) is needed for the United Nation's Humanitarian Needs and Response Plan. This funding is intended to provide life-saving aid to 20.4 million people in Sudan. So far, however, only 47% of the required funds have been raised.</p><p>A total of 33.7 million people in the war- and famine-stricken country are dependent on humanitarian aid. Some 15.4 million alone require emergency shelter and basic household items. However, due to a lack of funding, aid organizations have been able to assist only 10%.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/sudan-misery-worsens-amid-plummeting-aid-for-displaced-people/a-79938864?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-11-16";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
