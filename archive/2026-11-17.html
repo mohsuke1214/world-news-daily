@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年11月17日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/17 04:26</span>
+    </div>
+
+    
+    <p class="title-ja">EU5カ国、拒否された亡命希望者をルワンダに送る計画を発表</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/16/five-eu-countries-announce-plan-to-send-rejected-asylum-seekers-to-rwanda?traffic_source=rss" target="_blank" rel="noopener">Five EU countries announce plan to send rejected asylum seekers to Rwanda</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>欧州５カ国は早ければ来年にも難民申請を拒否された人々をルワンダの処理センターに送る計画を発表し、弱い立場にある人々を虐待の危険にさらすことになるとして権利団体から非難を集めている。</p><p>計画された計画はルワンダとまだ交渉中であるが、移民たちはセンターに人々を送り込み、そこで移民たちは帰国するか、定住するか、滞在する権利がある他の場所に行くかを選択できるとキガリ氏が月曜日に述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>オーストリア、デンマーク、ドイツ、ギリシャ、オランダは、この計画はより多くの人々の欧州への移住を阻止することを目的としていると述べた。欧州連合は長年にわたり、移民規制を強化し、到着する亡命希望者の数を減らし、滞在資格のない移民の強制送還を増やすことに取り組んできた。</p><p>デンマークのメッテ・フレデリクセン首相は、「これはゲームチェンジャーとなり、不法移民という大きな課題に立ち向かうことができるようになるだろう」と述べた。 「私たちは密航業者のビジネスモデルを破壊します。私たちは国境の管理を取り戻し、不法移民の誘因を排除します。」</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Five European countries have announced a plan to send rejected asylum seekers to a processing centre in Rwanda as early as next year, drawing condemnation from rights groups who said it would leave vulnerable people at risk of abuse.</p><p>The planned scheme, which is still being negotiated with Rwanda, would send people to a centre where the migrants could choose to return home, settle or go somewhere else where they had a right to stay, Kigali said on Monday.</p><p>Austria, Denmark, Germany, Greece and the Netherlands said that the plan aimed to deter more people from migrating to Europe. The European Union has worked for years to tighten migration rules, reduce the number of asylum seekers arriving and increase deportations of migrants who are not entitled to stay.</p><p>“I think this will be a game changer, making us able to confront the massive challenges with illegal migration,” Danish Prime Minister Mette Frederiksen said. “We will break down the business model of human smugglers. We will take back control of our borders and we will remove the incentives for illegal migration.”</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/16/five-eu-countries-announce-plan-to-send-rejected-asylum-seekers-to-rwanda?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/17 04:10</span>
+    </div>
+
+    
+    <p class="title-ja">「未来的な議論が非常に現実味を帯びてきた」: なぜ世界は殺人ロボットの規制に苦戦しているのか</p>
+    <p class="title-en"><a href="https://www.france24.com/en/technology/20261116-a-futuristic-debate-now-very-real-why-the-world-is-struggling-to-regulate-killer-robots" target="_blank" rel="noopener">'A futuristic debate now very real': Why the world is struggling to regulate killer robots</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>128カ国の代表者らは月曜日にジュネーブで会合し、人間の関与なしで人を殺害できるAI搭載兵器の使用に関する法的拘束力のある規則の交渉を進めるかどうか決定する。 FRANCE 24 は人工知能研究者の Vincent Boulanin に話を聞き、何が問題になっているのかを明らかにしました。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Representatives from 128 nations are meeting in Geneva on Monday to decide whether to move ahead with negotiating legally binding rules around the use of AI-powered weapons that can kill without human involvement. FRANCE 24 spoke with artificial intelligence researcher Vincent Boulanin to find out just what is at stake.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/technology/20261116-a-futuristic-debate-now-very-real-why-the-world-is-struggling-to-regulate-killer-robots" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/17 01:21</span>
+    </div>
+
+    
+    <p class="title-ja">EU 5か国がルワンダに移民の「帰還拠点」を設ける計画を発表</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/nov/16/eu-states-immigration-return-hubs-rwanda" target="_blank" rel="noopener">Five EU states announce plans for immigration ‘return hubs’ in Rwanda</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ドイツ、オーストリア、オランダ、デンマーク、ギリシャは「重大な道徳的欠陥」として批判される政策への挑戦に直面する可能性が高い</p><p>EU加盟5カ国は、欧州に滞在する法的権利を持たない人々のためにルワンダにオフショアセンターを設立する計画を発表したが、試験計画では法的な問題に直面することが予想され、「重大な道徳的欠陥」として非難されている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ドイツ、オーストリア、オランダ、デンマーク、ギリシャの５カ国は、欧州からの追放に対してあらゆる訴えを尽くした人々を第三国に送還することを認めるＥＵの新たに合意された返還法を初めて利用しようとしている。</p><p>月曜日に発表された声明の中でEU5カ国は「実施に向けてパートナー国ルワンダとの具体的な交渉が始まる」と述べ、この計画は「不法移民のさらなる抑制、密航業者のビジネスモデルの解体、そして国民の負担の軽減に重要な貢献」となるだろうと述べた。</p><p>当局はこのモデルをテストするために、来年初めからルワンダに100人を派遣したいと考えている。この制度は、亡命申請が拒否された成人や、EUに居住する法的権利を持たない成人に適用される。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Germany, Austria, Netherlands, Denmark and Greece likely to face challenges to policy criticised as ‘grave moral failing’</p><p>Five EU member states have announced plans to set up an offshore centre in Rwanda for people with no legal right to stay in Europe, in a pilot scheme that is expected to face legal challenges and has been denounced as “a grave moral failing”.</p><p>The five countries – Germany, Austria, the Netherlands, Denmark and Greece – are the first to seek to use the EU’s newly agreed returns law that allows people who have exhausted all avenues of appeal against their removal from Europe to be sent to a third country.</p><p>In a statement released on Monday the five EU countries said “concrete negotiations with partner country Rwanda will begin for implementation”, saying the scheme would make “an important contribution to further curbing illegal migration, dismantling the business model of smugglers and relieving the burden on our population”.</p><p>Officials hope to send 100 people to Rwanda from early next year to test the model. The scheme will apply to adults whose claims to asylum have been rejected or others with no legal right to live in the EU.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/nov/16/eu-states-immigration-return-hubs-rwanda" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/16 23:58</span>
+    </div>
+
+    
+    <p class="title-ja">ロシアがウクライナによる戦争史上最大の無人機攻撃を報告、ランドマークのクリミア橋が衝突</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/ckx27v6dpjz0o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Landmark Crimea bridge hit as Russia reports biggest Ukrainian drone attack of war</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ロシアは、戦争が始まって以来最大のウクライナによる無人機攻撃を記録したと発表し、この攻撃では、ロシアと占領下のクリミアを結ぶランドマークの橋が軽微な損傷を受け、いくつかの製油所が攻撃された。</p><p>当局者らによると、ロシア軍は２４時間で２０４９機の無人機と４発のフラミンゴ長距離ミサイルを迎撃、破壊した。モスクワ市長のセルゲイ・ソビャニン氏は、首都だけで約600人が飛行したと付け加えた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>一方、キエフでは1日に17回という記録的な空襲警報が発令された。ロシアの空爆により少なくとも７人が死亡し、エネルギーインフラへの攻撃により５万人が停電した。</p><p>激しい攻撃は、米国、ウクライナ、ロシアの特使が戦争終結を目指して会談した数日後に行われた。</p><p>ウクライナ戦争は2022年2月のロシアの全面侵攻で始まった。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Russia says it has recorded the biggest Ukrainian drone attack since the war began, in which a landmark bridge linking Russia to occupied Crimea sustained minor damage and several oil refineries were hit.</p><p>The Russian military intercepted and destroyed 2,049 drones and four Flamingo long-distance missiles over 24 hours, officials said. Around 600 flew towards capital alone, Moscow Mayor Sergey Sobyanin added.</p><p>Kyiv, meanwhile, came under a record 17 air raid alerts in a single day. At least seven people were killed by Russian strikes and attacks on energy infrastructure caused blackouts for 50,000 people.</p><p>The intense strikes come days after US, Ukrainian and Russian envoys held talks aimed at ending the war.</p><p>The war in Ukraine began with Russia's full-scale invasion in February 2022.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/ckx27v6dpjz0o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/17 04:19</span>
+    </div>
+
+    
+    <p class="title-ja">サウジアラビア、フーシ派と戦う連合軍司令官を解任</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/16/saudi-arabia-dismisses-commander-of-coalition-forces-fighting-houthis?traffic_source=rss" target="_blank" rel="noopener">Saudi Arabia dismisses commander of coalition forces fighting Houthis</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>サウジアラビアは、イエメンでイランの支援を受けるフーシ派と戦う連合軍を監督する司令官を交代した。</p><p>サウジ国営メディアによると、サルマン国王は月曜日、ファイヤド・アル・ルワイリ将軍を指揮官に任命する法令を出した。ファハド・ビン・ハマド・アル・サルマン中将の解任は、連合軍がイエメン政府の暫定首都アデンを強化するため、紅海沿岸地域の奪還を目指す最近の取り組みを放棄せざるを得なくなった中で行われた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>アル・サルマン氏は、連合軍が撤退を余儀なくされた翌日、サウジ国防相の軍事顧問に任命された。</p><p>国際的に認知されているイエメン政府は日曜、連合軍がアデン防衛に集中するため、重要なバブ・アル・マンデブ海峡（米イラン戦争でホルムズ海峡の交通が滞る中、サウジアラビアの石油輸出は経由していた）付近の地域から撤退していると発表した。</p><p>この撤退は、イエメン内戦が7月に再開されて以来、サウジアラビアの空港や石油施設に弾道ミサイルを発射してきたフーシ派に対するサウジ支援の作戦にとって大きな挫折となった。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Saudi Arabia has replaced the commander overseeing its coalition forces as they battle the Iranian-backed Houthis in Yemen.</p><p>King Salman issued a decree on Monday assigning General Fayyad al-Ruwaili to the command, according to Saudi state media. The removal of Lieutenant General Fahd bin Hamad al-Salman came as coalition forces were forced to abandon their recent push to recapture regions along the Red Sea coast in order to reinforce the Yemeni government’s interim capital, Aden.</p><p>Al-Salman was appointed as a military adviser to the Saudi defence minister a day after coalition forces were forced to withdraw.</p><p>Yemen’s internationally recognised government said on Sunday that coalition forces were withdrawing from areas near the key Bab al-Mandeb strait – via which Saudi oil exports have been flowing while the United States-Iran war stifles traffic through the Strait of Hormuz – to focus on defending Aden.</p><p>The retreat marked a major setback for the Saudi-backed campaign against the Houthis, who have been firing ballistic missiles at Saudi Arabia’s airports and oil facilities since Yemen’s civil war restarted in July.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/16/saudi-arabia-dismisses-commander-of-coalition-forces-fighting-houthis?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/17 04:09</span>
+    </div>
+
+    
+    <p class="title-ja">イスラエルのアイゼンコットブロックはネタニヤフほど右翼ではないのか？</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/16/is-israels-opposition-less-right-wing-than-netanyahu?traffic_source=rss" target="_blank" rel="noopener">Is Israel’s Eisenkot bloc less right wing than Netanyahu?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イスラエルの次期政権樹立に向けた長く複雑な交渉が長引く中、元軍司令官ガディ・アイゼンコット氏が前政権の極右で分裂を招く政治からの決別を示す連立政権を樹立できるのではないかとの期待が高まっている。</p><p>現在暫定首相となっているベンヤミン・ネタニヤフ首相がまとめた連立政権は、イスラエルの極右の人物を政権に迎え入れた。 2023年10月7日のハマス主導のイスラエル攻撃に続くガザでの虐殺戦争と近隣諸国に対する度重なる軍事攻撃を超えて、政府は司法の監視を弱めようとし、占領下のヨルダン川西岸で不法入植地を拡大する積極的な政策を推進した。そこでは、パレスチナ人コミュニティに対する入植者のポグロムが、ほとんど処罰されずに続いている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「リクードはヨーロッパのほとんどの保守政党よりも右寄りに位置している。歴史的には保守党のようなものと考えられていたが、今日では極右政党のようなものに見える」とイスラエルの政党とそれに相当する国際政党との比較を研究しているエセックス大学のイスラエル人研究者ロイ・ズール氏は語る。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>As the long and complex negotiations to form Israel’s next government drag on, hopes are high that former military chief Gadi Eisenkot will be able to form a coalition that marks a break from the far-right and divisive politics of the previous administration.</p><p>The coalition brought together by the now-caretaker Prime Minister Benjamin Netanyahu brought figures from Israel’s far right into government. Beyond the genocidal war on Gaza following the October 7, 2023 Hamas-led attack on Israel, and repeated military strikes against neighbouring countries, the government sought to weaken judicial oversight and pursued an aggressive policy of illegal settlement expansion in the occupied West Bank. There, settler pogroms against Palestinian communities have continued with near impunity.</p><p>“Likud sits further to the right than most conservative parties in Europe. Although historically it was thought of as something like the Conservative Party, today it looks like something of a far-right party,” said Roi Zur, an Israeli academic at the University of Essex, who has researched the comparison between Israeli parties and their international equivalents.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/16/is-israels-opposition-less-right-wing-than-netanyahu?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/17 01:08</span>
+    </div>
+
+    
+    <p class="title-ja">イランで若手人材の流出が拡大</p>
+    <p class="title-en"><a href="https://www.dw.com/en/iran-s-growing-exodus-of-young-talent/a-79960368?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Iran's growing exodus of young talent</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>「私は実際には2023年にイランを離れることを決めていました」と匿名を希望した30代半ばの医師はDWに語った。</p><p>彼女の決定は、2022年にイランの厳格な服装規定に違反した疑いでイランのいわゆる道徳警察に逮捕された22歳のイラン系クルド人女性ジナ・マーサ・アミニが警察の拘留中に死亡したことを受けてのものである。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>アミニさんの死は広範な抗議活動を引き起こし、当局によるイランのヒジャブ義務の執行に異議を唱える「女性、命、自由」運動を刺激した。</p><p>この医師は、イランとの米国・イスラエル戦争が最終的に祖国を離れる計画を加速させたと語った。彼女は初夏からトルコの賃貸アパートで家族と一緒に暮らしている。彼らはそこからドイツへ向かうことを望んでいます。</p><p>「ドイツで私の専門的資格が認められるまでに2年かかりました。その後、テヘランのドイツ大使館に面接の申請をしました」と医師は語った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>"I had actually decided to leave Iran back in 2023," a physician in her mid-30s, who wished to remain anonymous, told DW.</p><p>Her decision followed the 2022 death in police custody of 22-year-old Iranian-Kurdish woman Jina Mahsa Amini , who had been arrested by Iran's so-called morality police for allegedly violating the country's strict dress code .</p><p>Amini's death sparked widespread protests and inspired the " Woman, Life, Freedom " movement, which challenged authorities' enforcement of Iran's hijab mandate .</p><p>The physician said that the US-Israel war with Iran ultimately accelerated her plans to leave her homeland. She has been living with her family in a rented apartment in Turkey since early summer. From there, they hope to continue on to Germany .</p><p>"It took two years for my professional qualifications to be recognized in Germany. After that, I applied for an appointment at the German Embassy in Tehran," the physician said.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/iran-s-growing-exodus-of-young-talent/a-79960368?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/16 20:09</span>
+    </div>
+
+    
+    <p class="title-ja">イエメン軍、港湾都市をフーシ派から守るため撤退</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cqvg2xgyvnjpo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Yemeni forces retreat to defend port city from Houthis</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>サウジアラビアの支援を受けるイエメンの親政府軍は、イラン支援のフーシ派との数週間にわたる戦闘の激化を受け、暫定首都アデンを守るため部隊を再配置していると発表した。</p><p>南部軍は、アデン周辺と近隣地域の陣地を強化するため、紅海の南端にある戦略的に重要なバブ・アル・マンダブ海峡を見下ろす地域から撤退すると発表した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>フーシ派が運営するメディアは、この運動が避難地域を制圧したと伝えている。サウジアラビアはコメントを出していない。</p><p>この変更により、フーシ派が9月に奇襲攻撃で占領した主要な航路付近の地域を確保しようとする数週間にわたる攻撃が終了する。</p><p>親政府軍は、フーシ派から重要な拠点を奪還しようとして、10月初旬に海峡を「確保」したと述べた。イラン支援の戦闘員らは１カ月前に海峡入口のペリム島や戦略上の港湾都市モカなどの地域を占領したと述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Yemeni pro-government forces backed by Saudi Arabia say they are redeploying troops to defend the country's interim capital, Aden, following weeks of intensified fighting with the Iran-backed Houthi movement.</p><p>The Southern Armed Forces said it was withdrawing from an area overlooking the strategically important Bab al-Mandab Strait, at the southern end of the Red Sea, to reinforce positions around Aden and neighbouring areas.</p><p>Houthi-run media say the movement has taken control of the evacuated territory. Saudi Arabia has not commented.</p><p>The shift ends a weeks-long offensive to try to secure the area near the key shipping route which the Houthis seized in a surprise offensive in September.</p><p>Pro-government forces said they had "secured" the strait in early October as they sought to retake crucial ground from the Houthis. The Iran-backed fighters said they had captured areas including Perim Island at the mouth of the strait and the strategic port city of Mokha a month prior.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cqvg2xgyvnjpo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/17 01:32</span>
+    </div>
+
+    
+    <p class="title-ja">Nvidia スキャンダル: 中国のチップのジレンマ、米国のライバル関係が AI 競争を形作る</p>
+    <p class="title-en"><a href="https://www.dw.com/en/nvidia-scandal-china-s-chips-dilemma-us-rivalry-shape-ai-race/a-79961766?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Nvidia scandal: China's chips dilemma, US rivalry shape AI race</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>中国は人工知能（AI）の世界的な競争のリーダーになるという野心的な計画を持っている。中国政府は、この目標を達成するには最先端のチップが必要であることを認識している。</p><p>共産党科学技術委員会の委員長を務める丁学祥副首相は、米国に対する戦略的競争力を高める中国の技術革新能力を強化する任務を負っている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>同党は現在、AIを活用して国民を監視し、高度な無人兵器システムを開発し、ロボット工学や産業オートメーションを通じて経済分野を変革している。</p><p>しかし、これまでのところ米国は製造技術とチップ設計で先頭に立っている。そしてワシントンは、この戦略分野での優位性を維持するために多くの措置を講じてきた。</p><p>早ければ2023年にも、当時のバイデン政権は国家安全保障上の理由を理由に、中国への先端半導体やチップ製造装置の輸出を制限することを決定した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>China has ambitious plans to become the leader in the global race for artificial intelligence (AI). Beijing is aware that the country needs cutting-edge chips to achieve this goal.</p><p>Vice Premier Ding Xuexiang, who chairs the Communist Party's Commission on Science and Technology, has been tasked with strengthening China's capacity for technological innovation, which would enhance its strategic competitiveness against the United States.</p><p>The party is currently using AI to monitor citizens, develop advanced unmanned weapons systems, and transform economic sectors through robotics and industrial automation, among other things.</p><p>But the US has so far been leading the way in manufacturing technology and chip design. And Washington has taken a slew of measures to retain its dominance in this strategic sector.</p><p>As early as 2023, the then Biden administration decided to restrict the export of advanced semiconductors and chip manufacturing equipment to China, citing national security reasons.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/nvidia-scandal-china-s-chips-dilemma-us-rivalry-shape-ai-race/a-79961766?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/16 20:12</span>
+    </div>
+
+    
+    <p class="title-ja">ユーロビジョン主催者、アジア初のコンテストでマレーシアによるLGBT+映像の削除を批判</p>
+    <p class="title-en"><a href="https://www.theguardian.com/tv-and-radio/2026/nov/16/eurovision-organisers-malaysia-removal-lgbt-footage-first-asian-contest" target="_blank" rel="noopener">Eurovision organisers criticise Malaysian removal of LGBT+ footage in first Asian contest</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>放送局TV3がタイのドラァグパフォーマーとゲイのフィリピン陪審報道官の映像をカットしたようだ</p><p>ユーロビジョンの主催者は、最初のユーロビジョン・アジアがマレーシアで放送された際に改変され、明らかに番組からLGBTQ+の画像や人物が削除されたことに「驚き、残念に思っている」と述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ユーロビジョンを所有する公共放送の連合体である欧州放送連合（EBU）は、ライセンスを受けてアジアコンテストを制作しているヴォクソベーション社に書簡を送り、マレーシアの放送局TV3に対し、なぜこのようなことが起こったのかを解明するよう求めると述べた。</p><p>フィリピンのカーメルが優勝したこのコンテストのオンラインで出回った映像には、バンコクで土曜日に行われた決勝戦の投票中に、フィリピンの広報担当副ガンダがフィリピンの陪審員の得点を与えたときの2つのカットのうちの最初のカットが映っていた。</p><p>Vice Ganda は同性愛者であり、ノンバイナリーであることを自認しています。このコメディアンはフィリピンのテレビ界最大のスターの一人であり、フィリピンで最も視聴されている昼の番組のトップを務め、国内でのLGBTQ+の受け入れを求めるキャンペーンを行ってきた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Broadcaster TV3 appears to cut footage of Thai drag performers and gay Philippine jury spokesperson</p><p>Eurovision’s organisers have said they are “surprised and disappointed” that the first Eurovision Asia was altered when it was broadcast in Malaysia, apparently removing LGBTQ+ imagery and people from the show.</p><p>The European Broadcasting Union (EBU), the alliance of public broadcasters that owns Eurovision, said it would write to Voxovation, the company producing the Asian contest under licence, and ask it to establish with the Malaysian broadcaster TV3 why it happened.</p><p>Footage circulating online of the contest, which was won by the Philippines’ Carmelle , showed the first of two cuts during the voting in Saturday’s final in Bangkok, when the Philippines’ spokesperson, Vice Ganda, awarded the Philippine jury’s points.</p><p>Vice Ganda is gay and identifies as non-binary. The comedian is among the biggest stars on Philippine television, has fronted the country’s most watched daytime show, and has campaigned for LGBTQ+ acceptance at home.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/tv-and-radio/2026/nov/16/eurovision-organisers-malaysia-removal-lgbt-footage-first-asian-contest" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/16 07:11</span>
+    </div>
+
+    
+    <p class="title-ja">トランプ大統領と習主席の中国での今後の会談から何を期待するか</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/15/nx-s1-6038814/what-to-expect-from-trump-and-xis-upcoming-meeting-in-china" target="_blank" rel="noopener">What to expect from Trump and Xi's upcoming meeting in China</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>今週中国の深センで開催されるアジア太平洋経済協力会議で、トランプ大統領が中国指導者習近平氏およびロシアのウラジーミル・プーチン大統領と会談する際に何が予想されるのかをプレビュー。</p><p>NPR プログラミングのトランスクリプトの精度と可用性は異なる場合があります。トランスクリプト テキストは、エラーを修正したり、音声の更新に一致させるために改訂される場合もあります。音声は、元の放送または出版後に編集される場合があります。 NPR の番組の信頼できる記録は音声記録です。 NPR のプラットフォームと製品には、サードパーティによって作成されたプログラムも含まれていることに注意してください。 NPR はそのコンテンツのトランスクリプトを保証できず、一部のトランスクリプトは自動ツールまたはその他のツールを使用して作成される場合があります。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>NPR は、取材やインタビューに対して金銭を提供したり受け取ったりしません。そのような申し出や要求を行う者は、NPR の従業員ではなく、NPR を代表するものでもありません。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Preview of what to expect as President Trump meets with Chinese leader Xi Jinping and Russian President Vladimir Putin at the Asia-Pacific Economic Cooperation summit in Shenzhen, China this week.</p><p>Accuracy and availability of transcripts for NPR programming may vary. Transcript text may also be revised to correct errors or match updates to audio. Audio may be edited after its original broadcast or publication. The authoritative record of NPR’s programming is the audio record. Please note that NPR platforms and products also include some programming produced by third parties; NPR cannot guarantee transcripts for that content and some transcripts may be produced using automated or other tools.</p><p>NPR does not offer or accept money for coverage or interviews. Anyone who makes such an offer or request is not an NPR employee and does not represent NPR.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/15/nx-s1-6038814/what-to-expect-from-trump-and-xis-upcoming-meeting-in-china" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/15 21:26</span>
+    </div>
+
+    
+    <p class="title-ja">ASEANは、離脱中のミャンマー指導者らに首脳会談への復帰の道を提供するが、和平計画に有意義な進展が見られるまで制限は継続すると述べた</p>
+    <p class="title-en"><a href="https://www.dw.com/en/asean-offers-myanmar-s-sidelined-leaders-a-path-back-to-summits-but-says-restrictions-will-stay-until-there-is-meaningful-progress-on-its-peace-plan/a-79951878?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">ASEAN offers Myanmar's sidelined leaders a path back to summits, but says restrictions will stay until there is meaningful progress on its peace plan</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>東南アジアの首脳らは日曜日、地域和平計画の進展を条件にミャンマー政府に段階的に関与させる一方で、ハイレベル会合への復帰を条件とすることで合意した。</p><p>ミャンマーは依然として東南アジア諸国連合（ASEAN）の加盟国であるが、2021年10月以降、政治指導者は首脳会議や外相会談から締め出されている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>その年、軍部が権力を掌握し、ノーベル平和賞受賞者のアウン・サン・スー・チー率いる選挙で選ばれた政府を打倒し、現在も続く内戦を引き起こした。</p><p>共同声明の中で、首脳は「現場の動向を考慮し、段階的かつ進捗に基づいたアプローチを通じてミャンマーとの調整された関与」を求めた。</p><p>両首脳は、ASEANが域内の5項目の和平計画について「持続的かつ具体的な進展」を遂げれば、ミャンマーの完全な政治的代表権を段階的に回復できる可能性があると述べた。この計画は2021年に合意されて以来、ほとんど成果を上げておらず、軍と民主主義・民族武装勢力との間で戦闘が続いている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Southeast Asian leaders agreed on Sunday to engage Myanmar's government in stages, while making its return to high-level meetings conditional on progress on a regional peace plan.</p><p>Myanmar remains a member of the Association of Southeast Asian Nations (ASEAN) , but its political leaders have been barred from summits and foreign ministers' meetings since October 2021.</p><p>The military seized power that year, overthrowing the elected government led by Nobel Peace Prize laureate Aung San Suu Kyi and triggering a civil war that continues today.</p><p>In a joint statement, the leaders called for "a calibrated engagement with Myanmar through a phased and progress-based approach, taking into account developments on the ground.”</p><p>They said ASEAN could gradually restore Myanmar's full political representation if it makes "sustained and concrete progress” on the bloc's five-point peace plan. The plan has yielded little since it was agreed on in 2021, and fighting continues between the military and pro-democracy and ethnic armed groups.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/asean-offers-myanmar-s-sidelined-leaders-a-path-back-to-summits-but-says-restrictions-will-stay-until-there-is-meaningful-progress-on-its-peace-plan/a-79951878?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/17 04:18</span>
+    </div>
+
+    
+    <p class="title-ja">米国の大手銀行の口座にオンラインでアクセスするのが困難だと数千人が報告</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/16/thousands-report-difficulties-accessing-accounts-online-at-major-us-banks?traffic_source=rss" target="_blank" rel="noopener">Thousands report difficulties accessing accounts online at major US banks</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>オンラインでサービス中断を追跡しているダウンディテクターによると、米国の大手銀行5行の顧客がサービス停止を報告している。</p><p>月曜日の報道によると、影響を受ける金融機関にはUSバンク、ウェルズ・ファーゴ、ゼル、JPモルガン・チェース、バンク・オブ・アメリカが含まれる。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>たとえばウェルズ・ファーゴでは、800人を超える顧客がログイン、口座残高、資金移動の問題などの問題を報告した。 Chase では、5,000 近くの顧客から問題が報告され、そのうちの 50% は口座残高と取引に関するものでした。</p><p>チェースの広報担当者は声明で「技術的な問題により、一部の取引の完了に通常より時間がかかっているが、顧客は引き続き自分の口座や資金にアクセスできる」と述べた。 「私たちはできるだけ早くこの問題を解決できるよう取り組んでいます。」</p><p>CNBCが匿名の情報筋の話として伝えたところによると、JPモルガン・チェースは「悪役」が混乱に関与していないようだと述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Customers at five major banks in the United States are reporting outages, according to Downdetector, which tracks service disruptions online.</p><p>The impacted institutions include US Bank, Wells Fargo, Zelle, JPMorgan Chase and Bank of America, according to reports on Monday.</p><p>At Wells Fargo, for example, more than 800 customers reported issues, including problems with logins, account balances and fund transfers. At Chase, nearly 5,000 customers reported issues, 50 percent of which involved account balances and transactions.</p><p>“Due to a technical issue, some transactions are taking longer than usual to complete but customers still have access to their accounts and funds,” a Chase spokesperson said in a statement. “We are working to resolve this as quickly as possible.”</p><p>JPMorgan Chase says “bad actors” do not appear to be involved in the disruption, according to CNBC, which cited an unnamed source.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/16/thousands-report-difficulties-accessing-accounts-online-at-major-us-banks?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/17 04:16</span>
+    </div>
+
+    
+    <p class="title-ja">トランプ大統領、「ジェンセンを取り戻せ」キャンペーン開​​始後、元エヌビディア社長の復帰を支持</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cry49plv8v3go?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Trump backs return of ex-Nvidia boss after 'Bring Jensen Back' campaign launched</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ドナルド・トランプ米大統領は、エヌビディア前最高経営責任者（CEO）の支持者らが同氏の復帰を求めている中、ジェンセン・フアン氏が職を返上するのは「決して気にしない」と述べた。</p><p>黄氏は先週、2件の事件が発覚した後、AIチップ大手の社長を辞任した。そのうちの1件は中国スパイ容疑の女性との件、もう1件は従業員の一人との件だった。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>これは、AI展開の重要な部分である世界で最も価値のある企業の1つに危機をもたらしたが、BBCは、Nvidiaの取締役会がHuang氏の復帰を検討していないと伝えた。</p><p>一方、トランプ政権は月曜日、中国によるエヌビディアなどの企業のAIチップへのアクセスをさらに制限すると発表した。</p><p>スペースX社のイーロン・マスク氏やフォートナイトメーカーエピック・ゲームズの最高経営責任者ティム・スウィーニー氏を含む仲間のテクノロジー企業幹部らは、エヌビディア取締役会に「ジェンセンを呼び戻せ」と求めるキャンペーンを支持している。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>US President Donald Trump has said he "would certainly not mind" seeing Jensen Huang handed back his job as allies of the former Nvidia chief executive called for him to be reinstated.</p><p>Huang resigned as boss of the AI chip giant last week after the emergence of two affairs, one of which was with a woman suspected of spying for China and another allegedly with one of his employees.</p><p>It created a crisis for one of the world's most valuable firms, which is a key part of the AI rollout, but the BBC has been told Nvidia's board is not considering reinstating Huang.</p><p>Meanwhile the Trump administration on Monday said it will further restrict China's âaccess to AI chips from companies like Nvidia.</p><p>Fellow tech bosses, including SpaceX's Elon Musk and Tim Sweeney, chief executive of Fortnite-maker Epic Games, have backed a campaign to get Nvidia's board to "Bring Jensen Back".</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cry49plv8v3go?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/17 03:04</span>
+    </div>
+
+    
+    <p class="title-ja">AI兵器への懸念が高まる中、国連協議は「殺人ロボット」の抑制を目指す</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/16/nx-s1-6042548/un-killer-robots-ai-weapons-drones" target="_blank" rel="noopener">U.N. talks seek to rein in 'killer robots' as fears over AI weapons grow</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ジュネーブ — 「キラーロボット」としても知られる自律型致死兵器の使用に関する規則の可能性についての交渉が、ジュネーブの国連で進行中である。</p><p>自律型兵器の規制支持者らは、5年に1度しか開催されない今週の特定通常兵器（CCW）に関する国連会議が、手遅れになる前に規則に合意する最後の最良の機会だと主張している。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>戦争技術はここ数年で急速に進歩しており、一部の専門家は、標的を選択し、自律的に殺害の決定を下せる兵器が世界に普及するまであと数カ月しかかからないと警告する人もいる。</p><p>ウクライナとガザではすでにAI支援兵器が標的を排除するために使用されており、ウクライナの民間人は買い物や通学中にドローンに「追われている」と報告している。しかし、これらは依然として人間によって遠隔制御されています。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>GENEVA — Negotiations on possible rules for the use of lethal autonomous weapons, also known as 'killer robots' are underway at the United Nations in Geneva.</p><p>Supporters of controls on autonomous weapons say this week's U.N. conference on Certain Conventional Weapons (or CCW), which meets just once every five years, is the last best chance to agree rules before it is too late.</p><p>Warfare technology has advanced rapidly in the last few years, with some experts warning that the world is just months away from having weapons that can choose targets and make the decision to kill autonomously.</p><p>In Ukraine and Gaza, AI-assisted weapons have already been used to take out targets, with Ukrainian civilians reporting being 'hunted' by drones as they shop or go to school. But these are still controlled remotely by humans.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/16/nx-s1-6042548/un-killer-robots-ai-weapons-drones" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/16 18:27</span>
+    </div>
+
+    
+    <p class="title-ja">11月に珍しい竜巻がデラウェア州を襲った</p>
+    <p class="title-en"><a href="https://www.theguardian.com/environment/2026/nov/16/delaware-hit-by-rare-november-tornado" target="_blank" rel="noopener">Delaware hit by rare November tornado</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>一方、アルゼンチンでは激しい雷雨により野球ボールほどの大きさのひょうが降った</p><p>米国国立気象局は、木曜日にEF1竜巻がデラウェア州セイラムウッズ近郊のニューアーク南東に到達したことを確認した。竜巻は幅160メートル、進路の長さは4.4マイル（7.1キロ）に達し、推定最大風速は時速100マイル（時速161キロ）に達した。負傷者や死者は出なかったが、数軒の家屋の窓や屋根が破損し、ホテルの大きな看板が多数の車の上に落ち、州間高速道路95号線でセミトラックが横転した。デラウェア州では毎年数回の竜巻が発生することが多いが、米国海洋大気局によると、同州で11月に竜巻が発生したのは1950年以来2度目だという。 11 月に竜巻が記録されたのは 1989 年だけです。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Meanwhile, severe thunderstorms bring hailstones the size of baseballs in Argentina</p><p>The National Weather Service in the US has confirmed that an EF1 tornado touched down south-east of Newark in the Salem Woods neighbourhood, Delaware , on Thursday. The tornado reached 160 metres wide, had a path length of 4.4 miles (7.1km) and reached estimated peak winds of up to 100mph (161km/h). There were no injuries or fatalities but windows and roofs were damaged on several homes, a large hotel sign fell on to a number of cars, and a semi truck overturned on I95. Although Delaware often experiences a few tornadoes every year, this is only the second time the state has had tornado activity in November since 1950, according to the National Oceanic and Atmospheric Administration. The only other November tornado recorded was in 1989.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/environment/2026/nov/16/delaware-hit-by-rare-november-tornado" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/16 22:16</span>
+    </div>
+
+    
+    <p class="title-ja">米国のバスケットボール選手がナイジェリアの空港で75ポンドのマリファナで逮捕、当局が発表</p>
+    <p class="title-en"><a href="https://www.theguardian.com/sport/2026/nov/16/us-basketball-player-arrested-with-75lb-of-marijuana-at-nigerian-airport-say-authorities" target="_blank" rel="noopener">US basketball player arrested with 75lb of marijuana at Nigerian airport, say authorities</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ナイジェリアで麻薬密輸に終身刑</p><p>アメリカのバスケットボール選手がナイジェリアで33.95kg（75ポンド）のマリファナを密輸しようとした疑いで逮捕された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ナイジェリアの国家麻薬取締局（NDLEA）は、ジョージア州出身のグリーン・ダモンテ・キーリーという28歳の選手が先週の水曜日、タイからアラブ首長国連邦経由の便で到着した後、ラゴスの主要空港で逮捕されたと発表した。</p><p>NDLEAによると、同選手はバスケットボールキャリアのための「ネットワークを構築する」ためにナイジェリアに来たと話したという。同庁は、彼の携帯電話に残された証拠は、彼が「麻薬密売活動についての知識と関与」を示唆していたと述べた。 NDLEAは、同選手が預け荷物2個を放棄した後、手荷物を持って空港を出ようとしたところを拘束したと発表した。同庁によると、これら２つのバッグにはマリファナ３２袋と追跡装置が入っていたことが判明したという。</p><p>ナイジェリアには厳格な麻薬法があり、密売には終身刑が科せられる。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Drug smuggling carries life sentence in Nigeria</p><p>An American basketball player has been arrested in Nigeria for allegedly attempting to smuggle 33.95kg (75lb) of marijuana into the country.</p><p>Nigeria’s National Drug Law Enforcement Agency (NDLEA) said a 28-year-old player named as Greene Da’monte Khiree from the state of Georgia was arrested at Lagos’s main airport last Wednesday after he arrived on a flight from Thailand via the United Arab Emirates.</p><p>The NDLEA said the player told them he had come to Nigeria to “build networks” for his basketball career. The agency said evidence on his phone suggested he had “knowledge of and involvement in the drug trafficking activity”. The NDLEA said it detained the player when he attempted to leave the airport with his hand luggage after abandoning two checked-in bags. The agency said those two bags were found to contain 32 parcels of marijuana, and a tracking device.</p><p>Nigeria has strict drug laws, and trafficking carries a sentence of life in prison.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/sport/2026/nov/16/us-basketball-player-arrested-with-75lb-of-marijuana-at-nigerian-airport-say-authorities" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/16 19:57</span>
+    </div>
+
+    
+    <p class="title-ja">南アフリカで銃乱射事件２件、１７人死亡</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c8y5x3n4kywpo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Two mass shootings in South Africa leave 17 dead</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>南アフリカ警察は日曜日の夜、2件の別々の銃撃で17人が殺害された事件を捜査している。</p><p>クワズール・ナタール州でミニバスの中で男性８人が射殺された。警察は現場に到着した際に彼らの死亡を宣言した。数時間後、プレトリア西部の小屋の中で9人が射殺されているのが発見された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>警察は２つの事件に関連性はないとしている。銃撃の動機はまだ解明されていない。</p><p>南アフリカはギャング関連の殺人を含む暴力犯罪の抑制に苦戦している。この国の殺人率は世界で最も高い国の一つです。</p><p>警察は、クワズール・ナタール州ピーターマリッツバーグ町郊外で銃撃事件の通報を受けて対応し、弾痕だらけの白い７人乗り車を発見したと発表した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>South African police are investigating the murders of 17 people in two separate shootings on Sunday night.</p><p>Eight men were fatally shot in a minibus in KwaZulu-Natal province. Police declared them dead when they arrived at the scene. Hours later, nine people were found shot dead inside a shack in western Pretoria.</p><p>Police say the two incidents are unrelated. The motive for the shootings has not yet been established.</p><p>South Africa is struggling to contain violent crime, including gang-related killings. The country has one of the world's highest murder rates.</p><p>Police say they responded to reports of a shooting â outside Pietermaritzburg town in KwaZulu-Natal and found a white seven-seater vehicle riddled with bullet holes.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c8y5x3n4kywpo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-11-17";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
