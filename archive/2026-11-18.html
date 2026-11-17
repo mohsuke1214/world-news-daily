@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年11月18日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/18 03:39</span>
+    </div>
+
+    
+    <p class="title-ja">EUとASEANは貿易関係の深化を追求しているが、企業は非公式な障壁に苦戦しており、ハードルは依然として残っている</p>
+    <p class="title-en"><a href="https://www.dw.com/en/eu-asean-pursue-deeper-trade-ties-but-hurdles-remain-as-businesses-struggle-with-informal-barriers/a-79971350?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">EU, ASEAN pursue deeper trade ties, but hurdles remain as businesses struggle with informal barriers</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>欧州連合と東南アジア諸国連合（ASEAN）は、両国が外交関係樹立50周年を迎える2027年に画期的な年を迎える可能性がある。</p><p>待望のインドネシアとの貿易協定が発効する見込みである一方、フィリピンとの協定は完了に近づき、タイやマレーシアとの交渉も進展している。来年末までに、EUは東南アジアの6カ国と貿易協定を結ぶ可能性があり、現在の加盟国は2カ国にとどまる可能性がある。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>この記念日は、EUとASEANの間のより広範な貿易協定という長年の野望を復活させる可能性もある。</p><p>11月17日、欧州委員会はブリュッセルで対話を主催し、既存および保留中の自由貿易協定（FTA）の進捗状況を含む東南アジアとの通商関係について話し合った。</p><p>しかし、注目は次に何が起こるかに移っている。 「FTAの締結は始まりに過ぎず、終わりではない」とEU・ASEANビジネス協議会のエグゼクティブディレクター、クリス・ハンフリー氏はDWに語った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The European Union and the Association of Southeast Asian Nations (ASEAN) could be heading for a breakthrough year in 2027, when the two sides mark 50 years of diplomatic ties.</p><p>A long-awaited trade agreement with Indonesia is expected to take effect, while a deal with the Philippines is nearing completion and negotiations with Thailand and Malaysia are making progress. By the end of next year, the EU could have trade deals in place with six Southeast Asian states, up from just two today.</p><p>The anniversary could also revive the long-standing ambition of a broader trade agreement between the EU and ASEAN.</p><p>On November 17, the European Commission hosted a dialogue in Brussels to discuss trade relations with Southeast Asia, including progress on existing and pending free trade agreements (FTAs).</p><p>But attention is turning to what comes next. "Finalizing FTAs is only the beginning, not the end," Chris Humphrey, executive director of the EU-ASEAN Business Council, told DW.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/eu-asean-pursue-deeper-trade-ties-but-hurdles-remain-as-businesses-struggle-with-informal-barriers/a-79971350?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/18 02:19</span>
+    </div>
+
+    
+    <p class="title-ja">「本当に怖かった」：ロシアによるキエフ橋攻撃中の避難生活について母親が語る</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cq7825234lgmo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">'It was really scary': Mother describes sheltering during Russia strikes on Kyiv bridge</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>キエフでは月曜日23時半前に弾道ミサイルの脅威を警告する警報が鳴った。しばらくして爆発音が鳴り響いた。</p><p>再び、市内を貫く広いドニプロ川にかかる主要な橋が標的となり、今度はロシアのミサイルが狙い通りに命中した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ピヴニチヌイ（北）橋の一端近くに大きなクレーターがあり、土砂降りの雨で水がそこを通って下の川に流れ込んでいる。舗装材と金属の塊が周囲に散らばっています。</p><p>ギザギザの穴の幅は最も広い部分で約 8 メートルです。</p><p>交差点は時折消防車やパトカーが高速で通過する以外は全面通行止めとなっている。対照的に、近くの道路は車やトラックで渋滞しており、長い迂回を余儀なくされています。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The alarms warning of a ballistic missile threat went off just before 23:30 on Monday in Kyiv. Moments later came the boom of explosions.</p><p>Once again, the main bridges over the broad River Dnipro that cuts through the city were the target and this time the Russian missiles hit what they wanted.</p><p>Close to one end of the Pivnichnyi (Northern) bridge there is a large crater and in the pouring rain, water now rushes through it to the river below. Chunks of tarmac and metal are scattered around.</p><p>At its broadest point, the jagged hole is about eight metres wide.</p><p>The crossing is closed to all traffic apart from the occasional fire engine or police car passing at high speed. By contrast, nearby roads are jammed with cars and trucks, forced to take long detours.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cq7825234lgmo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/18 01:39</span>
+    </div>
+
+    
+    <p class="title-ja">写真：生活水準と賃金をめぐってフランスで数万人が集会</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/gallery/2026/11/17/photos-tens-of-thousands-rally-in-france-over-living-standards-and-wages?traffic_source=rss" target="_blank" rel="noopener">Photos: Tens of thousands rally in France over living standards and wages</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>生活水準や公共サービスの圧迫に対する抗議活動が国を混乱させ続ける中、賃金上昇を確保するために労働組合が公共部門労働者による全国的なストライキを呼びかけたことを受け、フランス全土でデモ参加者が集結した。</p><p>先週の民間部門労働者の最低賃金引き上げに続き、金曜日のセバスティアン・ルコルニュ首相との協議で全面的な賃上げを求める組合の要求が満たされなかったことを受け、フランスの公務員580万人は火曜日、動員するよう促された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>今月初めに行われた前回の動員では数十万人の労働者が動員され、いくつかの都市で衝突が発生した際には警察が催涙ガスを発射したことを受けて、この日は9月以来、公共部門でストライキと抗議活動が行われる3度目の統一デーとなる。</p><p>レコルヌ氏の会合後、さらに多くの労働組合がストライキの呼びかけに参加し、政府の提案した措置は彼らが言うところの緊急の賃金と生活費の危機に対処していないと主張した。パリでは市東部で大規模な集会が開かれており、全国でも数十件のデモが計画されていた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Demonstrators have gathered across France after unions called a nationwide strike by public sector workers in a bid to secure pay rises, as protests over living standards and squeezed public services continue to roil the country.</p><p>France’s 5.8 million public sector employees were urged to mobilise on Tuesday after talks with Prime Minister Sebastien Lecornu on Friday failed to satisfy union demands for across-the-board pay rises, following last week’s minimum wage boost for private-sector workers.</p><p>It is the third united day of strikes and protests in the public sector since September, after a previous mobilisation earlier this month drew hundreds of thousands of workers and saw police fire tear gas as clashes broke out in several cities.</p><p>More unions joined the call to strike after Lecornu’s meeting, saying the government’s proposed measures did not address what they describe as an urgent pay and cost-of-living crisis. In Paris, a major rally was taking place in the east of the city, with dozens of other demonstrations planned nationwide.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/gallery/2026/11/17/photos-tens-of-thousands-rally-in-france-over-living-standards-and-wages?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/18 01:34</span>
+    </div>
+
+    
+    <p class="title-ja">「多くの怒りと弱い政府」：なぜフランスの公共部門の労働者はストライキをするのか？</p>
+    <p class="title-en"><a href="https://www.france24.com/en/video/20261117-a-lot-of-anger-and-a-weak-government-why-are-french-public-sector-workers-striking" target="_blank" rel="noopener">'A lot of anger and a weak government': Why are French public sector workers striking?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>火曜日、労働組合が賃金引き上げを求めて全国的な公共部門の新たなストライキを呼びかけたことを受け、フランス全土で数万人が抗議活動に参加した。この事態は、1か月以上にわたる騒乱と学生主導のしばしば暴力的な抗議活動が続いたが、政府はこれを鎮圧できなかった。フランス24のマルク・ペレルマン氏が解説する。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Tens of thousands of people took part in protests across France on Tuesday after unions called a new nationwide public sector strike to demand pay rises. It follows more than a month of unrest and often violent protests led by students that the government has failed to quell. France 24's Marc Perelman explains.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261117-a-lot-of-anger-and-a-weak-government-why-are-french-public-sector-workers-striking" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/18 03:27</span>
+    </div>
+
+    
+    <p class="title-ja">英国、イスラエルヨルダン川西岸の和解問題で企業を制裁</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cvglr977x3z0o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">UK sanctions firms over Israeli West Bank settlements</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>英国は、政府が同地域でのイスラエルの行動に対するより厳しい対応を発表して以来、最初の一連の措置として、占領下のヨルダン川西岸で入植地建設に関与しているとされる企業に制裁を科した。</p><p>政府は、建設・不動産開発会社８社に対する制裁により、資金の流れとヨルダン川西岸の建設支援能力が阻害されると述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>国際法上違法である入植地の建設は近年急増している。パレスチナ人とその財産に対する入植者による攻撃も急増している。</p><p>イスラエルのギデオン・サール外相は、今回の制裁を「法を遵守する民間企業を標的とした敵対行為」と呼んだ。</p><p>Xに関する動きを批判し、イスラエルはこれまでと同様に「対抗措置」で応じるだろうとし、「決定はやがて発表されるだろう」と書いた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The UK has sanctioned companies it said are involved in building settlements in the occupied West Bank, in the first package of measures since the government announced a tougher approach to Israeli actions in the territory.</p><p>The government said the sanctions against eight construction and property development firms would disrupt their flows of finance and ability to support building in the West Bank.</p><p>The construction of settlements, which are illegal under international law, has risen sharply in recent years. Settler attacks on Palestinians and their property have also surged.</p><p>Israeli Foreign Minister Gideon Saar called the sanctions a "hostile act targeting private, law-abiding companies".</p><p>Criticising the move on X, he wrote that Israel - as it has done in the past - will respond with "countermeasures", and that "decisions will be announced in due course".</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cvglr977x3z0o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/18 02:57</span>
+    </div>
+
+    
+    <p class="title-ja">イスラエル軍がシリアの村に侵攻、家屋が被害を受ける</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/17/israeli-forces-invade-syrian-village-leaving-homes-damaged?traffic_source=rss" target="_blank" rel="noopener">Israeli forces invade Syrian village leaving homes damaged</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イスラエル軍がシリアの村に侵攻、家屋が被害を受ける</p><p>ビデオには、シリアのダラア県でイスラエルによる住宅襲撃の余波で銃弾だらけの壁と黒焦げの持ち物が映り、家族が避難を強いられている様子が映っている。報道によると、侵攻中に23台のイスラエル軍車両がその地域に入ったという。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Israeli forces invade Syrian village leaving homes damaged</p><p>Video shows bullet-riddled walls and charred belongings in the aftermath of Israeli raids on homes in Syria’s Daraa province, forcing families to flee. Reports say 23 Israeli military vehicles entered the area during the incursion.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/17/israeli-forces-invade-syrian-village-leaving-homes-damaged?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/18 02:02</span>
+    </div>
+
+    
+    <p class="title-ja">サウジアラビア：人権団体が死刑執行数の増加に警鐘を鳴らす</p>
+    <p class="title-en"><a href="https://www.dw.com/en/saudi-arabia-rights-groups-raise-alarm-over-rising-number-of-executions/a-79970773?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Saudi Arabia: Rights groups raise alarm over rising number of executions</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>サウジアラビアは驚くべき速度で人々を処刑し続けている。土曜日、サウジアラビア東部州でジャワド・アブドラ・クライリス氏とファデル・ハッサン・アルサフワニ氏が処刑された。サウジ当局によると、両名はテロ犯罪で有罪判決を受けた。 2011年、アルサフワニは公民権と拘留者の釈放を求める平和的抗議活動の著名な主催者だった。当時未成年だったクライリスさんは、カティフ市で行われたこうした抗議活動の一つに参加した。</p><p>国連の恣意的拘禁に関する作業部会は、クライリス氏の拘禁が恣意的であったと認定し、2024年11月にクライリス氏を釈放するよう求めた。この意見には他の4人の男性も含まれていた。クライリスはこの5人のうち4人目に処刑された。人権団体によると、5人目のユセフ・アル・マナシフ氏は、サウジアラビア最高裁判所が死刑判決を支持した後も依然として危険にさらされている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Saudi Arabia continues to execute people at an alarming rate. On Saturday, Jawad Abdullah Qureiris and Fadel Hassan al-Safwani were executed in Saudi Arabia's Eastern Province. Both men were convicted of terrorist offenses, according to Saudi authorities. In 2011, al-Safwani was a prominent organizer of the peaceful protests that called for civil rights and the release of detainees. Qureiris, who was a minor at the time, participated in one of these protests in the city of Qatif.</p><p>The UN Working Group on Arbitrary Detention called for Qureiris' release in November 2024, after finding that his detention was arbitrary. The opinion also covered four other men. Qureiris was the fourth of these five to be executed. The fifth, Yousef al-Manasif, remains at risk after Saudi Arabia's Supreme Court upheld his death sentence, according to human rights organizations.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/saudi-arabia-rights-groups-raise-alarm-over-rising-number-of-executions/a-79970773?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/18 00:44</span>
+    </div>
+
+    
+    <p class="title-ja">トランプ大統領、ワシントンに対するイラン爆撃の可能性を「非常に真剣に」受け止めていると語る</p>
+    <p class="title-en"><a href="https://www.france24.com/en/americas/20261117-trump-says-he-takes-possible-iran-bomb-threat-to-washington-very-seriously" target="_blank" rel="noopener">Trump says he takes possible Iran bomb threat to Washington 'very seriously'</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イランがおそらく放射性爆弾でトランプ政権高官を標的にする計画を立てているとの報道を受け、ドナルド・トランプ大統領は火曜日、米国当局はワシントンに対するあらゆる脅威を「非常に真剣に」受け止めていると述べた。テヘランは報道を「捏造」として却下した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>President Donald Trump said Tuesday that US authorities take any possible threats to Washington ‘very seriously’, following reports that Iran was planning to target senior Trump administration officials, possibly with a radioactive bomb. Tehran dismissed the reports as ‘fabricated’.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/americas/20261117-trump-says-he-takes-possible-iran-bomb-threat-to-washington-very-seriously" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/18 01:16</span>
+    </div>
+
+    
+    <p class="title-ja">深セン：「中国のシリコンバレー」の内部</p>
+    <p class="title-en"><a href="https://www.france24.com/en/video/20261117-shenzhen-inside-china-s-silicon-valley" target="_blank" rel="noopener">Shenzhen: Inside ‘China’s Silicon Valley’</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>習近平は今年のAPEC首脳会議でドナルド・トランプとウラジーミル・プーチンを迎える際、自国で最も技術的に進んだ都市の一つでそれを行うことになる。深センは中国の最先端テクノロジーの主要拠点であり、ロボタクシーやAI搭載ドローンが背景の一部として当たり前に使われている場所です...その現在の地位は、かつて共産主義だったこの国を国際市場と外国投資に開放することを目的とした数十年にわたる政策の結果です。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>When Xi Jinping hosts Donald Trump and Vladimir Putin at this year's APEC summit, he'll be doing it in one of his country's most technologically advanced cities. Shenzhen is China's premier hub for cutting-edge tech – a place where robo-taxis and AI-powered drones are a normal part of the background... Its current status is the result of decades of policies aimed at opening up the once communist country to international markets and foreign investment.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261117-shenzhen-inside-china-s-silicon-valley" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/18 00:59</span>
+    </div>
+
+    
+    <p class="title-ja">トランプ大統領、マニラでのクアッド会議で重要鉱物協定を発表</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/17/trump-announces-critical-minerals-agreements-at-quad-meeting-in-manila?traffic_source=rss" target="_blank" rel="noopener">Trump announces critical minerals agreements at Quad meeting in Manila</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ドナルド・トランプ米国大統領は、米国とインド太平洋3カ国の安全保障グループであるクアッドのメンバーが、重要な鉱物のサプライチェーンの確保を目的とした合意に達したと述べた。</p><p>トランプ大統領は木曜日、フィリピンでインドのナレンドラ・モディ首相、オーストラリアのアンソニー・アルバニーズ首相、日本の高市早苗首相らクワッド首脳らと会談した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>トランプ大統領はマニラでの会談に先立ち、「我が国は、自由で開かれ、安定し、繁栄したインド太平洋の四隅である」と述べた。</p><p>トランプ大統領は会談中、重要鉱物に関する協定は「単一の外国供給者による強制」を防ぐことを目的としていると述べた。同氏は世界のレアアース供給を独占している中国を名指ししなかった。</p><p>トランプ大統領はその後、米国は10カ月以内にレアアースで「必要なものはすべて」手に入るだろうと述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>United States President Donald Trump says that members of the Quad, a security grouping of the US and three Indo-Pacific countries, have reached agreements aimed at securing supply chains of critical minerals .</p><p>Trump met India’s Prime Minister Narendra Modi, Australia’s Prime Minister Anthony Albanese and Japan’s Prime Minister Sanae Takaichi – the other Quad leaders – in the Philippines on Thursday.</p><p>“Our countries are the four corners of a free, open, stable, and prosperous Indo-Pacific,” Trump said in remarks ahead of the meeting in Manila.</p><p>During the meeting, Trump said the agreements on critical minerals aimed to prevent “coercion by any single foreign supplier”. He did not single out China, which dominates global rare earth supplies .</p><p>Trump later said the US would have “everything we need” on rare earths in 10 months.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/17/trump-announces-critical-minerals-agreements-at-quad-meeting-in-manila?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/17 23:53</span>
+    </div>
+
+    
+    <p class="title-ja">Nvidia、Huang氏の事件を受けて国家安全保障委員会を設置</p>
+    <p class="title-en"><a href="https://www.dw.com/en/nvidia-forms-national-security-committee-after-huang-affair/a-79970447?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Nvidia forms national security committee after Huang affair</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>Nvidiaは火曜日、取締役会レベルの国家安全保障および輸出管理委員会を設置したと発表した。</p><p>これは、不倫問題で先週辞任した元最高経営責任者（CEO）のジェンスン・ファン氏を巡るスキャンダルに続くもので、その中には中国のスパイ容疑でAI開発に不可欠な高品質チップの中国市場への供給に協力した女性とのスキャンダルも含まれている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>これらの出来事により、米国のハイテク巨人に対する監視と国家安全保障に対する同社の重要性が高まるとともに、投資家が世界で最も価値のある企業とみなす同社の株式市場評価額が1カ月で数千億ドルも吹き飛んだ。</p><p>Nvidiaはこの新しいグループを「国家安全保障および輸出管理監視委員会」と呼んでいる。</p><p>ゴールドマン・サックスの元副会長であるスザンヌ・ノラ・ジョンソン氏が委員長となり、同僚理事のスティーブン・ニール氏、法律事務所の元最高経営責任者（CEO）、カリフォルニア工科大学（カリフォルニア工科大学）の航空学と機械工学の教授であるジョン・ダビリ氏が委員長に加わる。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Nvidia on Tuesday said it had created a board-level national security and export-control committee.</p><p>This follows the scandal surrounding former CEO Jensen Huang , who resigned last week over extramarital affairs , including one with a woman suspected of spying for China and working to help ensure higher quality chips crucial to AI development made it to the Chinese market.</p><p>The events have heightened oversight of the US tech giant and its importance to national security, as well as wiping several hundred billion dollars off the stock market valuation of what investors treat as the world's most valuable company in the space of a month.</p><p>Nvidia is calling the new group its National Security and Export Control Oversight Committee.</p><p>Suzanne Nora Johnson, a former vice chair at Goldman Sachs, will chair the committee, joined by fellow directors Stephen Neal, a former CEO of a law firm, John Dabiri, a professor of aeronautics and mechanical engineering at the California Institute of Technology (Caltech).</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/nvidia-forms-national-security-committee-after-huang-affair/a-79970447?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/17 20:18</span>
+    </div>
+
+    
+    <p class="title-ja">習主席がAPECサミットで「チャイナマックスシン」メッセージを送る中、ハイテク深センが注目の舞台に</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/nov/17/hi-tech-shenzhen-chinamaxxing-xi-apec-summit" target="_blank" rel="noopener">Hi-tech Shenzhen takes centre stage as Xi sends ‘Chinamaxxing’ message at Apec summit</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>開催都市は、中国が世界経済の中心となる自信に満ちた革新的な大国に台頭していることを示すショーケースとなる</p><p>さわやかな夕方の深センの広場では、地元住民や観光客が、都市のスカイラインを構成する何十ものきらびやかな塔が、シアンとバイオレット、サイバーグリーン、中国国家の緋色と金の色のスペクトルで波紋を広げ、「Apec 2026」という文字を繰り返し点滅させているのを眺めていた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>アジア太平洋経済協力会議サミットは、中国の最も先進的な都市のひとつにとって夢のショーケースであり、同国の指導者、習近平はそのネオンの輝きに浸っている。</p><p>その傍らで、一連の注目度の高い二国間会談と、ドナルド・トランプ氏とウラジーミル・プーチン氏との歴史的な三者首脳会談の発表により、世界舞台におけるアジェンダセッターとしての習氏の地位は確固たるものとなった。</p><p>一方、より広範なAPEC首脳会議は、中国が「一国主義と保護主義」と呼ぶもの、つまり米国などの国々が中国に対して講じる通商措置に対して、多国間主義の管理者としての立場を示す機会となる。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Host city offers showcase of China’s rise into a confident and innovative power central to global economy</p><p>I n a Shenzhen square on a balmy evening, locals and tourists watched the dozens of glinting towers that make up the city’s skyline ripple through the colour spectrum – cyan and violet, cyber green, China’s national scarlet and gold – repeatedly flashing the words “Apec 2026”.</p><p>The Asia-Pacific Economic Cooperation summit is a dream showcase for one of China’s most advanced cities, and the country’s leader, Xi Jinping , is basking in its neon glow.</p><p>On the sidelines, a series of high-profile bilateral meetings and the announcement of a historic three-way summit with Donald Trump and Vladimir Putin have cemented Xi’s status as an agenda setter on the global stage.</p><p>The broader Apec summit , meanwhile, provides an opportunity for China to present itself as a steward of multilateralism against what it terms “unilateralism and protectionism” – that is to say, trade measures taken against Beijing by countries such as the US.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/nov/17/hi-tech-shenzhen-chinamaxxing-xi-apec-summit" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/18 03:34</span>
+    </div>
+
+    
+    <p class="title-ja">イラン、米海軍第5艦隊の本拠地バーレーンに第3弾攻撃を開始</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/17/nx-s1-6044255/us-iran-war-latest-bahrain" target="_blank" rel="noopener">Iran launches third round of strikes on Bahrain, host of U.S. Navy's 5th Fleet</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>月曜日、イランのテヘランのダウンタウンで、親政府キャンペーンの一環として、イラン国旗を掲げ、発射されたミサイル、ライフルを持った男性、人々と現在、拳を握りしめた革命防衛隊ミサイル部隊の司令官らを描いた看板の下に女性が掲げられており、ペルシャ語で「空は私たちの誇りと忠誠の場所です」と書かれている。ヴァヒド・サレミ/AP キャプションを隠す</p><p>カイロ—イランは火曜日、バーレーンにある米国のレーダー施設に無人機を発射した。これは、およそ2か月にわたる戦闘の停滞を経て、ペルシャ湾にある小さな島国にある米軍の目標に対するここ数日で3度目の攻撃である。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>バーレーンは火災の到来について警報を発した後、自国の防空システムが「危険なイラン空爆」の迎撃に成功したと発表した。</p><p>米軍は、米軍の装備品への損傷や米軍人員への負傷はなかったと発表した。</p><p>この攻撃は地域からの非難をもたらしているが、アナリストらは、テヘランの経済的圧力の増大と和平交渉の停滞が新たなエスカレーションのリスクを高めていると述べている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A woman holds an Iranian flag as part of a pro-government campaign beneath a billboard depicting a launched missile, a man with a rifle, people and current and the late Revolutionary Guard missile force commanders with clenched fists, with a sign which reads in Farsi: "The sky is a place for our pride and loyalty," in downtown Tehran, Iran, Monday. Vahid Salemi/AP hide caption</p><p>CAIRO — Iran fired drones on Tuesday at a U.S. radar facility in Bahrain, its third attack in recent days on American military targets in the tiny island kingdom in the Persian Gulf after a roughly two-month lull in fighting.</p><p>After issuing an alert about the incoming fire, Bahrain said that its air defense systems had successfully intercepted the "treacherous Iranian aerial attacks."</p><p>The U.S. military said there was no damage to U.S. equipment or injury to American personnel.</p><p>The attacks have brought condemnations from the region, while analysts say that Tehran's growing economic pressures and stalled peace negotiations are raising the risk of renewed escalation.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/17/nx-s1-6044255/us-iran-war-latest-bahrain" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/18 02:19</span>
+    </div>
+
+    
+    <p class="title-ja">コスタリカ人ジャーナリスト、25年ぶりのこうした殺人で射殺される</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/nov/17/costa-rica-journalist-camilo-rodriguez-shot-dead" target="_blank" rel="noopener">Costa Rican journalist shot dead in first such killing in 25 years</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>カミロ・ロドリゲスの死は、国が薬物暴力の急増に取り組む中で起こった</p><p>麻薬密売容疑者や政治家に対する疑惑を発表して名を上げたコスタリカ人ジャーナリスト、カミロ・ロドリゲス氏が月曜日に射殺されたと当局が発表した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>コスタリカでは25年ぶりにジャーナリストが殺害されたことが知られているが、ロドリゲスの死は、同国が長らく中米で最も平和で安定した民主主義国の一つとみなされていたにもかかわらず、国際人身売買グループによる麻薬暴力の急増に対処している中で起こった。</p><p>赤十字社の報告によると、ロドリゲスさん（51）は現地時間午後3時20分ごろ、首都サンノゼ郊外の幹線道路で大渋滞の最中に襲撃された。</p><p>ローラ・フェルナンデス大統領はビデオメッセージでこの攻撃を非難した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Camilo Rodriguez’s death comes as the country grapples with a surge in drug violence</p><p>The Costa Rican journalist Camilo Rodriguez, who gained prominence for publishing allegations against ⁠suspected drug traffickers and politicians, was shot dead on Monday, authorities said.</p><p>The first known killing of a journalist ⁠in Costa Rica in ⁠25 years, ​Rodriguez’s death comes as the country grapples with a surge in drug violence driven by international trafficking groups, despite long ⁠being regarded as one of Central America’s most peaceful and stable democracies.</p><p>Rodriguez, 51, was attacked at about 3.20pm local ⁠time amid heavy traffic on a main highway on the outskirts of the capital ​San Jose, the Red Cross ‌reported.</p><p>President Laura Fernandez condemned ‌the attack in a video message.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/nov/17/costa-rica-journalist-camilo-rodriguez-shot-dead" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/18 02:09</span>
+    </div>
+
+    
+    <p class="title-ja">CAIR、トランプ大統領の「中傷」に対して公民権運動を擁護</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/17/cair-defends-civil-rights-work-against-trumps-smear?traffic_source=rss" target="_blank" rel="noopener">CAIR defends civil rights work against Trump’s ‘smear’</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米国最大のイスラム自由民権団体は、「テロリスト」グループとして包括的に指定される可能性があるというドナルド・トランプ大統領の示唆を非難した。</p><p>アメリカ・イスラム関係評議会（CAIR）は、ホワイトハウスは権利団体を攻撃するのではなく、アメリカのイスラム教徒に対する暴力に対処すべきだと述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>CAIRは火曜日、アルジャジーラへの声明で、「トランプ政権は、このような憎悪に対抗する公民権団体に対する中傷を楽しむことではなく、この暴力的憎しみの急増に対処することに集中すべきである」と述べた。</p><p>トランプ大統領は月曜日、ムスリム同胞団を包括的に「テロリスト」に指定することを検討しており、テキサス州とフロリダ州ですでに「テロリスト」グループに分類されているCAIRについても政権が検討していると述べた。</p><p>「CAIRも私たちが注目している組織です」と彼はこの組織について語った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The largest Muslim civil liberties organisation in the United States has condemned suggestions by President Donald Trump that it could face a blanket designation as a “terrorist” group.</p><p>The Council on American–Islamic Relations (CAIR) said the White House should be addressing violence against American Muslims, rather than attacking the rights group.</p><p>“The Trump administration should focus on addressing this surge in violent hate, not entertaining smears against the civil rights organisation that counters such hate,” CAIR said in a statement to Al Jazeera on Tuesday.</p><p>On Monday, Trump said he was considering giving a blanket “terrorist” designation to the Muslim Brotherhood and that his administration was also looking at CAIR, which is already classified as a “terrorist” group in Texas and Florida.</p><p>“CAIR is another one we are watching,” he said of the organisation.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/17/cair-defends-civil-rights-work-against-trumps-smear?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/18 00:17</span>
+    </div>
+
+    
+    <p class="title-ja">カーニー氏、中国訪問で苦境に立つカナダの自動車セクターに「他の選択肢」に注目</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cq98xlz09ye0o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Carney eyes 'other options' for embattled Canadian auto sector on China trip</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>カナダの自動車産業の窮状は、米国の関税を乗り越え、今後の道筋を描こうとするオタワの取り組みにおける最も明らかなストレステストの一つとなっている。</p><p>ドナルド・トランプ米大統領が非米国製自動車に25％の関税を課し、数十年にわたるカナダとの自由貿易と自動車統合を根底から覆して以来、この1年半はこの業界にとって厳しい状況となった。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>現在、マーク・カーニー首相は、解決策の一環として、アジア太平洋経済協力会議（APEC）出席のため訪問中の中国に注目していることを示唆した。</p><p>しかし、この道には議論がないわけではなく、トランプ大統領に近い人々の怒りを再び招いている。</p><p>カーニー氏は今週初めにカンボジア滞在中に記者団に対し、米国との貿易協定が合意できなかった場合、カナダは自動車製造部門を救うために欧州やアジアの自動車メーカーに頼る可能性があると語った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The plight of Canada's car industry has become one of the clearest stress tests of Ottawa's effort to weather US tariffs and chart a path forward.</p><p>The past year and a half has been tough on the sector since US President Donald Trump imposed a 25% tariff on non-American-made vehicles, upending decades of free trade and automotive integration with Canada.</p><p>Now Prime Minister Mark Carney has signalled that he is looking to China, where he is on a visit for the Asia-Pacific Economic Cooperation summit (Apec), as part of the solution.</p><p>But that avenue is not without controversy, and is once again drawing the ire of those close to Trump.</p><p>While in Cambodia earlier this week, Carney told reporters that Canada could turn to European and Asian carmakers to save its auto manufacturing sector if a trade deal with the US could not be reached.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cq98xlz09ye0o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/18 00:44</span>
+    </div>
+
+    
+    <p class="title-ja">都会のズールー族と「ラゴスで独身を続ける100の理由」: アフリカの物語を独自の視点で語る</p>
+    <p class="title-en"><a href="https://www.france24.com/en/tv-shows/arts24/20261117-urban-zulu-and-100-reasons-to-stay-single-in-lagos-telling-african-stories-on-their-own-terms" target="_blank" rel="noopener">Urban Zulu and '100 Reasons to Stay Single in Lagos': Telling African stories on their own terms</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ファッション、映画からテレビ、音楽に至るまで、アフリカのクリエイティブ産業は国際的な注目を集めています。しかし、アフリカの物語が世界中の聴衆に届くにつれて、より大きな疑問が浮上しています。誰がそれらの物語を伝えることができ、誰が大陸の見方を形作ることができるのでしょうか?ケープタウンで開催された FAME Week Africa で、arts24 はその会話を推進するクリエイターたちと会いました。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Africa's creative industries are attracting growing international attention, from fashion and film to television and music. But as African stories reach audiences around the world, a bigger question is emerging: who gets to tell those stories, and who gets to shape how the continent is seen? At FAME Week Africa in Cape Town, arts24 met some of the creatives driving that conversation.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/tv-shows/arts24/20261117-urban-zulu-and-100-reasons-to-stay-single-in-lagos-telling-african-stories-on-their-own-terms" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/18 00:43</span>
+    </div>
+
+    
+    <p class="title-ja">エリトリア国境で新たな衝突—エチオピアは地域戦争に突入するのか?</p>
+    <p class="title-en"><a href="https://www.dw.com/en/fresh-clashes-at-the-eritrean-border-is-ethiopia-sliding-into-a-regional-war/a-79970353?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Fresh clashes at the Eritrean border — is Ethiopia sliding into a regional war?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>数週間にわたって比較的安定した状態が続いたが、係争中のエチオピアとエリトリアの国境地域で新たな衝突が発生し、本格的な戦争の懸念が高まっている。一方、エチオピアとスーダンの外交関係は過去最低を記録した。</p><p>ティグレ人民解放戦線 (TPLF) と提携した戦闘員は 9 月 23 日に攻撃を開始した。それは、より大規模な反政府連合の一環としてエチオピア政府を打倒することを目的としていた。しかし、親政府民兵の支援を受けたエチオピア国防軍（ENDF）は、エチオピア北部のティグレ州からTPLFを着実に追い出してきた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>監視組織ACLEDの紛争追跡官によると、ENDFはティグラヤへさらに進軍し、事実上ティグラヤ国防軍（TDF）をエリトリアとの国境に向かって追い込んだという。数カ所で小競り合いが報告されており、一方ENDFはエリトリア国境の町バドメ近くの住宅に向けて重砲を発砲した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>After a few weeks of relative stability , fresh clashes in the contested Ethiopia-Eritrea border area have raised fears of a full-fledged war. Meanwhile, diplomatic relations between Ethiopia and Sudan have hit new lows.</p><p>Fighters allied with the Tigray People's Liberation Front (TPLF) launched their offensive on September 23 . It was aimed at overthrowing the Ethiopian government as part of a larger rebel coalition. But the Ethiopian National Defense Forces (ENDF), backed by pro-government militia, have steadily pushed the TPLF out of Tigray, a region in northern Ethiopia .</p><p>According to the conflict tracker of the monitoring organization ACLED, the ENDF have pushed further into Tigray, effectively driving the Tigrayan Defense Forces (TDF) towards the border with Eritrea. Skirmishes have been reported from several locations, while the ENDF have fired heavy artillery towards dwellings close to the Eritrean border town of Badme.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/fresh-clashes-at-the-eritrean-border-is-ethiopia-sliding-into-a-regional-war/a-79970353?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-11-18";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
