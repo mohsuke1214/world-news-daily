@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年11月20日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/20 02:55</span>
+    </div>
+
+    
+    <p class="title-ja">フランスのメディア規制当局、トップユーチューバーの選挙報道における偏りを監視すると発表</p>
+    <p class="title-en"><a href="https://www.france24.com/en/france/20261119-french-regulator-warns-influential-youtubers-respect-pluralism-rules-election-coverage" target="_blank" rel="noopener">French media regulator says it will monitor top YouTubers for bias in election coverage</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>メディア規制当局のアルコムは木曜日、従来のメディア企業の視聴者数を上回ることが多いコンテンツクリエイターの影響力の増大を反映して、来年の大統領選に向けて、選挙活動中にメディアの多元性を守ることを目的とした規則がフランスで最も影響力のあるユーチューバーに適用されると警告した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Rules designed to safeguard media pluralism during elections campaigns will apply to France's most influential YouTubers in the run-up to next year's presidential contest, media regulator Arcom warned on Thursday, reflecting the growing influence of content creators whose audiences often outstrip those of traditional media companies.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/france/20261119-french-regulator-warns-influential-youtubers-respect-pluralism-rules-election-coverage" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/20 02:52</span>
+    </div>
+
+    
+    <p class="title-ja">習・トランプ・プーチン首脳会談：それは何を達成したのか？</p>
+    <p class="title-en"><a href="https://www.dw.com/en/xi-trump-putin-summit-what-did-it-achieve/a-79996668?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Xi-Trump-Putin summit: What did it achieve?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>中国の習近平国家主席は木曜日、深センでドナルド・トランプ米大統領とロシアのウラジーミル・プーチン大統領を迎え、地政学的な緊張が高まる中、世界の３大軍事大国の首脳が一堂に会する前例のない三国首脳会談を開催した。</p><p>習氏は今回の会談を「画期的」だと称賛し、議論の範囲はグローバルガバナンスや非核化からウクライナ戦争やエネルギー安全保障にまで及んだと述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>会談後に発表された「和平宣言」では、ロシアのウクライナ戦争や米国主導のイラン戦争については言及されていない。</p><p>その代わりに、三首脳は国連改革を追求し、国際刑事裁判所の役割を制限し、核戦争回避への決意を再確認することで合意した。また、世界的なエネルギー問題に対処するため、精製石油製品の供給を増やすことも約束した。</p><p>この緊密に計画された会議は、中国、米国、ロシアが競合する影響力圏を中心に国際秩序の再構築を目指す可能性があるとの懸念を煽った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Chinese President Xi Jinping hosted US President Donald Trump and Russian President Vladimir Putin on Thursday for an unprecedented trilateral summit in Shenzhen, bringing together the leaders of the world's three most powerful military powers amid heightened geopolitical tensions.</p><p>Xi hailed the talks as "groundbreaking," saying discussions ranged from global governance and denuclearization to the war in Ukraine and energy security.</p><p>The "peace declaration" released after their meeting made no mention of Russia's war in Ukraine or the US-led war in Iran.</p><p>Instead, the three leaders agreed to pursue reforms of the United Nations, limit the role of the International Criminal Court and reaffirm their commitment to avoiding nuclear war. They also pledged to boost supplies of refined petroleum products to address global energy challenges.</p><p>The tightly choreographed meeting fueled concerns that Beijing, Washington and Moscow could seek to reshape the international order around competing spheres of influence.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/xi-trump-putin-summit-what-did-it-achieve/a-79996668?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/20 02:50</span>
+    </div>
+
+    
+    <p class="title-ja">中国の習主席、米国とロシアに世界平和を守るために協力するよう促す</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/19/aje-onl-nf_chinas-xi-urges-us-and-russia-for-world-peace-191126?traffic_source=rss" target="_blank" rel="noopener">China’s Xi urges US and Russia to join forces to safeguard world peace</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>中国の習主席、米国とロシアに世界平和を守るために協力するよう促す</p><p>中国の習近平国家主席は、ドナルド・トランプ米大統領とロシアのウラジーミル・プーチン大統領に対し、世界平和を守るために中国と協力するよう呼び掛けた。 ３首脳は深センでのＡＰＥＣ首脳会議に合わせて行われた３カ国首脳会談で初めて会談した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>China's Xi urges US and Russia to join forces to safeguard world peace</p><p>Chinese President Xi Jinping urged US President Donald Trump and Russian President Vladimir Putin to work with China to safeguard world peace. The three leaders met for the first time in a trilateral summit on the sidelines of the APEC summit in Shenzhen.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/19/aje-onl-nf_chinas-xi-urges-us-and-russia-for-world-peace-191126?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/20 02:38</span>
+    </div>
+
+    
+    <p class="title-ja">トランプ、プーチン、習主席、歴史的な会談後に「平和宣言」を発表</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c623j4ln97x7o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Trump, Putin and Xi release 'peace declaration' after historic meeting</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ドナルド・トランプ米大統領とロシアと中国のウラジーミル・プーチン、習近平両大統領は歴史的な三国会談を受けて「平和の共同宣言」を発表した。</p><p>３首脳はアジア太平洋経済協力会議（ＡＰＥＣ）首脳会議に合わせて、中国南東部の都市深センで９０分間会談した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>両大統領はこれまで一対一の会談を行ったことはあるが、三者会談は今回が初めて。</p><p>宣言の中で、「核戦争に勝つことはできず、決して戦ってはいけない」とし、各国は石油の生産と供給を増やす計画を立てていると述べた。また、世界的な課題により効果的に対応するために「国連改革に取り組む」と述べた。</p><p>木曜日の声明はまた、国家当局者が享受する免責の問題にも言及し、「国際刑事裁判所および他の同様の機関が管轄権を乱用してはならないことに合意した」と述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>US President Donald Trump and his Russian and Chinese counterparts Vladimir Putin and Xi Jinping have issued a "joint declaration of peace" following historic trilateral talks.</p><p>The three leaders met for 90 minutes in China's south-eastern city of Shenzhen, on the sidelines of the Asia-Pacific Economic Cooperation (APEC) summit.</p><p>While the presidents have previously had one-on-one meetings, these are their first trilateral talks.</p><p>In the declaration, they said "nuclear war cannot be won and must never be fought" and that the countries planned to increase the production and supply of petroleum. They also said they were "committed to reform the UN" to respond more effectively to global challenges.</p><p>Thursday's statement also flagged the issue of immunity enjoyed by state officials and said "they agreed that the International Criminal Court and other similar institutions must not abuse their jurisdiction".</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c623j4ln97x7o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/20 02:03</span>
+    </div>
+
+    
+    <p class="title-ja">イスラエル軍、イエローラインを越えてガザでの地上作戦を完了</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cw8r7510degno?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Israeli military completes ground operation in Gaza beyond Yellow Line</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イスラエル軍は、住民に避難を命じた翌日、ガザ中央部の管轄外の一部で異例の地上作戦を完了したと軍が発表した。</p><p>水曜日、砲撃に紛れて戦車がヌセイラット難民キャンプの東の地域と領土の南北に走る幹線道路に進軍すると、家族らが家やテントから避難した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>イスラエル軍は、この「標的を絞った」作戦は、イスラエルが占領するガザ地区の60％以上を示す、いわゆるイエローラインの西側にある「テロトンネル」を解体することを目的としていると述べた。</p><p>ガザ地区の残りの地域を支配するパレスチナの武装組織ハマスは、2025年10月の停戦合意に対する「重大な違反」でイスラエルを非難した。</p><p>ガザでは過去13か月にわたり暴力が続いており、イスラエル軍はほぼ毎日空爆を行っており、ガザに住む210万人の生活環境は依然として悲惨な状態が続いている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Israeli forces have completed a rare ground operation in part of central Gaza outside their control, the military says, a day after residents were ordered to evacuate.</p><p>Families fled their homes and tents on Wednesday as tanks advanced into an area east of Nuseirat refugee camp and onto the territory's main north-south road under the cover of artillery strikes.</p><p>The Israeli military said the "targeted" operation aimed to dismantle a "terror tunnel" west of the so-called Yellow Line, which marks the more than 60% of Gaza's territory occupied by Israel.</p><p>The Palestinian armed group Hamas, which controls the rest of Gaza, accused Israel of a "flagrant violation" of the October 2025 ceasefire deal.</p><p>Violence has continued in Gaza over the past 13 months, with near-daily Israeli strikes, and living conditions for the 2.1 million people there remain dire.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cw8r7510degno?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/20 01:59</span>
+    </div>
+
+    
+    <p class="title-ja">イエメンの包囲されたタイズ市は深刻化する水危機に直面している</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/19/yemens-besieged-city-of-taiz-faces-a-deepening-water-crisis?traffic_source=rss" target="_blank" rel="noopener">Yemen’s besieged city of Taiz faces a deepening water crisis</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イエメン、タイズ – カイド・アル・シャラビさんは、きれいな水のタンカーを受け取る番が来るまで3日間待った。</p><p>しかし、遅延だけが問題ではありません。彼は、イエメン南西部のタイズをフーシ派が包囲した結果、今はさらに多くの代償を支払わなければならないと述べている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「1か月半前に包囲が始まって以来、給水車に2倍の値段を支払わなければならなかったのはこれで2度目だ」とアル・シャラビさんはアルジャジーラに語った。 「このままでは、安全でない水を使用する住民が増えるのではないかと心配です。」</p><p>国連児童機関（ユニセフ）は、タイズでの水生産量がほぼ半減し、80万人以上が人道支援から遮断されていると報告している。</p><p>2014年にイエメン戦争が始まって以来、この地域を襲う最新の戦闘で、政府軍兵士が街を守ろうとしているにもかかわらず、この危機により街は動揺している。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Taiz, Yemen – Qaid al-Sharaabi waited three days before it was his turn to receive a tanker of clean water.</p><p>But the delay is not the only problem. He says he now has to pay more – the result of the Houthi siege on Taiz , in southwestern Yemen.</p><p>“This is the second time since the siege began a month-and-a-half ago that I’ve had to pay twice the price for a water tanker,” al-Sharaabi told Al Jazeera. “I’m afraid that if things continue like this, more residents will resort to using unsafe water.”</p><p>The United Nations children’s agency (UNICEF) says that water production in Taiz has nearly halved, while more than 800,000 people are reported to be cut off from humanitarian assistance.</p><p>The crisis has left the city reeling , even as government soldiers try to defend it, in the latest round of fighting to hit the area since the war in Yemen started in 2014.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/19/yemens-besieged-city-of-taiz-faces-a-deepening-water-crisis?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/19 18:46</span>
+    </div>
+
+    
+    <p class="title-ja">ホルムズ海峡でイランによる船舶攻撃が激化</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/19/nx-s1-6044206/irans-attacks-on-ships-in-the-strait-of-hormuz-escalate" target="_blank" rel="noopener">Iran's attacks on ships in the Strait of Hormuz escalate</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イランはホルムズ海峡で船舶を攻撃し、ペルシャ湾周辺の数カ国を空爆するなど攻勢に出た。</p><p>NPR は、取材やインタビューに対して金銭を提供したり受け取ったりしません。そのような申し出や要求を行う者は、NPR の従業員ではなく、NPR を代表するものでもありません。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Iran takes the offensive with attacks on ships in the Strait of Hormuz and airstrikes on several countries around the Persian Gulf.</p><p>NPR does not offer or accept money for coverage or interviews. Anyone who makes such an offer or request is not an NPR employee and does not represent NPR.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/19/nx-s1-6044206/irans-attacks-on-ships-in-the-strait-of-hormuz-escalate" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/18 18:58</span>
+    </div>
+
+    
+    <p class="title-ja">ミャンマー虐殺判決を受け、米国がノーベル賞受賞判事に制裁を加えるのではないかとの懸念が高まる</p>
+    <p class="title-en"><a href="https://www.theguardian.com/world/2026/nov/18/us-sanctions-icj-judges-myanmar-genocide-ruling-israel-gaza-court" target="_blank" rel="noopener">Fears grow that US will put Nobel-winning judge under sanctions after Myanmar genocide ruling</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ミャンマーに対する判決は、ガザでのイスラエルの行動に対する裁判所の判決の前例となる可能性がある</p><p>国際司法裁判所が木曜日にミャンマー政府がロヒンギャに対する虐殺を行ったとの判決を下した場合、米国が今年のノーベル平和賞受賞者のナビ・ピレー氏を含む国際司法裁判所の裁判官に制裁を課す可能性があるとの懸念が高まっている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ICJはこれまでジェノサイドを犯した国家を認定したことはなく、これまでの訴訟で重要な要素となっていたのは、国民、民族、人種、宗教集団を「全体的または部分的に破壊する意図」を持って犯された行為と定義される犯罪の「意図」をどのように証明するかという点だった。</p><p>ロヒンギャ生存者の代理人を務める弁護士らは、2016年と2017年のラカイン州への襲撃の際、逃亡中の人々の殺害を含むミャンマー国軍の行動パターンから、同グループを壊滅させようとする明らかな試みが示されていると述べた。</p><p>虐殺条約を解釈するのは独立した裁判官の役割である。しかし、ジェノサイド判決は米国政府によって犯罪の「法的基準」を引き下げられると解釈される可能性があるため、裁判所の裁判官らは潜在的な米国制裁から資産を守る方法についてアドバイスを受け入れている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A ruling against Myanmar could set precedent for court’s judgment on Israel’s actions in Gaza</p><p>Fears are growing that the US could impose sanctions on judges at the international court of justice, including this year’s Nobel peace prize winner, Navi Pillay , if the court rules on Thursday that the Myanmar government committed genocide against the Rohingya.</p><p>The ICJ has never found a state responsible for committing genocide, and a significant factor in previous cases has been how to prove “intent” in a crime defined as acts committed with the “intent to destroy, in whole or in part” a national, ethnical, racial or religious group.</p><p>Lawyers representing Rohingya survivors say patterns of behaviour by Myanmar’s military, including killing people as they fled, show clear attempts to destroy the group during assaults on Rakhine state in 2016 and 2017.</p><p>It is the role of independent judges to interpret the genocide convention. However, judges at the court have taken advice on how to protect their assets from potential US sanctions, as a genocide ruling could be interpreted by Washington as lowering the “legal threshold” for the crime.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/world/2026/nov/18/us-sanctions-icj-judges-myanmar-genocide-ruling-israel-gaza-court" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/20 02:34</span>
+    </div>
+
+    
+    <p class="title-ja">深セン首脳会談は米中貿易戦争にどのような影響を与えるのか。</p>
+    <p class="title-en"><a href="https://www.france24.com/en/asia-pacific/20261119-what-impact-will-shenzhen-summit-us-china-trade-war" target="_blank" rel="noopener">What impact will the Shenzhen summit have on the US-China trade war?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>木曜日に深センで行われたロシアのウラジーミル・プーチン大統領との三者会談で、ドナルド・トランプ米大統領と中国の習近平国家主席の間で温かい言葉が交わされたにもかかわらず、米中両国の間でくすぶっている貿易戦争は依然として解決に近づいているようには見えない。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Despite warm words between US President Donald Trump and Chinese President Xi Jinping at three-way talks with Russian President Vladimir Putin in Shenzhen Thursday, the simmering trade war between Washington and Beijing still looks to be no closer to resolution.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/asia-pacific/20261119-what-impact-will-shenzhen-summit-us-china-trade-war" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/20 02:12</span>
+    </div>
+
+    
+    <p class="title-ja">トランプ大統領、中国のAPEC首脳会議で習近平の演説中に居眠りをしたと非難</p>
+    <p class="title-en"><a href="https://www.theguardian.com/us-news/2026/nov/19/trump-apec-asleep-china" target="_blank" rel="noopener">Trump accused of falling asleep during Xi Jinping speech at Apec summit in China</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>中国指導者が演説中、米大統領は居眠りしていたようだったが、ホワイトハウスは起きていると主張した</p><p>ドナルド・トランプ大統領は、テレビ放映中、今回は中国で開催されたアジア太平洋経済協力会議（APEC）首脳会議での習近平国家主席の演説中に居眠りをしたとして再び非難された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>米国大統領は木曜日、約10秒間目を閉じていたようだった。目を閉じると、トランプ氏は頭を下に傾け、両手は前で握りしめたままだった。</p><p>反トランプ共和党、カリフォルニア州知事ギャビン・ニューサム報道局、保守派弁護士ジョージ・コンウェイなど、著名なトランプ批判者数人がソーシャルメディア上で米国大統領が居眠りしていたと主張した。</p><p>ホワイトハウス当局者らは疑惑を否定し、80歳の米大統領が目の前の書類に目を落としていたと主張した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>US president appeared to doze off while Chinese leader made speech, but White House insisted he was awake</p><p>Donald Trump was, again, accused of falling asleep during a televised event, this time during the speech of the Chinese president, Xi Jinping, at the Asia-Pacific Economic Cooperation (Apec) summit in China.</p><p>The US president appeared to close his eyes for roughly 10 seconds on Thursday. As his eyes closed, Trump’s head tilted downward, and his hands remained clasped in front of him.</p><p>Several prominent Trump critics on social media alleged that the US president was asleep, including Republicans Against Trump , California governor Gavin Newsom’s press office and conservative lawyer George Conway .</p><p>White House officials denied the allegations, claiming the 80-year-old US president was looking down at papers in front of him.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/us-news/2026/nov/19/trump-apec-asleep-china" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/20 01:55</span>
+    </div>
+
+    
+    <p class="title-ja">ミャンマー、少数民族ロヒンギャに対する大量虐殺、国連最高裁判所の判決</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c804wzp20ddvo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Myanmar committed genocide against Rohingya minority, top UN court rules</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ミャンマーは国際司法裁判所（ICJ）により少数民族ロヒンギャに対する大量虐殺の罪で有罪判決を受けた。</p><p>この判決は、国家が国際法廷で大量虐殺を行ったと認定された初めてのことである。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>国連最高裁判所の岩沢裕二所長は、ミャンマーはロヒンギャ人口のかなりの部分を「破壊する意図」を持っており、犯罪を隠すために「広範な証拠隠滅」に取り組んでいると述べた。</p><p>2017年の軍事弾圧により、数千人のロヒンギャが殺害され、仏教徒が多数を占めるミャンマー（旧ビルマ）から70万人以上が避難を余儀なくされた。ミャンマーは、ミャンマー軍が武装集団による攻撃に対応したと主張し、同国に対する主張を否定した。</p><p>裁判所は木曜日、これまでに確認した「証拠から導き出せる合理的な推論は大量虐殺の意図だけである」と認定した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Myanmar has been found guilty of committing genocide against its Rohingya minority by the International Court of Justice (ICJ).</p><p>The verdict marks the first time a state has ever been found to have committed genocide by an international court.</p><p>Yuji Iwasawa, president of the UN's top court, said Myanmar had the "intention to destroy" a substantial part of the Rohingya population and engaged in "extensive destruction of evidence" to hide its crimes.</p><p>A military crackdown in 2017 killed thousands of Rohingya and forced more than 700,000 to flee Buddhist-majority Myanmar, formerly known as Burma. Myanmar denied the claims against it, saying its forces had responded to attacks by armed groups.</p><p>The court found on Thursday that "genocidal intent is the only reasonable inference that can be drawn from the evidence" it had seen.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c804wzp20ddvo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/19 22:26</span>
+    </div>
+
+    
+    <p class="title-ja">パキスタン大臣がインド訪問へ、事態打開は期待できない</p>
+    <p class="title-en"><a href="https://www.dw.com/en/pakistan-minister-to-visit-india-but-no-breakthrough-expected/a-79991717?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Pakistan minister to visit India, but no breakthrough expected</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>パキスタンのムサディク・マスード・マリク気候変動大臣は、ニューデリーで開催される上海協力機構（SCO）の文明対話に参加するため、11月20日から22日までインドを訪問する。</p><p>核武装した宿敵両国が昨年４日間にわたる戦争を戦って以来、パキスタン連邦閣僚のインド訪問は初めてとなる。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>2025年4月にインド統治下のカシミール地方で武装集団が主にヒンズー教徒の観光客20人以上を殺害したことを受けて戦闘が勃発した。ニューデリーはイスラマバードが攻撃を支援したと非難したが、パキスタンは容疑を否定した。</p><p>軍事衝突以来、外交上の緊張は高いままで、両国間に公式な関与の余地はほとんど残されていない。</p><p>SCO文明対話は、2025年9月に天津で開催されたSCOサミットでナレンドラ・モディ首相によって提案された。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Pakistan's Climate Change Minister Musadik Masood Malik will travel to India from November 20 to 22 to participate in the Shanghai Cooperation Organization (SCO) Civilizational Dialogue in New Delhi.</p><p>It marks the first India visit by a Pakistani federal minister since the two nuclear-armed archrivals fought a four-day war last year.</p><p>The fighting erupted after armed gunmen killed over two dozen tourists, mostly Hindus, in India-administered Kashmir in April 2025. New Delhi accused Islamabad of backing the attack, a charge Pakistan denied.</p><p>Since the military confrontation, diplomatic tensions have remained high, leaving little room for official engagement between the two sides.</p><p>The SCO Civilizational Dialogue was proposed by Prime Minister Narendra Modi at the SCO summit in Tianjin in September 2025.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/pakistan-minister-to-visit-india-but-no-breakthrough-expected/a-79991717?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/20 02:15</span>
+    </div>
+
+    
+    <p class="title-ja">「無罪ではない」：弾劾投票後もヘグセス氏は依然として顕微鏡下に置かれている</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/19/not-an-acquittal-after-impeachment-vote-hegseth-still-under-microscope?traffic_source=rss" target="_blank" rel="noopener">‘Not an acquittal’: After impeachment vote, Hegseth still under microscope</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米国の中間選挙を受けて、ピート・ヘグセス国防長官が、議会で新たに民主党多数派が就任した後も閣僚レベルの地位を維持できるかどうかに注目が集まっている。</p><p>フォックスニュースの司会者から軍長官に転身した同氏にはすでに、解任を求める声が高まっている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>しかしアナリストらは、ヘグセス氏の弾劾がドナルド・トランプ大統領の下での軍事政策にどの程度影響を与えるか疑問視している。</p><p>元国防総省の中東顧問ジャスミン・エル・ガマル氏は、「結局のところ、国防長官は戦争形成の強力な参加者である」と述べた。</p><p>しかしエルガマル氏は、ヘグセス氏だけを標的にするだけでは、米国・イスラエルによる対イラン戦争開始などの決定に対する説明責任を確保するには不十分だと考えている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>In the wake of the United States midterm elections, attention has turned to whether Secretary of Defense Pete Hegseth will be able to preserve his cabinet-level position once Congress’s new Democratic majorities are sworn in.</p><p>Already, the Fox News host-turned-military-chief has faced mounting calls for his removal from office.</p><p>But analysts question the extent to which Hegseth’s impeachment would affect military policy under President Donald Trump.</p><p>“Ultimately, the secretary of defence is a powerful participant in shaping a war,” said Jasmine El-Gamal, a former Middle East adviser in the Pentagon.</p><p>El-Gamal, however, believes targeting Hegseth alone would not be enough to secure accountability for decisions like launching the US-Israel war on Iran.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/19/not-an-acquittal-after-impeachment-vote-hegseth-still-under-microscope?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/19 22:31</span>
+    </div>
+
+    
+    <p class="title-ja">ベネズエラ、マドゥロ大統領解任から1年も経たないうちに米国と軍事協定に署名</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cmwy8pyqlq5vo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Venezuela signs military deal with US less than a year after Maduro's removal</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米軍が首都カラカスを襲撃し、当時の南米国家指導者ニコラス・マドゥロ氏を拘束してから1年も経たないうちに、米国とベネズエラは軍事関係を再構築した。</p><p>マドゥロ大統領の元副大統領デルシー・ロドリゲス率いる暫定政府は水曜日、ピート・ヘグセス米国防長官と軍事協力協定に署名した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>これまでのところ合意に関する詳細はほとんど明らかにされていないが、ヘグセス氏は、ベネズエラは12カ月も経たないうちに「最も攻撃的な地域的脅威から順守する安全保障パートナーになった」と述べた。</p><p>ロドリゲス暫定大統領は、この協定は「共通の脅威」に対抗するのに役立つと述べた。</p><p>両国間の軍事協力は2005年、当時のベネズエラ左翼大統領ウゴ・チャベスによって打ち切られた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>The United States and Venezuela have re-established military ties less than a year after US forces seized the then-leader of the South American country, NicolÃ¡s Maduro, in a raid on the capital, Caracas.</p><p>The interim government led by Delcy RodrÃ­guez, Maduro's former vice-president, signed a military co-operation agreement with US Secretary of Defence Pete Hegseth on Wednesday.</p><p>Few details about the deal have been released so far but Hegseth said that Venezuela had "gone from our most aggressive regional threat to a compliant security partner" in less than 12 months.</p><p>Interim President RodrÃ­guez said the deal would help confront "common threats".</p><p>Military co-operation between the two countries was terminated in 2005 by Hugo ChÃ¡vez, Venezuela's left-wing president at the time.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cmwy8pyqlq5vo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge guardian">The Guardian</span>
+      <span class="story-time">11/19 13:00</span>
+    </div>
+
+    
+    <p class="title-ja">世界の女性の4人に1人が夫婦間のセックスを拒否できないと国連が発表</p>
+    <p class="title-en"><a href="https://www.theguardian.com/global-development/2026/nov/19/women-girls-rights-rape-sexual-violence-africa-marriage-unfpa" target="_blank" rel="noopener">One in four women globally unable to refuse sex within marriage, says UN</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>アフリカ西部と中央部の女性のほぼ半数が同意を保留できず、女子が最も深刻な影響を受けているとUNFPAが調査</p><p>国連の報告書によると、世界中の女性の4人に1人は、夫やパートナーがセックスを要求した場合に同意する権限を持っていない。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>アフリカ西部と中部では、女性のほぼ半数（45％）が自分の結婚にノーと言えない一方、アフリカ東部と南部、アラブ諸国では女性の3分の1（33％）が同じ苦境に直面している。国連人口基金（UNFPA）が木曜日に発表した報告書によると、ラテンアメリカとカリブ海諸国では、10人に1人の女性がセックスを拒否できないという。</p><p>比較可能なデータを持つ8か国（アンゴラ、コンゴ民主共和国、カザフスタン、マラウイ、マリ、ナイジェリア、タジキスタン、ザンビア）の報告書の分析によると、15～19歳の若い女性と少女は、45～49歳の年配の女性に比べて、ノーと言う力がさらに弱かった。この調査結果は、思春期の少女が非常に高い割合で親密なパートナーからの暴力に耐えていることを示す研究と一致している。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Almost half of women in west and central Africa cannot withhold consent, with girls worst affected, UNFPA finds</p><p>One in four women around the world have no power of consent if their husband or partner demands sex, according to a UN report.</p><p>In west and central Africa, almost half of women (45%) are not able to say no in their own marriage, while a third of women (33%) in east and southern Africa and in Arab states face the same predicament. In Latin America and the Caribbean, one in 10 women are not able to refuse sex, said the report by the UN Population Fund ( UNFPA ) published on Thursday.</p><p>Younger women and girls aged 15 to 19 had even less power to say no, compared with older women aged 45 to 49, according to analysis in the report of eight countries with comparable data (Angola, the Democratic Republic of the Congo, Kazakhstan, Malawi, Mali, Nigeria, Tajikistan and Zambia). The findings align with research showing adolescent girls endure very high rates of intimate partner violence.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.theguardian.com/global-development/2026/nov/19/women-girls-rights-rape-sexual-violence-africa-marriage-unfpa" target="_blank" rel="noopener">
+      記事全文を読む(The Guardian) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/18 21:14</span>
+    </div>
+
+    
+    <p class="title-ja">メアリー・ペルトラがアラスカ州の上院議席をひっくり返す。そして、NVIDIAはジェンセン・ファンを復帰させない</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/18/g-s1-154145/up-first-newsletter-mary-peltola-alaska-trump-asia-nvidia-tech-issues-ai" target="_blank" rel="noopener">Mary Peltola flips Alaska's Senate seat. And, Nvidia won't reinstate Jensen Huang</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>AP通信によると、元民主党議員メアリー・ペルトラ氏がアラスカ州の上院議員選挙で共和党ダン・S・サリバン上院議員を破った。彼女の勝利により、民主党は次期議会に上院議員を56人獲得することになる。アラスカ州は総選挙に順位付け投票を使用していますが、ペルトラは 1 位票の過半数を確保し、順位付け計算の必要性を排除しました。ペルトラ氏の勝利は、2024年にトランプ大統領が13ポイントの差で勝った州の上院議席を逆転させる。ペルトラ氏のチームが現職から票を吸い上げるために別の候補者を選挙戦に引き入れようとした疑惑により、選挙戦最終日は騒然となった。ペルトラ陣営は関与を否定した。</p><p>トランプ大統領は中国南部の都市深センに到着し、木曜日に中国の習近平国家主席と会談する予定だ。両首脳の会談は今年３回目となる。両首脳は、現在保留中の貿易、投資、関税について話し合う予定だ。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Former Democratic Rep. Mary Peltola has defeated Republican Sen. Dan S. Sullivan in Alaska's U.S. Senate race, according to The Associated Press. Her victory gives Democrats 56 senators in the upcoming Congress. Alaska uses ranked-choice voting for its general election, but Peltola secured a majority of first-place votes , eliminating the need for ranked-choice calculations. Her win flips a Senate seat in a state that President Trump won by 13 percentage points in 2024. The race's final days were tumultuous due to allegations that Peltola's team tried to recruit another candidate to the race to siphon votes from the incumbent. Peltola's campaign denied any involvement.</p><p>Trump has arrived in the Southern Chinese city of Shenzhen, where he is set to meet with China's President Xi Jinping on Thursday. This will mark the third time these two leaders have met this year. They are expected to discuss trade, investment and tariffs, which are currently on hold.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/18/g-s1-154145/up-first-newsletter-mary-peltola-alaska-trump-asia-nvidia-tech-issues-ai" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/20 00:54</span>
+    </div>
+
+    
+    <p class="title-ja">ミャンマー虐殺に関するICJ判決：「ロヒンギャの歴史的勝利、国際正義の画期的な出来事」</p>
+    <p class="title-en"><a href="https://www.france24.com/en/icj-ruling-on-myanmar-genocide-historic-victory-for-rohingya-landmark-for-international-justice" target="_blank" rel="noopener">ICJ ruling on Myanmar genocide: ‘Historic victory for Rohingya, landmark for international justice’</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>エリン・オガンキー氏は、国際法学者委員会のメンバー、人権弁護士、そしてベテランの戦争犯罪検察官であるリード・ブロディ氏を歓迎します。ブロディ氏によれば、ミャンマーに対する国際司法裁判所の判決は「ロヒンギャにとって歴史的な勝利であるだけでなく、国際司法にとって画期的な出来事でもある」という。同氏は、法廷が大量虐殺の意図の証拠をどのように評価し、対テロとしてのミャンマーの軍事作戦の正当性を拒否したかを説明した。同氏は、「武力紛争や安全保障目標の存在は、大量虐殺の意図を排除するものではない」と主張し、この発見は、ガザをめぐるイスラエルに対する南アフリカの訴訟を含め、「将来の大量虐殺事件に広範な影響を与える」と信じている。ブロディ氏はまた、この事件を提起し国際的な責任を問うガンビアの役割についても触れ、「私たちは非常に危険な時期にある」と警告した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Erin Ogunkeye welcomes Reed Brody, Member of the International Commission of Jurists, Human Rights Lawyer and veteran war crimes prosecutor. The International Court of Justice's ruling on Myanmar marks, according to Brody, "a historic victory for the Rohingya, but also a landmark for international justice." He explains how the court assessed evidence of genocidal intent, rejecting Myanmar's justification of its military operations as counterterrorism. He argues that "the existence of an armed conflict or a security objective doesn't exclude genocidal intent," a finding he believes will have "far-reaching implications in future genocide cases," including South Africa's case against Israel over Gaza. Brody also discusses the Gambia's role in bringing the case and growing challenges to international accountability, warning that "we're in a very dangerous moment."</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/icj-ruling-on-myanmar-genocide-historic-victory-for-rohingya-landmark-for-international-justice" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/20 00:52</span>
+    </div>
+
+    
+    <p class="title-ja">セネガル沖で移民を乗せた船が沈没、数十人が行方不明</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c58j484089ewo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Dozens missing after boat carrying migrants sinks off Senegal's coast</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>セネガル当局は、移民５０～１００人を乗せた船が大西洋で転覆したことを受け、捜索活動を続けている。</p><p>これまでに4人の遺体が回収されたと伝えられている。今も数十人が行方不明となっている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ダカール南部のイェンヌ村近くに漂着した大破したボートから私物が発見された。捜索活動は水曜日中続き、木曜日に再開される予定だった。</p><p>これは、セネガルで最も致命的な移民災害の一つである北西部の町ティエップ沖での船の難破により少なくとも39人が死亡してから2週間も経たないうちに起きた。</p><p>村長の代表者オウマー・ソウ氏は、今回の悲劇は現地時間午前２時（日本時間午後２時）頃に起きたと語った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Senegalese authorities are continuing search operations after a boat said to be carrying between 50 and 100 migrants capsized in the Atlantic Ocean.</p><p>Four bodies have reportedly been recovered so far. Dozens of people are still missing.</p><p>Personal belongings were found on the badly damaged boat, which washed ashore near the village of Yenne, south of Dakar. Search operations continued throughout Wednesday and were due to resume on Thursday.</p><p>This comes less than two weeks after a shipwreck off the coast of the north-western town of Thieppe killed at least 39 people, in one of Senegal's deadliest migration disasters.</p><p>Oumar Sow, a representative of the village chief, said the latest tragedy happened around 02:00 local time (02:00 GMT).</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c58j484089ewo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-11-20";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
