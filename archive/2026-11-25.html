@@ -1,0 +1,933 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年11月25日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/25 04:27</span>
+    </div>
+
+    
+    <p class="title-ja">コロンビア中心部の都市で自動車爆弾が建物を破壊</p>
+    <p class="title-en"><a href="https://www.france24.com/en/car-bomb-destroys-buildings-in-central-colombian-city" target="_blank" rel="noopener">Car bomb destroys buildings in central Colombian city</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>アベラルド・デ・ラ・エスプリエラ大統領は、月曜日、コロンビア中部の都市ビリャビセンシオで自動車爆弾が爆発し、地元の知事室と周囲の建物が破壊されたと発表した。右翼指​​導者は、過去2年間攻撃を強化している左翼FARC反政府勢力に対抗し、国内の麻薬取引に対する大規模な取り締まりを実施した。 FRANCE 24のダニエル・ウィッティントン記者が報じた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A car bomb detonated in the central Colombian city of Villavicencio on Monday, destroying a local governor's office and surrounding buildings, President Abelardo de la Espriella said. The right-wing leader has conducted a major crackdown on the country's drug trade, in response to left-wing FARC rebels who have stepped up attacks over the past two years. FRANCE 24's Daniel Whittington reports.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/car-bomb-destroys-buildings-in-central-colombian-city" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/25 04:22</span>
+    </div>
+
+    
+    <p class="title-ja">プーチン大統領、ウクライナによるロシアの石油施設攻撃を受けて報復は「避けられない」と発言</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/24/putin-says-kyiv-hit-russian-oil-plants-despite-trump-plea-vows-retaliation?traffic_source=rss" target="_blank" rel="noopener">Putin says retaliation ‘inevitable’ after Ukraine hit Russian oil plants</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ロシアのウラジーミル・プーチン大統領は、ドナルド・トランプ米大統領の攻撃差し止め要請にもかかわらず、ウクライナはロシアの製油所への攻撃を続けていると述べ、報復をちらつかせた。</p><p>キエフがロシアが同様の措置を講じた場合にのみロシアのエネルギー目標への攻撃を停止すると述べたことを受けて、プーチン大統領は火曜日に脅迫を行った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>2022年のロシアによるウクライナへの全面侵攻で始まった紛争で、トランプ大統領が10月中旬にエネルギー停戦を宣言した後、ウクライナへの攻撃は沈静化したが、10月下旬に再び攻撃が活発化した。</p><p>プーチン大統領は、クレムリンで行われた政府高官と石油幹部らの会合で、「米国大統領の訴えとそのような攻撃を控えるよう直接要請したにもかかわらず、キエフ政権が我が国の精製施設への攻撃を続けていることが分かる。しかし、キエフ当局はこの勧告を無視している」と述べた。</p><p>「この点で、我々の報復措置は避けられないことを強調したい。」</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Ukraine has continued its attacks on Russian oil refineries despite requests from US President Donald Trump to withhold them, Russian President Vladimir Putin has said while threatening retaliation.</p><p>Putin made the threat on Tuesday, after Kyiv said it would stop striking Russian energy targets only when Moscow did the same.</p><p>Ukrainian attacks subsided after Trump’s mid-October declaration of an energy ceasefire in the conflict that began with Russia’s full-scale invasion of Ukraine in 2022. But they picked up again in late October.</p><p>“We see that the Kyiv regime continues to attack our refining facilities, despite the US president’s appeal and direct request to refrain from such attacks. But the Kyiv authorities are ignoring this advice,” Putin told a meeting of government officials and senior oil executives in the Kremlin.</p><p>“In this regard, I would like to stress that retaliatory measures on our part are inevitable.”</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/24/putin-says-kyiv-hit-russian-oil-plants-despite-trump-plea-vows-retaliation?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/25 01:49</span>
+    </div>
+
+    
+    <p class="title-ja">フランスのサルコジ元大統領と妻カルラ・ブルーニ氏が裁判へ</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c65y17pwv1z7o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">French ex-President Sarkozy and wife Carla Bruni to face trial</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ニコラ・サルコジ氏とその妻カルラ・ブルーニ・サルコジ氏は、リビアの独裁者故ムアンマル・カダフィ大佐からの資金で選挙活動に資金を提供したと共謀した元フランス大統領の有罪判決に端を発する罪で、来年裁判を受ける予定だ。</p><p>この容疑は、サルコジ氏に有罪となる可能性のある証拠を持っていると当初発言した主要証人の証言の撤回に焦点を当てている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>サルコジ氏は昨年9月にこの事件で懲役5年の判決を受け、収監されたのはわずか20日間だったが、刑務所に収監された初のフランス元大統領となった。同氏はこの訴訟で不正行為を行ったことを常に否定しており、控訴評決は来週月曜日になる予定だ。</p><p>2012年に再選に敗れて以来、サルコジ氏は複数の犯罪捜査に直面している。</p><p>2024年、彼は2012年の再選運動への違法資金提供を理由に、懲役1年（うち執行猶予6か月）を言い渡された。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Nicolas Sarkozy and his wife Carla Bruni-Sarkozy are to face trial next year over charges stemming from the former French president's conviction for conspiring to fund his election campaign with money from late Libyan dictator Muammar Gaddafi.</p><p>The charges centre on the retraction of the testimony of a key witness who had initially said he had evidence that could incriminate Sarkozy.</p><p>Sarkozy was given a five-year sentence in the case last September and became the first French ex-president to go to jail, even though he only spent 20 days behind bars. He has always denied doing anything wrong in the case and the appeals verdict is expected next Monday.</p><p>Since losing his re-election bid in 2012, Sarkozy has faced several criminal investigations.</p><p>In 2024, he was handed a one-year sentence â of which six months were suspended â over the illegal financing of his 2012 re-election campaign.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c65y17pwv1z7o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/25 01:18</span>
+    </div>
+
+    
+    <p class="title-ja">ウクライナのNATO加盟と防空強化への取り組みは依然として物議を醸している</p>
+    <p class="title-en"><a href="https://www.dw.com/en/ukraine-s-bid-for-nato-membership-and-more-air-defense-remains-controversial/a-80029852?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Ukraine's bid for NATO membership and more air defense remains controversial</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ビデオ通話がつながるまでに時間がかかりました。ヴォロディミル・ゼレンスキー氏がベルリンでついに代表団に挨拶したとき、拍手が起きた。ウクライナ大統領は、NATO加盟32カ国から集まった国会議員に対し、特にロシアからの大規模な空爆に対して自国を支援し続けるよう訴えた。</p><p>「親愛なる友人の皆さん、冬はもう目の前にあります。そしてもちろん、私たちの最優先事項は防空です」とゼレンスキー大統領は代表団に語った。彼の国は、より多くのパトリオットやその他の包括的な対空攻撃システムを緊急に必要としています。 「そして、あなた方の国はそれを持っています。ロシアの弾道ミサイルを阻止できるミサイルが、倉庫に眠って埃をかぶっているべきではありません。そして、私たちはこれを公然と言います。これについて私たちを助けてください。」</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>このビデオを表示するには、JavaScript を有効にし、HTML5 ビデオをサポートする Web ブラウザへのアップグレードを検討してください。</p><p>ゼレンスキー大統領は自国がNATO軍事同盟に参加するよう改めて呼びかけた。この問題は、ベルリンでの第72回年次総会のために集められたNATO議会が決定するものではない。しかし、ウクライナ大統領にとって、自身の要請を改めて表明することは重要だった。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>It took a while for the video call to connect. When Volodymyr Zelenskyy finally greeted the delegates in Berlin, applause broke out. The Ukrainian president appealed to the gathered parliamentarians from 32 NATO member states to keep supporting his country, especially against the massive aerial bombardment from Russia .</p><p>"Dear friends, winter is now ahead of us. And of course, our number one priority is air defense," Zelenskyy told the delegates. His country urgently needs more Patriot and other comprehensive anti-air attack systems. "And your countries have them. Missiles that can stop Russian ballistic missiles should not be sitting in warehouses collecting dust. And we say this openly. Please help us with this."</p><p>To view this video please enable JavaScript, and consider upgrading to a web browser that supports HTML5 video</p><p>Zelenskyy renewed his call for his country to join the NATO military alliance. That issue is not for the NATO Parliamentary Assembly, which was gathered for its 72nd annual meeting in Berlin, to decide. But it was important to the Ukrainian president to reiterate his request.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/ukraine-s-bid-for-nato-membership-and-more-air-defense-remains-controversial/a-80029852?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/25 04:52</span>
+    </div>
+
+    
+    <p class="title-ja">トルコ軍ヘリコプター墜落、トルキエ西部で５人死亡</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/24/turkish-military-helicopter-crash-kills-five-in-western-turkiye?traffic_source=rss" target="_blank" rel="noopener">Turkish military helicopter crash kills five in western Turkiye</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>トルコ国防省によると、トルコ空軍のヘリコプターがトルキエ西部で墜落し、乗組員５人が死亡した。</p><p>この事故は、同様の事故で4人が死亡した12日後の火曜日に発生した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>同省は火曜日の声明で「我が国空軍所属のAS-532ヘリコプターが訓練目的でエスキシェヒルを離陸後墜落した」と発表した。 「ヘリコプターの残骸は到着しており、捜索救助活動が続いている。」</p><p>同省は墜落原因については明らかにしていない。エスキシェヒルは空軍第 1 メインジェット基地司令部の本拠地です。</p><p>メディアの映像には、エスキシェヒル市中心部から西​​に約15キロ（9マイル）離れたヨルカッカイル村近くの事故現場に救急チームがいる様子が映っていた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A Turkish Air Force helicopter has crashed in western Turkiye, killing five crew members, according to the country’s Ministry of National Defence.</p><p>The accident occurred on Tuesday, 12 days after similar accident killed four people.</p><p>“An AS-532 helicopter belonging to our air force crashed after taking off from Eskisehir for training purposes,” the ministry said in a statement on Tuesday. “The wreckage of the helicopter has been reached and search and rescue operations are continuing.”</p><p>The ministry did not specify the cause of the crash. Eskisehir is home to the air force’s 1st Main Jet Base Command.</p><p>Media footage showed emergency teams at the scene of the crash near Yorukakcayir village, about 15km (nine miles) west of Eskisehir city centre.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/24/turkish-military-helicopter-crash-kills-five-in-western-turkiye?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/25 01:51</span>
+    </div>
+
+    
+    <p class="title-ja">イエメン軍、フーシ派戦闘員がアデンの政府本拠地に迫っていると発表</p>
+    <p class="title-en"><a href="https://www.france24.com/en/middle-east/20261124-yemen-army-houthi-attack-aden" target="_blank" rel="noopener">Yemen’s army says Houthi fighters closing in on government stronghold of Aden</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>イエメン軍は火曜日、国際的に認められた政府の本拠地アデンにフーシ派戦闘員が約60キロ（40マイル）離れたところから迫っていると発表し、あらゆる攻撃を撃退すると誓った。軍報道官は、紅海付近でのフーシ派の進撃と政府の撤退を受けて防衛策が準備されていると述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Yemen's military on Tuesday said that Houthi fighters were closing in on the internationally recognised government's stronghold of Aden from about 60km (40 miles) away and vowed to repel any assault. A military spokesman said defences were prepared following Houthi advances and government pullbacks near the Red Sea.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/middle-east/20261124-yemen-army-houthi-attack-aden" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/25 00:17</span>
+    </div>
+
+    
+    <p class="title-ja">戦争から2年、シリアで地雷被害者が急増</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c893rl37ywdgo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Land mine casualties soar in Syria, two years after war</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>日曜、シリア北西部ウム・フーザイムにある自宅裏の畑で、11歳のアラーちゃんが兄弟たちとともに家族のヤギの世話をしていたところ、閃光と耳をつんざくような衝撃音がした。</p><p>「その後、人々の叫び声が聞こえた」とアラアさんの父親、ワリド・モハメド・アルガファルさんはBBCに語った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ワリドさんが外に逃げると、娘がうつぶせになって死亡し、10歳の弟マフムード君が重傷を負っているのを発見した。</p><p>知らず知らずのうちに、子供たちは地雷を引き起こしていました。</p><p>国連地雷対策局（ウンマス）によると、今週の事件などにより、2024年12月のバシャール・アル・アサド政権崩壊以来、シリア国内で爆発物によって死傷した子どもの数は約1,000人となった。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Eleven-year-old Alaa was tending her family's goats with her siblings in a field behind their home in Umm Khuzaym, north-west Syria, on Sunday when there was a flash and a deafening bang.</p><p>"Then we heard people screaming," Alaa's father, Walid Mohammed Al-Ghafar, told the BBC.</p><p>Walid ran outside to find his daughter lying face down, killed, and her 10-year-old brother, Mahmoud, seriously injured.</p><p>Unwittingly, the children had triggered a landmine.</p><p>The incident and others this week bring to nearly 1,000 the number of children killed or injured by explosive ordnance in Syria since the fall of Bashar al-Assad in December 2024, according to the UN Mine Action Service (Unmas).</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c893rl37ywdgo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/24 23:36</span>
+    </div>
+
+    
+    <p class="title-ja">なぜイランの医薬品サプライチェーンは破綻しているのか</p>
+    <p class="title-en"><a href="https://www.dw.com/en/why-iran-s-medicine-supply-chain-is-failing/a-80035268?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Why Iran's medicine supply chain is failing</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>アフマド* 67 歳は、抗精神病薬クロルプロマジンを求めてテヘランの 20 軒近くの薬局を訪れましたが、手ぶらで帰ってきました。</p><p>「患者が必要な薬を見つけるためだけにこれほど多くの薬局に行かなければならない場合、誰が薬を供給する責任があるのか​​を真剣に問わなければなりません」と同氏はDWに語った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>糖尿病を患うテヘラン在住の 37 歳のミトラ* さんは、インスリンを探すのに何日も費やしました。 「これらは私が服用を延期したり、単純にやめたりできる薬ではありません」と彼女は言った。 「私の人生は、このインスリンを定期的に摂取できるかどうかにかかっています。」</p><p>彼らの試練は、イランの医療制度全体にわたる広範な危機を反映している。</p><p>DWはテヘランの住民とともに、イラン食品医薬品局（IFDA）の職員やテヘラン、ラシュト、マハーバードの薬局職員と話をした。イランでは外国メディアと話すことは依然として危険であるため、インタビューは匿名または仮名を使用して行われた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Ahmad,* 67, visited nearly 20 Tehran pharmacies for the antipsychotic drug chlorpromazine, but left empty-handed .</p><p>"When a patient has to go to this many pharmacies just to find an essential drug, you really have to ask who is responsible for supplying medicine," he told DW.</p><p>Mitra,* a 37-year-old Tehran resident with diabetes , spent days hunting for insulin. "These are not drugs I can postpone taking or simply give up," she said. "My life depends on regular access to this insulin."</p><p>Their ordeal reflects a wider crisis across Iran's health care system .</p><p>Along with Tehran residents, DW spoke with an official at Iran's Food and Drug Administration (IFDA) and pharmacy workers in Tehran, Rasht and Mahabad. The interviews were conducted anonymously or using pseudonyms as speaking with foreign media remains dangerous in Iran.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/why-iran-s-medicine-supply-chain-is-failing/a-80035268?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/25 04:19</span>
+    </div>
+
+    
+    <p class="title-ja">中国南方航空部門、ボーイング737-8型機50機を購入へ</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/economy/2026/11/24/china-southern-airlines-unit-to-buy-50-boeing-737-8-planes?traffic_source=rss" target="_blank" rel="noopener">China Southern Airlines unit to buy 50 Boeing 737-8 planes</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>証券取引所への提出書類によると、中国南方航空は、子会社のアモイ航空がボーイングと737-8型機50機を定価約74億ドルで購入する契約に署名したと発表した。</p><p>売買契約は火曜日に証券取引所に提出された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>中国南方航空は提出書類の中で、ボーイングがアモイ航空に「大幅な割引」を提案したため、実際の購入価格は定価よりも低くなるだろうと述べた。航空会社が飛行機メーカーに大量の注文をする場合、大幅な割引が標準的に行われます。</p><p>この発注は、5月に北京で行われたドナルド・トランプ米大統領と中国の習近平国家主席との首脳会談で中国が行ったジェット機200機の供与の約束に続くものだ。提出書類では、この命令がその約束の一部であるかどうかについては言及されていない。</p><p>ボーイングはここ10年近く、中国から大規模な受注を獲得していなかった。中国は昨年、自国の航空会社がボーイング製ジェット機の納入を禁止したと伝えられている。また、トランプ大統領が対中関税を発動したことを受け、貿易戦争のさなか米国企業からの航空機関連機器や部品の購入も一時停止した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>China Southern Airlines says its subsidiary, Xiamen Airlines, has signed an agreement with Boeing to buy 50 737-8 aircraft at a list price of about $7.4bn, according to a stock exchange filing.</p><p>The purchase agreement was filed with the stock exchange on Tuesday.</p><p>The actual purchase price would be lower than the list price as Boeing had offered Xiamen Airlines a “significant discount”, China Southern said in the filing. Large discounts are standard practice when airlines place sizeable orders with planemakers.</p><p>The order follows a commitment for 200 jets that China made during a summit between United States President Donald Trump and Chinese leader Xi Jinping in Beijing in May. The filing did not say whether this order is part of that commitment.</p><p>Boeing had not won a major order from China in almost a decade. Last year China reportedly prohibited its airlines from taking deliveries of Boeing jets. It also paused purchases of aircraft-related equipment and parts from US companies in the midst of a trade war, after Trump unleashed a barrage of tariffs on Beijing.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/economy/2026/11/24/china-southern-airlines-unit-to-buy-50-boeing-737-8-planes?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/25 03:07</span>
+    </div>
+
+    
+    <p class="title-ja">インド政府は「陰謀に負けた」と発言、「ゴキブリ」のリーダーが英国飛行を禁止</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cm5y1ezx2gqyo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Indian government has 'lost the plot', says 'cockroach' leader barred from UK flight</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>インドの「ゴキブリ」運動の指導者の一人は、英国への出国を阻止されたことでデリー政府が「陰謀を完全に失った」と述べた。</p><p>サウラフ・ダスさんは、火曜日の朝の飛行機に搭乗する予定だったが、入国管理官から生年月日に関連する不一致のためパスポートに「フラグが付けられている」と言われたと語った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>BBCとのインタビューでダス氏は、自身の文書に矛盾はないと述べ、インド政府が活動家らの渡航や若者にとって重要な問題についての講演を阻止する安っぽい戦術をとっていると非難した。</p><p>BBCは連邦内務省、デリー警察、空港当局にコメントを求めた。</p><p>サウラフ氏はBBCワールドサービスのニュースアワー番組に対し、今回の事件は政府が「恐れている」ことを示していると語った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>One of the leaders of India's "cockroach" movement has said the Delhi government has "completely lost the plot" after he was stopped from leaving the country for the UK.</p><p>Saurav Das said he was meant to board a flight on Tuesday morning but was told by immigration officers his passport had been "flagged" because of discrepancies involving his date of birth.</p><p>In an interview with the BBC, Das said there were no discrepancies in his documents, accusing the Indian government of using cheap tactics to stop activists from travelling and speaking on issues that matter to young people.</p><p>The BBC has reached out to the federal home ministry, Delhi police and airport officials for comment.</p><p>Saurav told the BBC World Service's Newshour programme the incident showed the government was "scared".</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cm5y1ezx2gqyo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/24 21:51</span>
+    </div>
+
+    
+    <p class="title-ja">北朝鮮はロシアへの追加派兵を控えているのか？</p>
+    <p class="title-en"><a href="https://www.dw.com/en/is-north-korea-holding-back-on-sending-russia-more-troops/a-80033025?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Is North Korea holding back on sending Russia more troops?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>夏の間、ウクライナのウォロディミル・ゼレンスキー大統領は、ロシアの戦争努力に対する北朝鮮の継続的な支援の一環として、3万人から5万人の北朝鮮兵士がロシアに派兵されるだろうと予想していると述べた。</p><p>しかし、現時点では軍備増強はいまだ実現していないようであり、北朝鮮がロシアへの大量派兵を継続するかどうかは不透明だ。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>9月にウクライナ偽情報対策センター所長を辞任したアンドリー・コバレンコ氏は11月9日、テレグラムに寄稿し、8月の情報評価でクレムリンが秋の攻勢に向けて北朝鮮軍3万人以上の追加派遣を要請したことが示されたと述べた。</p><p>同氏は、北朝鮮の金正恩朝鮮労働党委員長とロシアのウラジーミル・プーチン大統領との首脳会談が９月に予定されていたが、実現しなかったと述べた。クヴィ氏は、北朝鮮は2024年にロシアのクルスク地域に数千人の軍隊を派遣しており、そこではモスクワがウクライナの侵攻を撃退するために戦っていたと主張した。</p><p>コバレンコ氏は、ウクライナのドネツク地域のロシア占領地域での攻撃作戦に参加することは北朝鮮にとって依然として越えてはならない一線である可能性があるため、北朝鮮がモスクワの要請を拒否したと考えている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Over the summer, Ukrainian President Volodymyr Zelenskyy said that he expected between 30,000 and 50,000 North Korean soldiers would be deployed to Russia as part of Pyongyang's ongoing support of Moscow's war effort .</p><p>However, it now appears that troop buildup has yet to materialize, and it is unclear whether North Korea will continue sending large numbers of troops to Russia.</p><p>Writing on Telegram on November 9, Andrii Kovalenko, who resigned in September as head of Ukraine's Center for Countering Disinformation, said an August intelligence assessment indicated that the Kremlin had requested more than 30,000 additional North Korean troops for an autumn offensive.</p><p>He said a summit between North Korean leader Kim Jong Un and Russian President Vladimir Putin was expected in September, but did not happen. Kviy has claimed that North Korea previously sent thousands of troops to Russia's Kursk region in 2024, where Moscow was fighting to repel a Ukrainian incursion.</p><p>Kovalenko believes Pyongyang turned down Moscow's request because taking part in offensive operations in Russian-occupied parts of Ukraine's Donetsk region may still be a red line for North Korea .</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/is-north-korea-holding-back-on-sending-russia-more-troops/a-80033025?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/24 19:00</span>
+    </div>
+
+    
+    <p class="title-ja">電気自動車ブームによる人的コストがコンゴ訴訟の中心に</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/24/nx-s1-6042912/drc-congo-mining-china-copper-colbalt-critical-minerals" target="_blank" rel="noopener">The human cost of the electric vehicle boom is at the center of a lawsuit in Congo</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>コルウェジ、コンゴ民主共和国 — コルウェジにある中国所有の銅とコバルト鉱山のそばの低木地にある小さなコンクリートブロックの家で、母親が壊滅的な喪失の物語を語ります。</p><p>彼女は、近隣の鉱山からの汚染が家族の苦しみの原因であると信じています。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>彼女は3人の子供を亡くしました。 2人は出生時に死亡した。 3人目は鼻血を繰り返して死亡した。彼女の生き残った2人の子供のうちの1人は発育不全を患っています。</p><p>現在、彼女と他の26人の住民は、コンゴ民主共和国における汚染者の責任を問う異例の試みとして、同社を法廷に提訴している。彼らはまた、環境規制の執行を怠ったとして政府を告訴している。</p><p>他の原告と同様、彼女はNPRに対し、会社や政府からの報復を恐れ、自分を特定しないよう求めた。原告らの名前は法廷文書で公表されているが、さらなる暴露は避けたいとしている。弁護士らは原告らが他の地元住民からの脅迫に直面する可能性も懸念している。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>KOLWEZI, Democratic Republic of Congo — In a small cinderblock home in the scrub beside a Chinese-owned copper and cobalt mine in Kolwezi, a mother shares a story of devastating loss.</p><p>She believes pollution from the neighboring mine is responsible for her family's suffering.</p><p>She has lost three children. Two died at birth. A third suffered repeated nosebleeds before dying. One of her two surviving children has stunted growth.</p><p>Now she and 26 other residents are taking the company to court in a rare attempt to hold alleged polluters accountable in the Democratic Republic of Congo. They are also suing the government, accusing it of failing to enforce environmental regulations.</p><p>Like other plaintiffs, she asked NPR not to identify her, fearing retribution from the company or government. Although the claimants' names are public in court documents, they want to avoid further exposure. Their lawyers also fear the plaintiffs could face intimidation from other locals.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/24/nx-s1-6042912/drc-congo-mining-china-copper-colbalt-critical-minerals" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/25 04:59</span>
+    </div>
+
+    
+    <p class="title-ja">ブケレの手法：エルサルバドル指導者の強権的な戦術はハイチに効果があるのか​​？</p>
+    <p class="title-en"><a href="https://www.france24.com/en/tv-shows/the-debate/20261124-the-bukele-method-will-salvadoran-leader-s-strong-arm-tactics-work-for-haiti" target="_blank" rel="noopener">The Bukele method: will Salvadoran leader's strong-arm tactics work for Haiti?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ハイチ国民はブケレ方式を歓迎している。アメリカ大陸最貧国の国民は、過去6年間に国を蹂躙したギャングに対するエルサルバドル大統領の「先に撃って、後で質問する」というやり方を応援している。派遣された警察は実際に法と秩序を回復できるのだろうか？ハイチを支援するための国際社会による数十年にわたる取り組みのリストの最新情報について伺います。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Haitians are hailing the Bukele method. Citizens of the Americas’ poorest nation cheering the Salvadoran president’s ’shoot first, ask questions later’ method of dealing with the gangs that have overrun their country the past six years. Can the police force deployed actually restore law and order? We’ll ask about the latest in a decades-long list of efforts by the international community to support Haiti.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/tv-shows/the-debate/20261124-the-bukele-method-will-salvadoran-leader-s-strong-arm-tactics-work-for-haiti" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/25 03:55</span>
+    </div>
+
+    
+    <p class="title-ja">米国司法長官、NVIDIAの捜査に関する質問を回避</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/crpdw1qx7jgxo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">US attorney general dodges questions about Nvidia investigation</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米国司法長官のトッド・ブランシュ氏は、エヌビディアを「良き企業市民」として支持しているが、政府による捜査を受けているかどうかについてはコメントを拒否している。</p><p>AIマイクロチップメーカーの最高経営責任者としてのフアン氏の復帰へのドナルド・トランプ大統領の関与について国会議員が回答を求めている中、ブランシュ氏はジェンセン・フアン氏の機密保持状況に関する情報はないと述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>黄氏は、中国スパイ疑惑を含む不倫関係の暴露で辞任を余儀なくされてから２週間も経たないうちに復職した。</p><p>ブランシュ氏は火曜日、司法省かFBIがファン氏を捜査したのかと数回質問され、「何のことを言っているのか分からない」と答えた。</p><p>黄氏は来週にも議会に出廷する予定で、国家安全保障上の懸念から、中国のスパイとされるメガスピード社の元幹部との関係について尋問される予定だ。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>US Attorney General Todd Blanche has backed Nvidia as a "good corporate citizen" while refusing to comment on whether it was being investigated by the administration.</p><p>Blanche said he had no information about Jensen Huang's security clearance status, as lawmakers demand answers about President Donald Trump's involvement in Huang's reinstatement as the AI microchip maker's chief executive.</p><p>Huang was given his job back less than two weeks after being forced to resign over revelations of extramarital affairs, including one with an alleged Chinese spy.</p><p>Asked several times on Tuesday if the justice department or FBI had investigated Huang, Blanche responded: "I don't know what you're talking about."</p><p>Huang is still set to appear before Congress next week, where he will be questioned over his relationship with a former executive for Megaspeed - the alleged China spy - due to national security concerns.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/crpdw1qx7jgxo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/25 03:00</span>
+    </div>
+
+    
+    <p class="title-ja">岐路に立つコロンビア：紛争の中で平和を模索</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/witness/2026/11/24/colombia-at-a-crossroads-searching-for-peace-amid-conflict?traffic_source=rss" target="_blank" rel="noopener">Colombia at a Crossroads: Searching for peace amid conflict</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>コロンビアの和平合意から10年後、元FARC戦闘員で芸術家の名誉ある人物が壁画で署名者を殺害した。</p><p>元FARC戦闘員からアーティストに転身したユヘニ・イスキエルドは、2016年のコロンビアのハバナ和平協定以降に殺害された平和署名参加者仲間を追悼する壁画を描いている。この協定により、50年以上にわたる武力紛争は正式に終結したが、その後、武装勢力が報復を実行し、領土支配を求めて戦い、数百人の署名者が殺害された。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ユヘニさんは、激化する暴力によって国が45万人以上の命を奪った過去に戻る恐れがあると懸念しており、彼女の壁画がコロンビア国民に永続的な平和は可能であると信じるきっかけになればと願っている。</p><p>『交差点のコロンビア』は、ロドリゴ・バスケス・サレシ監督のドキュメンタリー映画です。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A decade after Colombia’s peace accords, former FARC fighter and artist honours killed signatories with a mural.</p><p>Yuheni Izquierdo, a former FARC fighter turned artist, paints a mural commemorating fellow peace signatories killed since Colombia’s 2016 Havana peace accords. More than 50 years of armed conflict formally ended with the agreement, but hundreds of signatories have since been killed as armed groups carry out reprisals and fight for territorial control.</p><p>Yuheni fears that the escalating violence threatens to return the country to a past that claimed more than 450,000 lives and hopes her mural will inspire Colombians to believe that a lasting peace is possible.</p><p>Colombia at a Crossroads is a documentary film by Rodrigo Vazquez Salessi.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/witness/2026/11/24/colombia-at-a-crossroads-searching-for-peace-amid-conflict?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/24 21:12</span>
+    </div>
+
+    
+    <p class="title-ja">ジェンセン・フアンが Nvidia に復帰そしてゴメス議員、性的違法行為の疑いで辞任</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/24/g-s1-155227/up-first-newsletter-nvidia-jensen-huang-trump-ukraine-russia-jimmy-gomez" target="_blank" rel="noopener">Jensen Huang returns to Nvidia. And, Rep. Gomez resigns amid alleged sexual misconduct</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>Nvidia は昨日、ジェンスン・フアン氏を CEO に復帰させ、同社の株価を 30% 以上急騰させました。トランプ大統領は、黄氏の帰国を促進した功績を主張した。同CEOの復帰は、中国スパイと疑われる米国諜報機関の女性との関与を含む婚外交渉報道によるわずか2週間前の辞任に続くものである。大統領の親しい友人であるファン氏は以前、ホワイトハウスの新しい宴会場と警備施設に2500万ドルを寄付していた。彼の復帰は Nvidia の株価を押し上げ、株式市場全体の上昇を引き起こし、一人の男の復帰には約 1 兆ドルの価値があることが明らかになりました。シリコンバレーでの多様性と包括性を主張する一部の人々は、ファン氏の復帰は利益が唯一の優先事項であることを示していると主張する。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Nvidia reinstated Jensen Huang as CEO yesterday , causing the company's stock to soar more than 30%. President Trump claimed credit for facilitating Huang's return . The CEO's comeback follows his resignation just two weeks earlier due to reports of extramarital affairs, including involvement with a woman U.S. intelligence agencies suspected of being a Chinese spy. Huang, a close ally of the president, had previously donated $25 million to the new White House ballroom and security complex. His return boosted Nvidia's stock and triggered a rally in the entire stock market, revealing that one man's comeback is worth about a trillion dollars. Some individuals advocating for diversity and inclusion in Silicon Valley argue that Huang's return signals that profit is the only priority .</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/24/g-s1-155227/up-first-newsletter-nvidia-jensen-huang-trump-ukraine-russia-jimmy-gomez" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/25 04:54</span>
+    </div>
+
+    
+    <p class="title-ja">セネガルAFCONの判決は「スポーツ法の本に載っているのは良い」と専門家が語る</p>
+    <p class="title-en"><a href="https://www.france24.com/en/senegal-afcon-ruling-good-in-the-books-of-sports-law-expert-says" target="_blank" rel="noopener">Senegal AFCON ruling 'good in the books of sports law', expert says</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>FRANCE 24のジェニー・シンとスポーツプレゼンターでジャーナリストのタンド・シビヤ氏は、セネガルを2025年アフリカネイションズカップの優勝者に復帰させるというスポーツ仲裁裁判所の決定は、「法学の観点から、あるいは前例を作るという観点からすれば、スポーツ法の本に載るのは良いことだろう。なぜなら、審判のあらゆる決定が常に法廷に持ち込まれれば、本当に問題になるからだ」と説明する。ゲームの品質、ガバナンス、正当性を改ざんするものです。」</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Speaking with FRANCE 24's Jennie Shin, sports presenter and journalist Thando Sibiya explains that the decision by the Court of Arbitration for Sport to reinstate Senegal as ⁠winner of ​the 2025 Africa Cup of Nations "from a jurisprudence perspective or creating precedent, it is going to be good in the books of sports law, because if every single decision of a referee is taken to a court of law all the time, it really tampers with the quality, governance and legitimacy of the game".</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/senegal-afcon-ruling-good-in-the-books-of-sports-law-expert-says" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/25 04:10</span>
+    </div>
+
+    
+    <p class="title-ja">ナイジェリア国王、92歳、性的暴行容疑で停職処分</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/cmglrz462nn6o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Nigerian monarch, 92, suspended after sexual assault claims</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ナイジェリアで最も有名な君主の一人であるダウラ首長は、ポーランド人観光客による性的暴行疑惑を受けて、すべての公務と旅行を停止された。</p><p>この訪問者は、ウマル・ファルーク・ウマルさん（92）が観光客に遭遇した際に胸をつかまれ、その経験に嫌悪感を感じたと語った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>この疑惑はソーシャルメディアプラットフォーム全体で広範な議論を引き起こし、多くが首長の停職と捜査を要求したが、カツィナ州政府は現在その要求に耳を傾けている。</p><p>ウマル氏は疑惑や停職処分についてコメントしていない。</p><p>彼は、政治的権力を失ったとはいえ、ナイジェリア北部で依然として大きな文化的、宗教的影響力を行使している数人の首長（植民地時代以前に遡る伝統的な役割）の1人である。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>One of Nigeria's best-known monarchs, the Emir of Daura, has been suspended from all official engagements and travel following allegations of sexual assault by a Polish tourist.</p><p>The visitor said Umar Farouk Umar, 92, had grabbed her chest during a tourism encounter and that she felt disgusted by the experience.</p><p>The allegation sparked widespread discussion across social media platforms, with many calling for the suspension of the emir and an investigation - calls the Katsina state government has now heeded.</p><p>Umar has not commented on the allegations or his suspension.</p><p>He is one of several emirs - a traditional role dating back to pre-colonial times - who still wield great cultural and religious influence in northern Nigeria, although they have lost their political power.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/cmglrz462nn6o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-11-25";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
