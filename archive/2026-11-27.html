@@ -1,0 +1,937 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World News Digest</title>
+<meta name="description" content="世界6メディアの主要ニュースを地域別に毎日19時(JST)自動更新">
+<style>
+  :root {
+    --bg: #0f1115; --card-bg: #171a21; --border: #262b36;
+    --text: #e7e9ee; --text-dim: #9aa1b1; --text-faint: #6f7789;
+    --accent: #4f8dfd;
+    --bbc: #bb1919; --aj: #d18700; --guardian: #0b4f8a;
+    --dw: #008b9a; --f24: #5b48c2; --npr: #b0304d;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f4f5f7; --card-bg: #ffffff; --border: #e2e4ea;
+      --text: #1a1d24; --text-dim: #4b5464; --text-faint: #808895;
+      --accent: #2563eb;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans",
+      "Noto Sans JP", Roboto, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.8;
+  }
+  /* ---- archive sidebar ---- */
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; width: 232px;
+    background: var(--card-bg); border-right: 1px solid var(--border);
+    overflow-y: auto; padding: 22px 14px 30px; z-index: 40;
+    transform: translateX(-100%); transition: transform 0.25s ease;
+  }
+  .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,0.35); }
+  .side-title {
+    font-size: 0.78rem; font-weight: 700; letter-spacing: 0.08em;
+    color: var(--text-faint); text-transform: uppercase; margin: 0 6px 12px;
+  }
+  .side-home {
+    display: block; padding: 8px 12px; margin: 0 0 16px;
+    border-radius: 8px; background: var(--bg); border: 1px solid var(--border);
+    color: var(--accent); font-size: 0.85rem; text-decoration: none; font-weight: 600;
+  }
+  .side-home:hover { border-color: var(--accent); }
+  .side-month {
+    font-size: 0.74rem; color: var(--text-faint); margin: 14px 6px 6px;
+    font-weight: 700;
+  }
+  .date-link {
+    display: block; padding: 7px 12px; margin-bottom: 4px;
+    border-radius: 8px; color: var(--text-dim); font-size: 0.86rem;
+    text-decoration: none; border: 1px solid transparent;
+  }
+  .date-link:hover { color: var(--accent); background: var(--bg); }
+  .date-link.active {
+    color: var(--accent); background: var(--bg);
+    border-color: var(--accent); font-weight: 700;
+  }
+  .side-note { color: var(--text-faint); font-size: 0.78rem; margin: 8px 6px; }
+  #menu-btn {
+    position: fixed; bottom: 18px; left: 18px; z-index: 50;
+    width: 52px; height: 52px; border-radius: 50%;
+    background: var(--accent); color: #fff; border: none;
+    font-size: 1.25rem; cursor: pointer;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.35);
+  }
+  #side-overlay {
+    display: none; position: fixed; inset: 0; z-index: 35;
+    background: rgba(0,0,0,0.45);
+  }
+  #side-overlay.show { display: block; }
+  @media (min-width: 1200px) {
+    .sidebar { transform: none; box-shadow: none; }
+    body { padding-left: 232px; }
+    #menu-btn, #side-overlay { display: none !important; }
+  }
+  header { max-width: 720px; margin: 0 auto; padding: 40px 20px 8px; }
+  h1 { font-size: 1.7rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .subtitle { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .updated { color: var(--text-faint); font-size: 0.82rem; margin: 10px 0 0; }
+  .toc {
+    max-width: 720px; margin: 0 auto; padding: 14px 20px 4px;
+    display: flex; flex-wrap: wrap; gap: 8px;
+    position: sticky; top: 0; background: var(--bg); z-index: 5;
+    border-bottom: 1px solid var(--border);
+  }
+  .toc a {
+    display: inline-block; padding: 5px 13px; border-radius: 999px;
+    border: 1px solid var(--border); background: var(--card-bg);
+    color: var(--text-dim); font-size: 0.82rem; text-decoration: none;
+    margin-bottom: 10px;
+  }
+  .toc a:hover { color: var(--accent); border-color: var(--accent); }
+  .toc .count { color: var(--text-faint); font-size: 0.75rem; }
+  main { max-width: 720px; margin: 0 auto; padding: 0 20px 60px; }
+  .region-head {
+    font-size: 1.15rem; font-weight: 700; margin: 34px 0 14px;
+    padding-left: 12px; border-left: 4px solid var(--accent);
+    scroll-margin-top: 70px;
+  }
+  .story {
+    background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 12px; padding: 20px 22px; margin-bottom: 14px;
+  }
+  .story-meta { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .badge {
+    font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em;
+    padding: 3px 9px; border-radius: 999px; color: #fff;
+  }
+  .badge.bbc { background: var(--bbc); }
+  .badge.aj { background: var(--aj); }
+  .badge.guardian { background: var(--guardian); }
+  .badge.dw { background: var(--dw); }
+  .badge.f24 { background: var(--f24); }
+  .badge.npr { background: var(--npr); }
+  .story-time { color: var(--text-faint); font-size: 0.76rem; }
+  .title-ja { font-size: 1.08rem; font-weight: 700; margin: 0 0 3px; line-height: 1.55; }
+  .title-en {
+    font-size: 0.8rem; color: var(--text-faint); margin: 0 0 12px; line-height: 1.5;
+  }
+  .title-en a { color: inherit; text-decoration: none; }
+  .title-en a:hover { color: var(--accent); text-decoration: underline; }
+  .body-ja p { margin: 0 0 10px; color: var(--text-dim); font-size: 0.93rem; }
+  .body-ja p:last-child { margin-bottom: 0; }
+  details { margin-top: 12px; border-top: 1px dashed var(--border); padding-top: 10px; }
+  summary {
+    cursor: pointer; color: var(--accent); font-size: 0.8rem;
+    list-style: none; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "▸ "; }
+  details[open] summary::before { content: "▾ "; }
+  details .more-ja p { margin: 10px 0 0; color: var(--text-dim); font-size: 0.93rem; }
+  details .orig-label {
+    margin: 14px 0 0; color: var(--text-faint); font-size: 0.75rem;
+    text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  details .orig p {
+    margin: 8px 0 0; color: var(--text-faint); font-size: 0.84rem; line-height: 1.65;
+  }
+  .read-more { display: inline-block; margin-top: 10px; font-size: 0.8rem; }
+  .read-more a { color: var(--accent); text-decoration: none; }
+  .read-more a:hover { text-decoration: underline; }
+  footer {
+    max-width: 720px; margin: 0 auto; padding: 0 20px 50px;
+    color: var(--text-faint); font-size: 0.78rem; line-height: 1.7;
+  }
+  footer a { color: var(--accent); }
+  .empty-note { color: var(--text-dim); font-size: 0.9rem; padding: 20px; }
+</style>
+</head>
+<body>
+<aside class="sidebar" id="sidebar">
+  <p class="side-title">Archive</p>
+  <a class="side-home" href="../index.html">最新のニュース</a>
+  <div id="datelist"><p class="side-note">読み込み中…</p></div>
+</aside>
+<div id="side-overlay"></div>
+<button id="menu-btn" title="過去のニュース">📅</button>
+
+<header>
+  <h1>World News Digest</h1>
+  <p class="subtitle">BBC / Al Jazeera / The Guardian / DW / France 24 / NPR — 地域別・毎日19:00(JST)自動更新</p>
+  <p class="updated">2026年11月27日 版(アーカイブ)</p>
+</header>
+
+
+<nav class="toc">
+  
+  <a href="#europe">欧州・ロシア <span class="count">4</span></a>
+  
+  <a href="#mideast">中東 <span class="count">4</span></a>
+  
+  <a href="#asia">アジア・太平洋 <span class="count">4</span></a>
+  
+  <a href="#americas">米州 <span class="count">4</span></a>
+  
+  <a href="#africa">アフリカ <span class="count">2</span></a>
+  
+</nav>
+
+
+<main>
+  
+  <h2 class="region-head" id="europe">欧州・ロシア</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/27 03:48</span>
+    </div>
+
+    
+    <p class="title-ja">国境なき記者団、物議を醸しているフランスのテレビ局CNewsの放送停止を要求</p>
+    <p class="title-en"><a href="https://www.france24.com/en/france/20261126-reporters-without-borders-demands-suspension-controversial-french-tv-channel-cnews" target="_blank" rel="noopener">Reporters Without Borders demands suspension of controversial French TV channel CNews</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>パリに本拠を置く国際報道の自由団体「国境なき記者団（RSF）」は木曜日、フランスのメディア規制当局アルコムに対し、多元主義を守らなかったとして右翼チャンネルCNewsを1か月間停止するよう求めた。保守派の億万長者ヴィンセント・ボロレ氏が所有するニュースチャンネルは、放送停止の呼びかけを非難した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Paris-based international press freedom group Reporters Without Borders (RSF) on Thursday called on France's media regulator Arcom to suspend right-wing channel CNews for one month over its failure to uphold pluralism. The news channel owned by conservative billionaire Vincent Bolloré condemned the call for its suspension.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/france/20261126-reporters-without-borders-demands-suspension-controversial-french-tv-channel-cnews" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/27 02:54</span>
+    </div>
+
+    
+    <p class="title-ja">クウェートのストライキでイタリア人2人死亡、イランは責任を否定</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c39w9y5dx4k5o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Two Italians killed in strike in Kuwait, as Iran denies responsibility</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>クウェートの施設への攻撃でイタリア人２人が死亡し、両国はイランの関与を非難している。</p><p>イタリア外務省によると、２人はドイツの武器製造会社ラインメタル社に勤務する技術者だった。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>イランは攻撃に対する責任を否定しており、国軍報道官のアボルファズル・シェカルチ氏は、同国軍による「軍事作戦や攻撃作戦は行われていない」と述べた。</p><p>クウェート国防省はこれに先立ち、イランから多数の無人機が探知され迎撃された後、落下した破片によりイタリア人２人、クウェート国民１人、パキスタン国民の４人が負傷したと発表した。</p><p>これは、クウェートが米軍駐留空軍基地に対するイランによる夜間の無人機攻撃を撃退したと発表してからわずか1週間余りで、同国への攻撃は2カ月以上ぶりとなる。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Two Italian nationals have died following a strike on a facility in Kuwait which both countries have blamed on Iran.</p><p>The pair were technicians working for German arms manufacturing company Rheinmetall, Italy's foreign ministry said.</p><p>Iran has denied responsibility for the attack, with armed forces spokesperson Abolfazl Shekarchi saying "no military or offensive operations have been conducted" by its military.</p><p>Kuwait's defence ministry said earlier that four people - the two Italians, a Kuwaiti national and Pakistani national - had been injured from falling shrapnel after a number of drones from Iran were detected and intercepted.</p><p>It comes just over a week after Kuwait said it had repelled overnight Iranian drone attacks on an airbase which hosts US forces - the first strikes in more than two months on the country.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c39w9y5dx4k5o?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/27 02:53</span>
+    </div>
+
+    
+    <p class="title-ja">EU指導者らは長期予算、ウクライナへの追加資金について合意に苦戦している</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/economy/2026/11/26/eu-leaders-struggle-to-agree-on-long-term-budget-more-money-for-ukraine?traffic_source=rss" target="_blank" rel="noopener">EU leaders struggle to agree on long-term budget, more money for Ukraine</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>欧州連合の指導者らは、2028年から2034年までのEUの約1兆7600億ドルの予算案で合意に達し、来年のウクライナの経済的・軍事的需要を満たすための新たな490億ドルの融資に合意するのに苦労している。</p><p>木曜日にブリュッセルで開かれた臨時EU首脳会議でも両者の違いは明らかで、一部の指導者は引き締めを要求する一方、他の指導者は予算の大部分を消費する伝統的な政策を擁護した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>しかし、大半は重要な新たな優先事項のための追加資金と、戦争開始からほぼ5年が経過したウクライナを支援することを望んでいた。</p><p>ドイツのフリードリヒ・メルツ首相は「欧州は堅実な財政を必要としている。これ以上債務を負うことはできないし、負うべきではない」と矛盾の一部を浮き彫りにした発言で述べた。 「同時に、確実に果たさなければならない一連の任務もあります。」</p><p>同氏は記者団に対し、「優先事項は経済の繁栄でなければならず、域内市場はその可能性を最大限に発揮できなければならず、防衛の強化が必要だ」と語った。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>European Union leaders are struggling to reach a deal on the bloc’s nearly $1.76 trillion budget proposal for 2028 to 2034 and agree a new $49bn loan to help Ukraine meet its economic and military needs next year.</p><p>The differences were visible at an extraordinary EU summit in Brussels on Thursday, where some leaders called for belts to be tightened, while others defended traditional policies that consume large parts of the budget.</p><p>Most, however, wanted extra funds for important new priorities and to help Ukraine almost five years into the war.</p><p>“Europe needs solid finances. We can’t and we mustn’t take on more debt,” German Chancellor Friedrich Merz said, in remarks that highlighted some of the contradictions. “At the same time, there is a series of tasks we must fulfil reliably.”</p><p>“The priorities must be a flourishing economy, the internal market must be able to develop its full potential, and we need better defence,” he told reporters.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/economy/2026/11/26/eu-leaders-struggle-to-agree-on-long-term-budget-more-money-for-ukraine?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/26 22:41</span>
+    </div>
+
+    
+    <p class="title-ja">EUとインドネシアの貿易協定は新たな市場を開拓するも課題は残る</p>
+    <p class="title-en"><a href="https://www.dw.com/en/eu-indonesia-trade-deal-opens-new-markets-but-challenges-remain/a-80059568?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">EU-Indonesia trade deal opens new markets, but challenges remain</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>欧州連合がアジアにおける存在感を深め、貿易関係を多様化しようとする中、インドネシアはますます重要なパートナーとして浮上している。</p><p>先週ブリュッセルで行われた調印式で、欧州委員会のウルズラ・フォン・デア・ライエン委員長は、ジャカルタとの通商協定は、7億3000万人の市場を結び付けるこの地域における「最も野心的な協定」の1つであると述べた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>この協定は10年近い交渉の集大成であり、貿易パートナーシップを多様化し、重要な原材料へのアクセスを確保し、中国への戦略的依存を軽減するというEUの努力を反映している。</p><p>インドネシアにとって、投資を誘致し、輸出を拡大し、世界のサプライチェーンにおける地位を強化する機会を提供します。</p><p>この協定により、98％以上の品目で関税が段階的に撤廃され、15年間の二国間貿易額のほぼ全額がカバーされることになる。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>As the European Union seeks to deepen its presence in Asia and diversify its trade relationships, Indonesia is emerging as an increasingly important partner.</p><p>At a signing ceremony in Brussels last week , European Commission President Ursula von der Leyen described the bloc's trade agreement with Jakarta as one of its "most ambitious deals" in the region, linking markets of 730 million people.</p><p>The deal, the culmination of nearly a decade of negotiations, reflects the EU's efforts to diversify its trade partnerships, secure access to critical raw materials and reduce strategic dependencies on China .</p><p>For Indonesia, it offers opportunities to attract investment, expand exports and strengthen its position in global supply chains.</p><p>The agreement will gradually scrap tariffs on more than 98% of product categories, covering almost the entire value of bilateral trade over 15 years.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/eu-indonesia-trade-deal-opens-new-markets-but-challenges-remain/a-80059568?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="mideast">中東</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/27 03:30</span>
+    </div>
+
+    
+    <p class="title-ja">クシュナー氏、ガザ破壊の「良い点」を説明</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/26/kushner-explains-the-good-thing-about-gazas-destruction?traffic_source=rss" target="_blank" rel="noopener">Kushner explains the ‘good thing’ about Gaza’s destruction</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>クシュナー氏、ガザ破壊の「良い点」を説明</p><p>ドナルド・トランプの義理の息子ジャレッド・クシュナーは、イスラエルによるガザ虐殺戦争の「良いところ」は、それを「何か新しいもの」に組み込むことができることだと語った。同氏はガザの再建をパレスチナ人に対する「多大な親切行為」だと述べ、エジプトのシナイ半島にデータセンターを設置した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Kushner explains the ‘good thing’ about Gaza’s destruction</p><p>Donald Trump’s son-in-law Jared Kushner says the “good thing” about Israel’s genocidal war on Gaza is that it can be built into “something new”. He described rebuilding Gaza as a “huge act of kindness” towards Palestinians and pitched data centres in Egypt’s Sinai Peninsula.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/video/newsfeed/2026/11/26/kushner-explains-the-good-thing-about-gazas-destruction?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/27 02:38</span>
+    </div>
+
+    
+    <p class="title-ja">ネタニヤフ首相の汚職裁判：本当に終わったのか？</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/news/2026/11/26/netanyahus-corruption-trial-is-it-really-all-over?traffic_source=rss" target="_blank" rel="noopener">Netanyahu’s corruption trial: Is it really all over?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ベンヤミン・ネタニヤフ首相は水曜日、長期にわたる汚職裁判の裁判官が同首相に対する最も重大な訴訟を取り下げるよう勧告し、勢いを増した。</p><p>10月の選挙以来イスラエルの暫定首相を務めているネタニヤフ首相は、ライバルのガディ・アイゼンコット氏が連立政権を築こうとする中、政治権力の維持を目指して戦っている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>また、2020年に贈収賄、詐欺、背任の訴訟が始まって以来、3件の汚職事件でも戦っている。</p><p>同氏の話によれば、この裁判は彼の政治家としてのキャリアに付きまとい、2019年から2022年にかけて選挙が繰り返された混沌とした時期に政権樹立を妨げ、捜査と裁判中に彼自身と家族に「何年ものひどい苦しみ」を与えた責任があると述べた。</p><p>ネタニヤフ首相に不利な証拠の多くは、全国メディアで彼自身と妻サラに有利な報道を確保しようとした同首相の努力に基づいている。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Benjamin Netanyahu got a boost on Wednesday , when judges in his long-running corruption trial recommended dropping the most serious case against him.</p><p>Netanyahu, who has been Israel’s caretaker prime minister since October’s election , is fighting to maintain political power as his rival Gadi Eisenkot tries to build a coalition.</p><p>He has also been fighting three corruption cases since 2020, when proceedings against him for bribery, fraud and breach of trust began.</p><p>In his telling, the trial has dogged his political career, prevented him from forming a government during a chaotic period of repeated elections between 2019 and 2022 and was responsible for “years of terrible suffering” for himself and his family during the investigation and trial.</p><p>Much of the evidence against Netanyahu rests on his efforts to secure favourable coverage for himself and his wife, Sara, in the national media.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/news/2026/11/26/netanyahus-corruption-trial-is-it-really-all-over?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/27 02:37</span>
+    </div>
+
+    
+    <p class="title-ja">サウジのポップミュージックは繁栄していますが、それには正当な理由があるのでしょうか?</p>
+    <p class="title-en"><a href="https://www.dw.com/en/saudi-pop-music-is-thriving-but-for-the-right-reasons/a-80036013?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Saudi pop music is thriving — but for the right reasons?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>現在、ラッパーのアサエル・ビシはサウジアラビアの注目のヒップホップスターの一人であり、同国最大のニューミュージックのレコードレーベルであるMDLBEASTと契約している。しかし、少し前まで、彼女はまったく別の理由で国際的な見出しを飾っていました。</p><p>2020年、ビシが地元のカフェで踊る人々をフィーチャーした曲「ビント・メッカ」または「メッカから来た少女」のミュージックビデオを公開した後、メッカ知事はビシの制作チーム全員の逮捕を要求した。同氏は、このビデオは聖都の地元の習慣や伝統に違反していると述べた。結局、撮影許可について話し合って事態は解決した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>そして 2023 年の初めまでに、Bishi は MDLBEAST と契約し、それ以来 Spotify などの音楽プラットフォームで数十万のストリーミングを記録しました。</p><p>過去には、他のサウジアラビアのラッパーも同様の違反容疑で刑務所に収監されている。ビシの物語が別の方向に進んだという事実は、おそらく部分的には、31歳のビシのキャリアパスがサウジのポップミュージック業界全体と同じような軌道を描いているためである。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Today, rapper Asayel Bishi is one of Saudi Arabia's rising hip-hop stars, signed to the country's biggest record label for new music, MDLBEAST. But not so long ago, she was making international headlines for a totally different reason.</p><p>In 2020, after Bishi released a music video for a song, "Bint Mecca," or "girl from Mecca," featuring people dancing in a local cafe, Mecca's governor called for the arrest of Bishi's whole production team. He said the video violated the holy city's local customs and traditions . In the end, the situation was resolved with a discussion about filming permits.</p><p>And by early 2023, Bishi was signed to MDLBEAST and has since racked up hundreds of thousands of streams on music platforms like Spotify .</p><p>In the past, other Saudi rappers have ended up in prison for similar, alleged transgressions. The fact that Bishi's story went a different way is probably partially because the 31-year-old's career path is on a similar trajectory to the Saudi pop music industry as a whole.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/saudi-pop-music-is-thriving-but-for-the-right-reasons/a-80036013?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/27 01:13</span>
+    </div>
+
+    
+    <p class="title-ja">バグダッド政府による石油と国境検問所の占拠計画に対するイラク・クルディスタンの抗議デモ</p>
+    <p class="title-en"><a href="https://www.dw.com/en/protests-in-iraqi-kurdistan-at-plans-for-government-in-baghdad-to-take-over-oil-border-crossings/a-80065994?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Protests in Iraqi Kurdistan at plans for government in Baghdad to take over oil, border crossings</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>抗議活動参加者は木曜早朝、イラク・クルディスタンのアルビル（アルビルとも表記されることも多い）の街頭に大挙して出陣し、イラク北部の半自治地域の巨大な旗を振った。</p><p>彼らは、バグダッドがこれまでクルド人当局が行っていた石油事業と国境検問所を管理するという今週初めに発表された連邦政府の計画に対応していた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>イラクのアリ・アル・ザイディ首相は、今回の変更を発表した際、この措置は石油密輸を阻止する取り組みの一環であると述べた。</p><p>この計画は、中央政府と、認識や権限のレベルに差はあるものの、1991年以来ほぼ自らを統治してきたクルド人当局との間の長期にわたる権力闘争の激化を示すものであった。</p><p>ライバルのクルド人政党が地域の首都での大規模な抗議活動に参加した。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Protesters took to the streets of Irbil, also often written Erbil, in Iraqi Kurdistan early on Thursday in large numbers, waving massive flags of the semiautonomous region in northern Iraq .</p><p>They were responding to federal government plans announced earlier in the week for Baghdad to take control of oil operations and border crossings previously run by Kurdish authorities.</p><p>Iraqi Prime Minister Ali al-Zaidi had said the measures were part of a bid to stop oil smuggling when announcing the changes.</p><p>The plans marked an escalation in the long-running power struggle between the central government and Kurdish authorities that have largely governed themselves since 1991, albeit with varying levels of recognition and authority.</p><p>Rival Kurdish parties joined forces for the large protests in the regional capital.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/protests-in-iraqi-kurdistan-at-plans-for-government-in-baghdad-to-take-over-oil-border-crossings/a-80065994?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="asia">アジア・太平洋</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/27 01:21</span>
+    </div>
+
+    
+    <p class="title-ja">バンコクの製油所爆発で9人負傷、3人重体</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/crx209kwk4kzo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Nine injured, three critically, after Bangkok oil refinery explosion</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>バンコクの製油所で爆発があり、当局は９人が負傷したと発表した。</p><p>AFP通信によると、このうち3人は重篤な状態で、地元の病院は当初の4人に対する評価を修正したと伝えた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>14時45分（日本時間午後7時45分）頃、タイの首都東部にあるエネルギー大手バンチャック・コーポレーションが運営するプラカノン施設での爆発の後、火災が発生した。</p><p>同社は、火災は３０分以内に鎮火し消し止められたと発表し、事故原因は調査中であると付け加えた。</p><p>爆発後、地元当局が住民にその地域から立ち去るよう指示したため、バンコクのスカイライン全体に黒煙が見られた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Nine people have been injured after an explosion at an oil refinery in Bangkok, authorities have said.</p><p>Three of them are in critical condition, according to news agency AFP, which said the local hospital had revised its earlier assessment of four.</p><p>A fire broke out after the blast at the Phra Khanong facility run by energy giant Bangchak Corporation in the east of Thailand's capital at around 14:45 (07:45 GMT).</p><p>The company said the fire was brought under control and put out within 30 minutes, adding that the cause of the incident was being investigated.</p><p>Black smoke could be seen across Bangkok's skyline after the blast, as local officials told residents to leave the area.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/crx209kwk4kzo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/27 00:19</span>
+    </div>
+
+    
+    <p class="title-ja">独裁国家ベトナムは死刑を段階的に廃止する準備はできているのか？</p>
+    <p class="title-en"><a href="https://www.dw.com/en/is-authoritarian-vietnam-ready-to-phase-out-the-death-penalty/a-80064271?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Is authoritarian Vietnam ready to phase out the death penalty?</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ベトナムはかつて世界で最も多くの死刑執行を行っている国の一つと考えられていたが、死刑に処せられる犯罪の数は着実に減少している。</p><p>11月20日、同国の国会は麻薬密売、16歳未満に対する強姦、人道に対する罪など6つの犯罪に対する死刑を廃止する改正刑法を承認した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>来年3月にこの法案が発効すると、国家反逆罪、殺人、テロリズム、違法麻薬製造の4つの犯罪だけが死刑の対象となり、1997年の44件から減少する。</p><p>ハノイは死刑を完全に廃止する意向をほとんど示していないが、依然として定期的に囚人を処刑している国のうち、法的適用をこれほど大幅に狭めている国はほとんどない。</p><p>この改革は、ベトナムの与党共産党が政治的反対派や独立した市民社会に対する弾圧を強化している中で行われたことを考えると、特に顕著である。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Vietnam , a country once considered one of the world's most prolific executioners, is steadily reducing the number of crimes punishable by death.</p><p>On November 20, the country's National Assembly approved a revised Penal Code that abolishes capital punishment for six offenses, including drug trafficking, rape of a person under the age of 16 and crimes against humanity.</p><p>When the legislation takes effect next March, just four offences — treason, murder, terrorism and illegal drug production — will remain punishable by death, down from 44 in 1997.</p><p>Although Hanoi has given little indication that it intends to do away with capital punishment entirely, few countries that still regularly execute prisoners have narrowed its legal application so considerably.</p><p>The reforms are particularly striking given that they come as Vietnam's ruling Communist Party has intensified its crackdown on political dissent and independent civil society .</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/is-authoritarian-vietnam-ready-to-phase-out-the-death-penalty/a-80064271?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/26 19:25</span>
+    </div>
+
+    
+    <p class="title-ja">ミャンマー、ICJ大量虐殺判決の一部に従うことを拒否</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c61wr87wyg5wo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Myanmar refuses to comply with parts of ICJ genocide ruling</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ミャンマーは国際司法裁判所（ICJ）による大量虐殺判決の「不適切な」部分には従わないと、同国の指導者ミン・アウン・フライン氏が判決後初めてのパブリックコメントで述べた。</p><p>ICJの画期的な判決は先週、数千人が死亡、70万人以上が避難を余儀なくされた2017年の軍事弾圧で少数民族ロヒンギャに対する大量虐殺を行ったとしてミャンマーに有罪判決を下した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ミャンマーは大量虐殺を否定し、自国軍は武装勢力の攻撃に対応したと述べた。 1948年の大量虐殺条約に違反していることが判明した初めての州だ。</p><p>国営メディアの報道によると、ミン・アウン・フライン氏は「『大量虐殺』という言葉は国の評判に深刻な影響を与えた」と述べた。</p><p>国営メディアによると、クーデター指導者から大統領に転身したミャンマーは水曜日の会議で、「ミャンマーは責任ある国として適切な行動を取るだろうが、不適切とみなした要求には従わない」と述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Myanmar will not comply with "inappropriate" parts of the genocide ruling by the International Court of Justice (ICJ), its leader Min Aung Hlaing has said in his first public comments since the court decision.</p><p>The ICJ's landmark ruling last week found Myanmar guilty of committing genocide against its Rohingya minority in a 2017 military crackdown that killed thousands and forced more than 700,000 to flee.</p><p>Myanmar denied committing genocide, saying its forces had responded to attacks by armed groups. It is the first state to have been found in violation of the 1948 Genocide Convention.</p><p>Min Aung Hlaing said "the term 'genocide' had seriously affected the country's reputation", state media report.</p><p>"Myanmar would take actions appropriate for a responsible country but would not comply with requirements it considered inappropriate," the country's coup leader-turned-president said at a meeting on Wednesday, according to state media.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c61wr87wyg5wo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/25 18:44</span>
+    </div>
+
+    
+    <p class="title-ja">中国、政治局員と上海党書記の陳吉寧を捜査</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/25/nx-s1-6053801/china-investigation-politburo-shanghai-party" target="_blank" rel="noopener">China investigates Politburo member and Shanghai party chief Chen Jining</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ファイル - 2025年3月6日、北京ホテルで開催された全人代の傍ら、政府活動報告の審議に出席する上海市共産党書記の陳済寧。ン・ハン・グアン/AP キャプションを隠す</p><p>バンコク - 中国の汚職防止監視団体は火曜日、中国共産党当局が党規律違反の疑いで上海市党書記の陳吉寧を捜査していると発表した。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>同政治局員は、習近平国家主席の長期にわたる反汚職キャンペーンのターゲットとなった最新の高官であり、その範囲や深度が衰える気配はない。</p><p>陳氏は中央規律検査委員会の調査を受けている。中国中央規律検査委員会の短い発表では、それ以上の詳細は明らかにされていない。</p><p>上海市政府が発表した声明では、中国共産党上海委員会常務委員会が陳氏の調査決定に対して「断固とした支持を表明した」と述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>FILE - Chen Jining, Communist Party Secretary for Shanghai attends a deliberation on the government work report, on the sideline of the National People's Congress at the Beijing Hotel, March 6, 2025. Ng Han Guan/AP hide caption</p><p>BANGKOK — Chinese Communist Party authorities are investigating Shanghai party secretary Chen Jining for suspected violations of party discipline, China's anti-corruption watchdog said Tuesday.</p><p>The Politburo member is the latest senior official targeted in President Xi Jinping's long-running anti-corruption campaign, which has shown no signs of letting up in scope or depth.</p><p>Chen is under investigation by the Central Commission for Discipline Inspection. The brief announcement by China's Central Commission for Discipline Inspection provided no further details.</p><p>A statement released by the Shanghai city government said the Standing Committee of the Shanghai Committee of the CCP "expressed firm support" for the decision to investigate Chen.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/25/nx-s1-6053801/china-investigation-politburo-shanghai-party" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="americas">米州</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge aj">Al Jazeera</span>
+      <span class="story-time">11/27 03:27</span>
+    </div>
+
+    
+    <p class="title-ja">トランプ大統領、中間選挙前に発表されたGDP統計を「偽物」と呼び、調査を要求</p>
+    <p class="title-en"><a href="https://www.aljazeera.com/economy/2026/11/26/trump-calls-gdp-data-released-before-midterms-fake-demands-investigation?traffic_source=rss" target="_blank" rel="noopener">Trump calls GDP data released before midterms ‘fake’, demands investigation</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ドナルド・トランプ米大統領は、中間選挙前に商務省が意図的に誤った経済成長率を発表したと非難し、調査を開始したいと述べた。</p><p>トランプ大統領は、感謝祭の祝日でオフィスや株式市場が閉鎖されていた木曜日にコメントした。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>米商務省経済分析局は水曜日、第3四半期の年率成長率を10月29日に発表した事前予想の3.4％から最大4.3％に上方修正した。トランプ大統領の共和党は11月3日の選挙で大敗を喫した。</p><p>トランプ大統領は真実ソーシャルへの投稿で、「選挙前に公表された経済に関する本当の数字が偽物だったことがたった今明らかになった」と述べ、告発の証拠は示さなかった。</p><p>「なぜ選挙前に正しい数字が発表されなかったのか。私はこの状況の即時調査を求めている。これは小さな間違いではなく、大規模かつ意図的な間違いだ」と同氏は述べた。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>United States President Donald Trump has accused his Department of Commerce of purposely issuing incorrect economic growth figures before the midterm elections and says he wants to launch an investigation.</p><p>Trump made his comments on Thursday when offices and stock markets were closed for the Thanksgiving holiday.</p><p>The US Commerce Department’s Bureau of Economic Analysis on Wednesday revised third-quarter annualised growth up to 4.3 percent from the advance estimate of 3.4 percent it announced on October 29. Trump’s Republican Party suffered heavy losses in the November 3 elections.</p><p>“It was just revealed that the REAL Numbers on the Economy, published before the Election, were FAKE,” Trump said in a Truth Social post without providing evidence for the accusation.</p><p>“Why wasn’t the correct number issued before the Election? I am asking for an immediate investigation of this situation. This is not a small error, this is a massive, and purposeful, error,” he said.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.aljazeera.com/economy/2026/11/26/trump-calls-gdp-data-released-before-midterms-fake-demands-investigation?traffic_source=rss" target="_blank" rel="noopener">
+      記事全文を読む(Al Jazeera) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/27 01:01</span>
+    </div>
+
+    
+    <p class="title-ja">カリフォルニアでは異常な潮汐と高さ9メートル近くの波が海岸に打ち寄せる</p>
+    <p class="title-en"><a href="https://www.france24.com/en/video/20261126-in-california-exceptional-tides-and-nearly-9m-high-waves-batter-the-coast" target="_blank" rel="noopener">In California, exceptional tides and nearly 9m-high waves batter the coast</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米国：水曜日、強力な波と大潮により、サンフランシスコ南部のパシフィカの桟橋の一部が破壊された。マリン郡では当局が一時避難命令を出し、人々にビーチに近づかないよう呼び掛けた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>USA: Powerful waves and king tides destroyed part of a pier in Pacifica, south of San Francisco, on Wednesday. In Marin County, authorities issued a temporary evacuation order and urged people to stay away from the beach.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/video/20261126-in-california-exceptional-tides-and-nearly-9m-high-waves-batter-the-coast" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge bbc">BBC</span>
+      <span class="story-time">11/26 23:35</span>
+    </div>
+
+    
+    <p class="title-ja">米国の妊娠中の受刑者、診察後に刑務所の車両で逃走</p>
+    <p class="title-en"><a href="https://www.bbc.co.uk/news/articles/c9m2jke85xzxo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">Pregnant US inmate escapes in prison vehicle after medical appointment</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>米国ニューメキシコ州で、妊婦の受刑者が出産前診察から刑務所に戻る途中に警察車両を掌握し、拘留先から逃走したと同州矯正局が発表した。</p><p>地元メディアの報道によると、レベッカ・テイラーさん（26歳）は、彼女ともう一人の受刑者を輸送していたチームが食料を調達するためにアルバカーキで停車した際に、ダッジ・ジャーニーのハンドルを握り、そのまま走り去った。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>ニューメキシコ州矯正局は、車両と彼女の刑務所用ジャンプスーツは後に回収されたが、テイラーさんは今も逃走中であると発表した。</p><p>同省はフェイスブックの声明で、彼女は複数の窃盗と強盗の罪で投獄されていたと発表した。</p><p>地元メディアの報道によると、同じく出生前の診察から戻る途中だった別の受刑者も、テイラーが水曜朝に車を制御したため、車から降りることができたという。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>A pregnant inmate has escaped from custody in the US state of New Mexico, after taking control of a police vehicle while returning to prison from a prenatal appointment, the state's corrections department has said.</p><p>Rebecca Taylor, 26, took control of the Dodge Journey and drove away when the team transporting her and another inmate stopped to pick up food in Albuquerque, local media reported.</p><p>The New Mexico Corrections Department said that the vehicle and her prison jumpsuit were later recovered, but Taylor remains on the run.</p><p>She had been imprisoned for multiple theft and burglary charges, the department said in a Facebook statement.</p><p>Local media reported that another inmate, also travelling back from a prenatal appointment, was able to get out of the car as Taylor took control on Wednesday morning.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.bbc.co.uk/news/articles/c9m2jke85xzxo?at_medium=RSS&at_campaign=rss" target="_blank" rel="noopener">
+      記事全文を読む(BBC) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge npr">NPR</span>
+      <span class="story-time">11/26 22:31</span>
+    </div>
+
+    
+    <p class="title-ja">北朝鮮の金氏、トランプ大統領の申し入れを無視し核兵器をさらに製造すると誓う</p>
+    <p class="title-en"><a href="https://www.npr.org/2026/11/26/g-s1-155955/north-korea-kim-nuclear-weapons-trump" target="_blank" rel="noopener">North Korea's Kim vows to build more nuclear weapons after ignoring Trump's overture</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>北朝鮮政府が提供したこの写真では、2026年11月25日月曜日、北朝鮮の非公開の場所にある兵器級核物質の生産施設を視察する金正恩朝鮮労働党委員長が写っている。朝鮮中央通信社/韓国通信社（AP経由） キャプションを隠す</p><p>ソウル、韓国－北朝鮮の金正恩朝鮮労働党委員長は、最近のアジア訪問中にドナルド・トランプ米大統領からの会談の申し出を無視した数日後、核原料を生産する施設を訪問し、さらなる核兵器の製造を呼びかけた。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>専門家らは、金氏が独裁的統治の根幹である進化する核兵器を誇示し、核開発計画の解体に関する将来の協議への拒否を再確認したいのではないかとしている。</p><p>北朝鮮国営の朝鮮中央通信は木曜日、金氏が核物質生産工場２カ所を視察し、１つは新たに稼働し、もう１つは拡張中であると報じた。 ＫＣＮＡの写真には、金氏と軍高官らが兵器級ウランの製造に使用される遠心分離機とみられる密集した列の間を歩き、弾頭とみられるものが展示されているホールを巡回している様子が映っていた。一部の画像がぼやけていました。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>In this photo provided by the North Korean government, leader Kim Jong Un inspects a facility the government says is for producing weapons-grade nuclear material at an undisclosed location in North Korea, Monday, Nov. 25, 2026. Korean Central News Agency/Korea News Service via AP hide caption</p><p>SEOUL, South Korea — North Korean leader Kim Jong Un visited facilities that produce nuclear ingredients and called for building more nuclear weapons, days after ignoring U.S. President Donald Trump's offer to meet during his recent visit to Asia.</p><p>Experts say Kim likely wants to show off his evolving nuclear arsenal, the backbone of his authoritarian rule, and reaffirm his rejection of any future talks on dismantling his nuclear program.</p><p>The North's official Korean Central News Agency said Thursday that Kim inspected two nuclear materials production factories, one newly inaugurated and the other being expanded. KCNA photos showed Kim and senior military officials walking between dense rows of what appeared to be centrifuges used to produce weapons-grade uranium and touring halls displaying what were believed to be warheads. Some of the images were blurred.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.npr.org/2026/11/26/g-s1-155955/north-korea-kim-nuclear-weapons-trump" target="_blank" rel="noopener">
+      記事全文を読む(NPR) →</a></span>
+  </article>
+  
+  
+  <h2 class="region-head" id="africa">アフリカ</h2>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge f24">France 24</span>
+      <span class="story-time">11/27 01:19</span>
+    </div>
+
+    
+    <p class="title-ja">アフリカ横断: チュニジアの写真家が家族に焦点を当てる</p>
+    <p class="title-en"><a href="https://www.france24.com/en/across-africa-tunisian-photographer-s-family-focus-1" target="_blank" rel="noopener">ACROSS AFRICA:  Tunisian Photographer's Family Focus</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>ジョージア・カルビン・スミスによる大陸の物語。今週、コンゴ民主共和国でのエボラ出血熱流行に対応しようと奮闘している医療従事者らが、自分たちは見捨てられ、支援されていないと感じていると語った。また、ワールドカップは、少なくとも一部のファンにとっては、勝利以上のものでした。チュニジアのパフォーマンスはサポーターが期待したすべてではなかったかもしれないが、スポーツ写真家のホスニ・マヌービ氏は、自国の国際的なスポーツショーを記録する家族の伝統について決して否定的ではない。 [アーカイブ エピソード、2026 年 6 月]</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>Stories from the continent with Georja Calvin-Smith. This week, health workers struggling to keep pace with DR Congo's Ebola outbreak say they feel abandoned and unsupported. Also, the World Cup was about more than winning... for some fans, at least. Tunisia's performance may not have been all that its supporters had hoped, but sports photographer Hosni Manoubi is far from negative about a family tradition of documenting his country's international sports showings. [Archive Episode, June 2026]</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.france24.com/en/across-africa-tunisian-photographer-s-family-focus-1" target="_blank" rel="noopener">
+      記事全文を読む(France 24) →</a></span>
+  </article>
+  
+  <article class="story">
+    <div class="story-meta">
+      <span class="badge dw">DW</span>
+      <span class="story-time">11/27 00:04</span>
+    </div>
+
+    
+    <p class="title-ja">アフリカの反対派の声は高まる圧力に直面している</p>
+    <p class="title-en"><a href="https://www.dw.com/en/africa-s-opposition-voices-face-growing-pressure/a-80063893?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">Africa's opposition voices face growing pressure</a></p>
+    
+
+    
+    <div class="body-ja">
+      <p>カメルーンやタンザニアからモザンビーク、ナイジェリア、ザンビアに至るまで、野党指導者らは当局が法的措置や公共活動の制限を通じて政治的自由を制限していると非難している。</p><p>いずれの場合も当局者らは、この措置は国内法や安全保障規定に基づいて正当化されると述べている。</p>
+    </div>
+    
+
+    
+    <details>
+      <summary>続きを読む</summary>
+      
+      <div class="more-ja">
+        <p>「カメルーンは非常に敏感で、いつ政府を批判すべきか、いつ公然と政府を批判すべきではないかを知ることが重要だ」と中央アフリカの国国民、ンガム・グローリー・アニ・ムボム氏は語った。</p><p>彼女は、逮捕や暴力への恐怖が政治参加を妨げると述べた。 「野党支持者が自由に国民に意見を表明できない状況では、民主主義について語ることはできません」と彼女はDWに語った。</p><p>カメルーンの野党社会民主戦線のンダ・グリンバルド副書記長にとって、最大の障害の一つは公開集会の開催だ。</p>
+      </div>
+      
+      
+      <p class="orig-label">Original (English)</p>
+      <div class="orig">
+        <p>From Cameroon and Tanzania to Mozambique, Nigeria and Zambia, opposition leaders have accused authorities of limiting political freedoms through legal action and restrictions on public activity.</p><p>In each case, officials have said the measures are justified under national laws and security provisions.</p><p>" Cameroon is very sensitive, and it is important that we know when to criticize the government and when not to criticize the government openly," said Ngam Glory Ani Mbom, a citizen of the central African country.</p><p>She said fear of arrest and violence discourage political participation. "You cannot talk about democracy when opposition supporters cannot freely express their minds to the public," she told DW.</p><p>For Ndah Grimbald, deputy secretary-general of Cameroon's opposition Social Democratic Front, one of the biggest obstacles is organizing public meetings.</p>
+      </div>
+      
+    </details>
+    
+
+    <span class="read-more"><a href="https://www.dw.com/en/africa-s-opposition-voices-face-growing-pressure/a-80063893?maca=en-rss-en-world-4025-rdf" target="_blank" rel="noopener">
+      記事全文を読む(DW) →</a></span>
+  </article>
+  
+  
+</main>
+<footer>
+  このページは GitHub Actions により毎日19:00(JST)に自動生成されています。
+  日本語部分は記事冒頭を機械翻訳したもので、正確性は原文をご確認ください。<br>
+  出典:
+  <a href="https://www.bbc.com/news/world" target="_blank" rel="noopener">BBC</a> /
+  <a href="https://www.aljazeera.com/" target="_blank" rel="noopener">Al Jazeera</a> /
+  <a href="https://www.theguardian.com/world" target="_blank" rel="noopener">The Guardian</a> /
+  <a href="https://www.dw.com/en/" target="_blank" rel="noopener">DW</a> /
+  <a href="https://www.france24.com/en/" target="_blank" rel="noopener">France 24</a> /
+  <a href="https://www.npr.org/sections/world/" target="_blank" rel="noopener">NPR</a>
+</footer>
+
+<script>
+(function () {
+  var ARCHIVE_PREFIX = "";
+  var CURRENT_DATE = "2026-11-27";
+  var WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
+
+  var sidebar = document.getElementById("sidebar");
+  var overlay = document.getElementById("side-overlay");
+  var btn = document.getElementById("menu-btn");
+  function closeSide() { sidebar.classList.remove("open"); overlay.classList.remove("show"); }
+  btn.addEventListener("click", function () {
+    sidebar.classList.toggle("open");
+    overlay.classList.toggle("show", sidebar.classList.contains("open"));
+  });
+  overlay.addEventListener("click", closeSide);
+
+  fetch(ARCHIVE_PREFIX + "list.json", { cache: "no-store" })
+    .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(function (dates) {
+      var box = document.getElementById("datelist");
+      box.innerHTML = "";
+      if (!dates.length) {
+        box.innerHTML = '<p class="side-note">アーカイブはまだありません</p>';
+        return;
+      }
+      var lastMonth = "";
+      dates.forEach(function (d, idx) {
+        var parts = d.split("-");
+        var y = parts[0], m = parseInt(parts[1], 10), day = parseInt(parts[2], 10);
+        var monthKey = y + "年" + m + "月";
+        if (monthKey !== lastMonth) {
+          var h = document.createElement("p");
+          h.className = "side-month";
+          h.textContent = monthKey;
+          box.appendChild(h);
+          lastMonth = monthKey;
+        }
+        var wd = WEEKDAYS[new Date(y + "-" + parts[1] + "-" + parts[2] + "T00:00:00").getDay()];
+        var a = document.createElement("a");
+        a.className = "date-link" + (d === CURRENT_DATE ? " active" : "");
+        a.href = ARCHIVE_PREFIX + d + ".html";
+        a.textContent = m + "/" + day + " (" + wd + ")" + (idx === 0 ? " ・最新" : "");
+        box.appendChild(a);
+      });
+    })
+    .catch(function () {
+      document.getElementById("datelist").innerHTML =
+        '<p class="side-note">一覧を読み込めませんでした</p>';
+    });
+})();
+</script>
+</body>
+</html>
